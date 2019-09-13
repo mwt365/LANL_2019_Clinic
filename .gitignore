@@ -1,2 +1,3 @@
 .DS_Store
 *.dig
+__pycache__/
