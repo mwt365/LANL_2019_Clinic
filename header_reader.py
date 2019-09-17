@@ -69,9 +69,12 @@ def preprocess(filename):
     if filename is None:
         print("could not find file, exiting...")
         return None
-    else:
+    elif filename in os.listdir("."):
         wave_info = wave_spec_to_dict(filename)
         print(wave_info)
+    else:
+    	print(filename,' not found!')
+    	return None
 
 
 def main():
@@ -84,7 +87,6 @@ def main():
 	else:
 		for file in args.files:
 			if file[-3:] != 'dig':
-				print(file[-3:-1])
 				print('Error,', file,' is not .dig file')
 			else:
 				preprocess(file)
