@@ -7,3 +7,5 @@
 3. Perform FFT to get Intensity(frequency)
 
 4. pip install pycodestyle (for PEP8 linting)
+
+Usage for linting: Must install pipenv first, then run pipenv shell; pipenv install

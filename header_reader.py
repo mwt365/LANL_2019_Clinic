@@ -36,7 +36,7 @@ def wave_spec_to_dict(filename):
     waveform captured by the oscilloscope.
     """
     strings = instrument_spec_codes.keys()
-    header_limit = 11
+    # header_limit = 11
     current_line = 0
     f = open(filename, 'rb')
     lines_byte = f.readlines(256)
@@ -73,30 +73,30 @@ def preprocess(filename):
         wave_info = wave_spec_to_dict(filename)
         print(wave_info)
     else:
-    	print(filename,' not found!')
-    	return None
+        print(filename, ' not found!')
+        return None
 
 
 def main():
-	if args.files == []:
-	    for file_ in os.listdir("."):
-	        print(file_)
-	        if file_.endswith(".dig"):
-	            dig_file = file_
-	            preprocess(dig_file)
-	else:
-		for file in args.files:
-			if file[-3:] != 'dig':
-				print('Error,', file,' is not .dig file')
-			else:
-				preprocess(file)
+    if args.files == []:
+        for file_ in os.listdir("."):
+            print(file_)
+            if file_.endswith(".dig"):
+                dig_file = file_
+                preprocess(dig_file)
+    else:
+        for file in args.files:
+            if file[-3:] != 'dig':
+                print('Error,', file, ' is not .dig file')
+            else:
+                preprocess(file)
 
 
 parser = argparse.ArgumentParser(description='Accept files to be processed.')
-parser.add_argument('files', metavar='F', type=str, nargs='*',help='A list of file names. Seperate with spaces.')
+parser.add_argument('files', metavar='F', type=str, nargs='*',
+                    help='A list of file names. Seperate with spaces.')
 args = parser.parse_args()
 # print(args.files)
-
 
 
 if __name__ == '__main__':
