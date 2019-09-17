@@ -7,12 +7,12 @@ with open("GEN3CH_4_009.dig", "rb") as test_file:
 		output = open("guru99.txt","w+")
 		output.write(words)
 		print (len(data))
-		print(struct.calcsize('H'))
+		print(struct.calcsize('B'))
 		# for i in range(int(len(data)/2)):
 		# 	if (len(data) >2):
 		intArray = []
 		print(len(data))
-		intArray += struct.unpack("B" * (len(data) -512), data[512:-5])
+		intArray += struct.unpack(">B", data[2:3])
 		print(intArray)
 		# strInt = str(ints[1])
 		# output.write(strInt)
