@@ -75,20 +75,28 @@ def preprocess(filename):
 
 
 def main():
-    for file_ in os.listdir("."):
-        print(file_)
-        if file_.endswith(".dig"):
-            dig_file = file_
-            preprocess(dig_file)
+	if args.files == []:
+	    for file_ in os.listdir("."):
+	        print(file_)
+	        if file_.endswith(".dig"):
+	            dig_file = file_
+	            preprocess(dig_file)
+	else:
+		for file in args.files:
+			if file[-3:] != 'dig':
+				print(file[-3:-1])
+				print('Error,', file,' is not .dig file')
+			else:
+				preprocess(file)
 
 
 parser = argparse.ArgumentParser(description='Accept files to be processed.')
 parser.add_argument('files', metavar='F', type=str, nargs='*',help='A list of file names. Seperate with spaces.')
 args = parser.parse_args()
-print(args)
+# print(args.files)
 
 
 
 if __name__ == '__main__':
 
-    pass
+    main()
