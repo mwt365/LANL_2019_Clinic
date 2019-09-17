@@ -4,6 +4,7 @@
 Program for processing digilink files.
 """
 import os
+import argparse
 
 
 instrument_spec_codes = {
@@ -81,6 +82,13 @@ def main():
             preprocess(dig_file)
 
 
+parser = argparse.ArgumentParser(description='Accept files to be processed.')
+parser.add_argument('files', metavar='F', type=str, nargs='*',help='A list of file names. Seperate with spaces.')
+args = parser.parse_args()
+print(args)
+
+
+
 if __name__ == '__main__':
 
-    main()
+    pass
