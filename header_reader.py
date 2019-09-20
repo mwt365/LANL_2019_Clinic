@@ -75,7 +75,6 @@ def preprocess(filename):
 
 def main():
     for file_ in os.listdir("."):
-        print(file_)
         if file_.endswith(".dig"):
             dig_file = file_
             preprocess(dig_file)
