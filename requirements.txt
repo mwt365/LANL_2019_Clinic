@@ -1,4 +1,10 @@
+# packages that must be installed for running code in the repository.
+# add them here if I missed any. 
+
 numpy
 pycodestyle
 pytest
-
+scipy 
+matplotlib 
+jupyter 
+pandas 
