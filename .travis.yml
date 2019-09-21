@@ -4,6 +4,7 @@ python:
 branches:
   only:
     - trevor
+    - master
 cache: pip
 install: "pip install -r requirements.txt"
 script: python tests.py
