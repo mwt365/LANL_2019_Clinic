@@ -20,7 +20,7 @@ def make_dig_file(filename, tvals, vvals, dt=20e-12):
     # For a segment that is ramping from v0 to v1 over an interval Δt,
     # the phase is a parabolic function of time.
     segments = []
-    wavelength = 1550e-9  # m
+    wavelength = 1550e-9  # meters
     t, nsamp = tvals[0], 0
     phi0 = 0.0
     for nsegment in range(len(tvals) - 1):
