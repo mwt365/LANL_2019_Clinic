@@ -25,15 +25,24 @@ def save_as_dig(filename, vvals, datatype, dt=20e-12, initialTime=0, voltageMult
             The rest of the file will be writing the datapoints in binary.
     """
     dataformat = ""
-    if datatype == '8' or datatype == np.dtype("ubyte"):
+    if type(datatype) == type(str("example")) or type(datatype) == type('8'):
+        if datatype == '8':
+            dataformat = '8'
+            datatype = np.dtype("ubyte")
+        elif datatype == '16':
+            dataformat = '16'
+            datatype = np.dtype("int16")
+        elif datatype == '32':
+            dataformat = '32'
+            datatype = np.dtype("int32")
+        else:
+            raise ValueError("datatype corresponds to an unsupported data type.")
+    elif datatype == np.dtype("ubyte"):
         dataformat = '8'
-        datatype = np.dtype("ubyte")
-    elif datatype == '16' or datatype == np.dtype("int16"):
+    elif datatype == np.dtype("int16"):
         dataformat = '16'
-        datatype = np.dtype("int16")
-    elif datatype == '32' or datatype == np.dtype("int32"):
+    elif datatype == np.dtype("int32"):
         dataformat = '32'
-        datatype = np.dtype("int32")
     else:
         raise ValueError("datatype corresponds to an unsupported data type.")
 
