@@ -54,12 +54,12 @@ def save_as_dig(filename, vvals, datatype, dt=20e-12, initialTime=0, voltageMult
         f.write(" " * 512)  # write 512 bytes of spaces
         stuff = "\r\n".join([
             "Fri Sep 20 08:00:00 2019", # todays date Day Mon NumDay HH:MM:SS: YEAR
-            nsamples, # the number of samples used.
-            dataformat, # format for the data to be read as.
-            dt, # Time step between datapoints.
-            initialTime,
-            voltageMultiplier,
-            voltageOffset # Voltage zero
+            str(nsamples), # the number of samples used.
+            str(dataformat), # format for the data to be read as.
+            str(dt), # Time step between datapoints.
+            str(initialTime),
+            str(voltageMultiplier),
+            str(voltageOffset) # Voltage zero
         ])
         f.write(stuff + "\r\n")
         f.write(" " * (510 - len(stuff)))
