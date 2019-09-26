@@ -23,7 +23,7 @@ instrument_spec_codes = {
     'YMU': 'vertical_scale_factor',
     'YOF': 'vertical_offset',
     'YZE': 'vertical_offset_y_component',
-    'NR_FR': 'NR_FR'
+    'NR_FR': 'number_frames'
 }
 
 
