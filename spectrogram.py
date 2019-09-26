@@ -57,7 +57,7 @@ class Spectrogram:
         if self.digfile:
             self.load_dig_file()
         else:
-            raise ValueError(f"I don't understand files with extension {ext}")
+            print(f"I don't understand files with extension {ext}")
 
     @property
     def digfile(self):
@@ -161,16 +161,6 @@ class Spectrogram:
             f"{self.t0*1e6} µs to {(self.t0 + self.dt*self.samples)*1e6} µs in steps of {self.dt*1e12} ps"
         ])
 
-    def __repr__(self):
-        """ How we should represent a Spectrogram when we print it. 
-        """
-
-        output = "This spectrogram was generated from" + self.filename + ".\n"
-        output += "The specs for the instrument were as follows: \n"
-        output += self.notes.items().__repr__()
-        return output
-
-
     def values(self, tStart, ending):
         """
         Return a numpy array with the properly normalized voltages corresponding to this segment.
@@ -183,11 +173,14 @@ class Spectrogram:
             nSamples = ending
         else:
             nSamples = self.point_number(ending)
+        """
         with open(self.path, 'rb') as f:
             f.seek(offset)
             buff = f.read(nSamples * self.bytes_per_point)
+        """
+        raw = np.fromfile(self.path, self.data_format)[int(tStart):int(tStart+nSamples)]
 
-        raw = np.frombuffer(buff, self.data_format, nSamples, 0)
+        #raw = np.frombuffer(buff, self.data_format, nSamples, 0)
         return raw * self.dV + self.V0
 
     def time_values(self, tStart, ending):
@@ -225,7 +218,6 @@ class Spectrogram:
             1.0 / self.dt,  # the sample frequency
             # ('tukey', 0.25),
             nperseg=fftSize,
-            noverlap=None,
         )
         times += tStart
         # Convert to a logarithmic representation and use floor to attempt
@@ -245,13 +237,19 @@ class Spectrogram:
         plt.figure()
         plt.ylabel('Velocity (m/s)')
         plt.xlabel('Time (s)')
+        title = f"{self.filename} with a sliding window of "
         if 'max_vel' in kwargs:
             plt.ylim(top=kwargs['max_vel'])
+        if 'sample_window' in kwargs:
+            title += f"{kwargs['sample_window']} no overlap:"
         options = {}
         for key, val in kwargs.items():
-            if key == 'max_vel': continue
+            if key == 'max_vel' or key == 'sample_window': continue
             options[key] = val
+        if "cmap" in options.keys():
+            title += f"cmap: {options[key]}"
+            plt.title(title)
         plt.pcolormesh(sgram['t'], sgram['v'], sgram['spectrogram'], **options)
         plt.colorbar()
 
-
+        plt.show()
