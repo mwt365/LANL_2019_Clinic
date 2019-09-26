@@ -61,9 +61,3 @@ def save_as_dig(filename, vvals, datatype, dt=20e-12, initialTime=0, voltageMult
             f.write(vals.tobytes())
         f.close()
 
-if __name__ == '__main__':
-    make_dig_file(
-        "test.dig",
-        [0, 1e-5, 2e-5, 4e-5],
-        [1000, 1000, 5000, 3000]
-    )
