@@ -57,7 +57,7 @@ class Spectrogram:
         if self.digfile:
             self.load_dig_file()
         else:
-            print(f"I don't understand files with extension {ext}")
+            raise ValueError(f"I don't understand files with extension {ext}")
 
     @property
     def digfile(self):
@@ -160,6 +160,16 @@ class Spectrogram:
             f"{self.bits} bits" + f" {self.notes['byte_order']} first" if 'byte_order' in self.notes else "",
             f"{self.t0*1e6} µs to {(self.t0 + self.dt*self.samples)*1e6} µs in steps of {self.dt*1e12} ps"
         ])
+
+    def __repr__(self):
+        """ How we should represent a Spectrogram when we print it. 
+        """
+
+        output = "This spectrogram was generated from" + self.filename + ".\n"
+        output += "The specs for the instrument were as follows: \n"
+        output += self.notes.items().__repr__()
+        return output
+
 
     def values(self, tStart, ending):
         """
