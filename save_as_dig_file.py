@@ -57,7 +57,7 @@ def save_as_dig(filename, vvals, datatype, dt=20e-12, initialTime=0, voltageMult
         f.close()
     with open(filename, 'ab') as f:
         for val in vvals:           
-            vals = np.asarray(amp * seg, dtype=datatype)
+            vals = np.array(val, dtype = datatype)
             f.write(vals.tobytes())
         f.close()
 
