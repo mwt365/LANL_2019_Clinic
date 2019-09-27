@@ -69,7 +69,7 @@ class Spectrogram:
 
     @property
     def digfile(self):
-        "Is this Spectrogram drawn from a .dig file?"
+        """Is this Spectrogram drawn from a .dig file?"""
         return self.ext == 'dig'
 
     def load_dig_file(self):
@@ -80,12 +80,13 @@ class Spectrogram:
         holds a list of values separated by carriage return-linefeed
         delimiters. The remaining space is padded with null bytes.
         """
-        text = open(self.path, 'rb').read(1024).decode('ascii')
-        top = [x.strip() for x in text[:512].replace(
+        headerLength = 1024
+        text = open(self.path, 'rb').read(headerLength).decode('ascii')
+        top = [x.strip() for x in text[:headerLength // 2].replace(
             "\000", "").split('\r\n') if x.strip()]
         self.decode_dig_header(top)
 
-        bottom = [x.strip() for x in text[512:].replace(
+        bottom = [x.strip() for x in text[headerLength // 2:].replace(
             "\000", "").split('\r\n') if x.strip()]
         self.headers = top
 
@@ -181,9 +182,12 @@ class Spectrogram:
         else:
             nSamples = 1 + \
                 self.point_number(ending) - self.point_number(tStart)
+
         with open(self.path, 'rb') as f:
             f.seek(offset)
             buff = f.read(nSamples * self.bytes_per_point)
+
+        # raw = np.fromfile(self.path, self.data_format)[int(tStart):int(tStart+nSamples)]
 
         raw = np.frombuffer(buff, self.data_format, nSamples, 0)
         return raw * self.dV + self.V0

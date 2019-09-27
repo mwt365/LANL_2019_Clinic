@@ -63,6 +63,7 @@ class Spectrum:
         plt.xlabel(x[1])
         plt.ylabel(y[1])
 
+        plt.show()
     def save(self):
         """
         We should provide a sensible way to export. What file formats 
