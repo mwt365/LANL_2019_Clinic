@@ -13,19 +13,24 @@ import ipywidgets as widgets
 from IPython.display import display
 
 from spectrogram import Spectrogram
+from plotter import COLORMAPS
+
+DEFMAP = '3w_gby'  # should really be in a preferences file
 
 
 class PercentSlider(widgets.IntRangeSlider):
     """
     A Slider to represent the percentage of a range that we
-    wish to display. 
+    wish to display. The slider maps linearly over the range
+    specified by yrange = (ymin, ymax). Getters and setters
+    are defined for ymin, ymax, and range.
     """
 
     def __init__(self, description, initial_value, yrange):
         super().__init__(
             description=description,
             min=0, max=100, readout=True,
-            initial_value=initial_value,
+            value=initial_value,
             layout=widgets.Layout(width='400px')
         )
         self._ymin = yrange[0]
@@ -68,9 +73,13 @@ class SpectrogramWidget:
         """
         blah
         """
-        assert isinstance(
-            spectrogram, Spectrogram), "You must pass in a Spectrogram"
-        sg = self.spectrogram = spectrogram
+        if isinstance(spectrogram, str):
+            sg = self.spectrogram = Spectrogram(spectrogram)
+        else:
+            assert isinstance(
+                spectrogram, Spectrogram), "You must pass in a Spectrogram"
+            sg = self.spectrogram = spectrogram
+
         self.title = sg.filename.split('/')[-1].replace("_", "\\_")
         # handle the keyword arguments here
 
@@ -78,6 +87,7 @@ class SpectrogramWidget:
         self.sgram = sg.spectrogram(sg.t0, sg.t_final)
 
         # Create the figure to display this spectrogram
+        # It would be nice to make this bigger!
         gspec = {
             'width_ratios': [1.5, 6],
             'height_ratios': [5, ],
@@ -85,6 +95,14 @@ class SpectrogramWidget:
         self.fig, axes = plt.subplots(nrows=1, ncols=2, sharey=True,
                                       squeeze=True, gridspec_kw=gspec)
         self.axSpectrum, self.axSpectrogram = axes
+
+        # At the moment, clicking on the image updates the spectrum
+        # shown on the left axes. It would be nice to be more sophisticated and
+        # allow for more sophisticated interactions, including the ability
+        # to display more than one spectrum.
+        self.fig.canvas.mpl_connect(
+            'button_press_event', lambda x: self.handle_click(x))
+        self.spectrum(None)
 
         self.image = None     # we will set in update_spectrogram
         self.colorbar = None  # we will set this on updating, based on the
@@ -107,8 +125,9 @@ class SpectrogramWidget:
 
         cd['t_range'] = PercentSlider(
             "Time Range", (0, 25), (sg.t0, sg.t_final))
+        cd['t_range'].continuous_update = False
         cd['t_range'].observe(
-            lambda x: self.update_spectrogram(), names="value")
+            lambda x: self.do_update(x), names="value")
 
         cd['velocity_range'] = PercentSlider(
             "Velocity Range",
@@ -125,9 +144,21 @@ class SpectrogramWidget:
         )
         cd['intensity_range'].observe(lambda x: self.update_color_range(),
                                       names="value")
+
+        cd['color_map'] = widgets.Dropdown(
+            options=sorted(COLORMAPS.keys()),
+            value='3w_gby',
+            description='Color Map',
+            disabled=False,
+        )
+        cd['color_map'].observe(lambda x: self.update_cmap(), names="value")
+
         self.controls = widgets.HBox([
             widgets.VBox([
                 cd['t_range'], cd['velocity_range'], cd['intensity_range']
+            ]),
+            widgets.VBox([
+                cd['color_map'],
             ])
         ])
 
@@ -135,6 +166,9 @@ class SpectrogramWidget:
         if var in self.individual_controls:
             return self.individual_controls[var].range
         return None
+
+    def do_update(self, what):
+        self.update_spectrogram()
 
     def update_spectrogram(self):
         """
@@ -150,20 +184,31 @@ class SpectrogramWidget:
         self.individual_controls['intensity_range'].range = (cmin, cmax)
 
         # if we have already displayed an image, remove it
-        if self.image:
-            self.axSpectrogram.remove(self.image)
         if self.colorbar:
-            self.axSpectrogram.remove(self.colorbar)
+            self.colorbar.remove()
+            self.colorbar = None
+        if self.image:
+            self.image.remove()
+            self.image = None
+
         self.image = self.axSpectrogram.pcolormesh(
             self.sgram['t'] * 1e6,  # time, in microseconds
             self.sgram['v'],
-            self.sgram['spectrogram']  # need to deal with colormap
+            self.sgram['spectrogram']
         )
+
         self.colorbar = self.fig.colorbar(self.image, ax=self.axSpectrogram)
 
         self.axSpectrogram.set_title(self.title)
         self.axSpectrogram.set_xlabel('Time ($\mu$s)')
         self.axSpectrum.set_ylabel('Velocity (m/s)')
+        self.update_velocity_range()
+        self.update_color_range()
+        self.update_cmap()
+
+    def update_cmap(self):
+        mapname = self.individual_controls['color_map'].value
+        self.image.set_cmap(COLORMAPS[mapname])
 
     def update_velocity_range(self):
         vmin, vmax = self.range('velocity_range')
@@ -173,101 +218,23 @@ class SpectrogramWidget:
     def update_color_range(self):
         self.image.set_clim(self.range('intensity_range'))
 
-    def plotter(self):
-        """
-        Generate an interactive spectrogram object inside a jupyter notebook.
-        We will put the control panel on top, and the spectrogram underneath.
-        Controls:
-            widgets.IntSlider(min=0, max=100, value=20, readout=True)
-            widgets.Text(value='blah', disabled=True, )
-            widgets.BoundedFloatText(...)
-            widgets.ToggleButton
-            widgets.Checkbox
-            widgets.HBox(list of widgets)
-        """
+    def handle_click(self, event):
+        t, v = event.xdata * 1e-6, event.ydata
+        # Compute a spectrum
+        # we should do better about the length
+        self.spectrum(t)
 
-        # we will store the widgets in a dictionary inside the spectrogram object
-        self.widgets = {}
-        w = self.widgets
-
-        self.fig, (ax0, ax1) = plt.subplots(nrows=2, figsize=(10, 10))
-        self.axes = (ax0, ax1)
-        sgram = self.spectrogram(self.t0, self.t_final,
-                                 floor=0, normalize=True, remove_dc=True)
-        self.im = ax0.pcolormesh(sgram['t'] * 1e6,  # convert to microseconds
-                                 sgram['v'],
-                                 sgram['spectrogram']
-                                 )
-        self._sgram = sgram
-        self.cbar = self.fig.colorbar(self.im, ax=ax0)
-        title = self.filename.split('/')[-1]
-        ax0.set_title(title.replace("_", "\\_"))
-        ax0.set_xlabel('Time ($\mu$s)')
-        ax0.set_ylabel('Velocity (m/s)')
-
-        # Let's handle the time range with percentages of the full range
-        w['tRange'] = widgets.IntRangeSlider(
-            description="Time Range",
-            min=0, max=100,
-            value=(0, 50),
-            readout=True,
-            width=400
-        )
-        # Handle the range of the colormap in the same way?
-        w['velRange'] = widgets.IntRangeSlider(
-            description="Velocity Range",
-            min=0, max=100,
-            value=(0, 50),
-            readout=True,
-            width=300
-        )
-        w['zRange'] = widgets.IntRangeSlider(
-            description="Color Range",
-            min=0, max=100,
-            value=(40, 80),
-            readout=True,
-            width=400
-        )
-        w['controls'] = widgets.HBox(
-            [widgets.VBox([
-                w['tRange'],
-                w['velRange'],
-                w['zRange']
-            ]),
-            ])
-
-        # Now set up the linkages
-
-        def remake_image(self):
-            """Use values from all the controls to remake the image"""
-
-            ax0.remove(self.im)
-            ax0.remove(self.cbar)
-            self.im = ax0.pcolormesh(sg['t'] * 1e6,  # convert to microseconds
-                                     sg['v'],
-                                     sg['spectrogram']
-                                     )
-
-        def handle_vel_range(change):
-            vels = self._sgram['v']
-            vals = percentages(change.new, (vels[0], vels[-1]))
-            ax0.set_ylim(*vals)
-
-        def handle_z_range(change):
-            vals = self._sgram['spectrogram']
-            full_limits = np.min(vals), np.max(vals)
-            z_limits = percentages(change.new, full_limits)
-            self.im.set_clim(z_limits)
-
-        def handle_t_range(change):
-            t_limits = percentages(change.new, (self.t0, self.t_final))
-            self._sgram = self.spectrogram(t_limits[0], t_limits[1])
-            self.remake_image()
-
-        w['velRange'].observe(handle_vel_range, names='value')
-        w['zRange'].observe(handle_z_range, names='value')
-        w['tRange'].observe(handle_t_range, names='value')
-        display(w['controls'])
+    def spectrum(self, the_time):
+        if the_time == None:
+            # Initialize the axes
+            self.axSpectrum.plot([0, 1], [0, 1], 'r-')
+        else:
+            the_spectrum = self.spectrogram.spectrum(the_time, 8192)
+            line = self.axSpectrum.lines[0]
+            intensities = the_spectrum.db
+            line.set(xdata=intensities, ydata=the_spectrum.velocities)
+            self.axSpectrum.set_xlim(
+                (np.min(intensities), np.max(intensities)))
 
 
 if __name__ == '__main__':
