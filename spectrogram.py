@@ -51,13 +51,21 @@ class Spectrogram:
         self.V0 = 0.0
         self.dV = 0.0
         self.bits = 8
-        self.samples = 0
+        self.num_samples = 0
         self.wavelength = 1550.0e-9  # this is bad! We should fix it!
         self.notes = dict()
         if self.digfile:
             self.load_dig_file()
         else:
             print(f"I don't understand files with extension {ext}")
+
+    @property
+    def t_final(self):
+        return self.t0 + self.dt * (self.num_samples - 1)
+
+    @property
+    def v_max(self):
+        return self.wavelength * 0.25 / self.dt
 
     @property
     def digfile(self):
@@ -89,7 +97,7 @@ class Spectrogram:
         self.t0 = float(bottom[-3])  # initial time
         self.dt = float(bottom[-4])  # sampling interval
         self.bits = int(bottom[-5])  # 8, 16, or 32
-        self.samples = int(bottom[-6])
+        self.num_samples = int(bottom[-6])
         self.bytes_per_point = self.bits // 8
         self.data_format = {1: np.uint8, 2: np.int16,
                             4: np.int32}[self.bytes_per_point]
@@ -157,7 +165,7 @@ class Spectrogram:
         return "\n".join([
             self.filename,
             f"{self.bits} bits" + f" {self.notes['byte_order']} first" if 'byte_order' in self.notes else "",
-            f"{self.t0*1e6} µs to {(self.t0 + self.dt*self.samples)*1e6} µs in steps of {self.dt*1e12} ps"
+            f"{self.t0*1e6} µs to {(self.t0 + self.dt*self.num_samples)*1e6} µs in steps of {self.dt*1e12} ps"
         ])
 
     def values(self, tStart, ending):
@@ -171,7 +179,8 @@ class Spectrogram:
         if isinstance(ending, int):
             nSamples = ending
         else:
-            nSamples = self.point_number(ending)
+            nSamples = 1 + \
+                self.point_number(ending) - self.point_number(tStart)
         with open(self.path, 'rb') as f:
             f.seek(offset)
             buff = f.read(nSamples * self.bytes_per_point)
@@ -192,6 +201,37 @@ class Spectrogram:
             nSamples = 1 + int((tFinal - tStart) / self.dt)
         return np.linspace(tStart, tFinal, nSamples)
 
+    def normalize(self, array, chunksize=4096, remove_dc=True):
+        """
+        Given an array of periodically sampled points, normalize to a
+        peak amplitude of 1, possibly after removing dc in segments of
+        chunksize.
+        """
+        if remove_dc:
+            num_chunks, num_leftovers = divmod(len(array), chunksize)
+            if num_leftovers:
+                leftovers = array[-num_leftovers:]
+                chunks = array[:num_chunks *
+                               chunksize].reshape((num_chunks, chunksize))
+                avg = np.mean(leftovers)
+                leftovers -= avg
+            else:
+                chunks = array.reshape((num_chunks, chunksize))
+            # compute the average of each chunk
+            averages = np.mean(chunks, axis=1)
+            # shift each chunk to have zero mean
+            for n in range(num_chunks):
+                chunks[n, :] -= averages[n]
+            flattened = chunks.reshape(num_chunks * chunksize)
+            if num_leftovers:
+                flattened = np.concatenate((flattened, leftovers))
+        else:
+            flattened = array
+
+        # Now normalize, making the largest magnitude 1
+        peak = np.max(np.abs(array))
+        return flattened / peak
+
     def spectrum(self, t, nSamples, remove_dc=True):
         """
         Compute a spectrum from nSamples centered at time t
@@ -203,22 +243,34 @@ class Spectrogram:
         raw = self.values(tStart, nSamples)
         return Spectrum(raw, self.dt, remove_dc)
 
-    def spectrogram(self, tStart, tEnd, fftSize=8192, floor=1e-2):
+    def spectrogram(self, tStart, tEnd,
+                    fftSize=8192,
+                    floor=0,
+                    normalize=False,
+                    remove_dc=False
+                    ):
         """
         Compute a spectrogram. This needs work! There need to be
         lots more options that we either want to supply with
         default values or decode kwargs. But it should be a start.
         """
+        vals = self.values(tStart, tEnd)
+        if normalize:
+            vals = self.normalize(
+                vals, chunksize=fftSize, remove_dc=remove_dc)
         freqs, times, spec = signal.spectrogram(
-            self.values(tStart, tEnd),
+            vals,
             1.0 / self.dt,  # the sample frequency
             # ('tukey', 0.25),
             nperseg=fftSize,
-            noverlap=None,
+            noverlap=fftSize // 8,
+            detrend="linear",  # could be constant,
+            scaling="spectrum"
         )
         times += tStart
         # Convert to a logarithmic representation and use floor to attempt
         # to suppress some noise.
+        spec *= 2.0 / (fftSize * self.dt)
         spec = 20 * np.log10(spec + floor)
         # scale the frequency axis to velocity
         velocities = freqs * 0.5 * self.wavelength
@@ -228,19 +280,25 @@ class Spectrogram:
             'spectrogram': spec,
             'fftSize': fftSize,
             'floor': floor
-            }
+        }
 
-    def plot(self, sgram, **kwargs): # max_vel=6000, vmin=-200, vmax=100):
-        plt.figure()
-        plt.ylabel('Velocity (m/s)')
-        plt.xlabel('Time (s)')
+    def plot(self, axes, sgram, **kwargs):
+        # max_vel=6000, vmin=-200, vmax=100):
         if 'max_vel' in kwargs:
-            plt.ylim(top=kwargs['max_vel'])
-        options = {}
-        for key, val in kwargs.items():
-            if key == 'max_vel': continue
-            options[key] = val
-        plt.pcolormesh(sgram['t'], sgram['v'], sgram['spectrogram'], **options)
-        plt.colorbar()
+            axes.set_ylim(top=kwargs['max_vel'])
+            del kwargs['max_vel']
+        pcm = axes.pcolormesh(sgram['t'] * 1e6, sgram['v'],
+                              sgram['spectrogram'], **kwargs)
+        plt.gcf().colorbar(pcm, ax=axes)
+        axes.set_ylabel('Velocity (m/s)')
+        axes.set_xlabel('Time ($\mu$s)')
+        title = self.filename.split('/')[-1]
+        axes.set_title(title.replace("_", "\\_"))
 
 
+if __name__ == '__main__':
+    sp = Spectrogram('sample.dig')
+    print(sp)
+    vals = sp.values(0, 50e-6)
+    normed = sp.normalize(vals)
+    normed.tofile('normed.csv', sep="\n", format="%.6f")
