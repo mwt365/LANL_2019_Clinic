@@ -15,7 +15,7 @@ from IPython.display import display
 from spectrogram import Spectrogram
 from plotter import COLORMAPS
 
-DEFMAP = '3w_gby'  # should really be in a preferences file
+DEFMAP = '3w_gby'  # should really be in an .ini file
 
 
 class PercentSlider(widgets.IntRangeSlider):
@@ -71,7 +71,20 @@ class SpectrogramWidget:
 
     def __init__(self, spectrogram, **kwargs):
         """
-        blah
+        For the widget to behave in a Jupyter notebook, place
+        %matplotlib widget
+        at the top of the notebook. This requires that the package
+        ipympl is installed, which can be done either with pip3
+        or conda install ipympl.
+
+        I also recommend editing ~/.jupyter/custom/custom.css to modify
+        the definition of .container
+
+        .container {
+            width: 100% !important; 
+            margin-right: 40px;
+            margin-left: 40px;
+            }
         """
         if isinstance(spectrogram, str):
             sg = self.spectrogram = Spectrogram(spectrogram)
@@ -201,6 +214,7 @@ class SpectrogramWidget:
 
         self.axSpectrogram.set_title(self.title)
         self.axSpectrogram.set_xlabel('Time ($\mu$s)')
+        self.axSpectrogram.set_xlim(tmin * 1e6, tmax * 1e6)
         self.axSpectrum.set_ylabel('Velocity (m/s)')
         self.update_velocity_range()
         self.update_color_range()
