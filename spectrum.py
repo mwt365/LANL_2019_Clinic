@@ -7,6 +7,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.fftpack import fft
 
+
 class Spectrum:
     """
     Given an array of values corresponding to equally spaced
@@ -51,8 +52,8 @@ class Spectrum:
     @property
     def db(self):
         if hasattr(self, 'epsilon'):
-            return np.log10(self._power + self.epsilon)
-        return np.log10(self._power)
+            return 20.0 * np.log10(self._power + self.epsilon)
+        return 20.0 * np.log10(self._power)
 
     def plot(self, use_db=True, against_v=True):
         x = (self.velocities,
