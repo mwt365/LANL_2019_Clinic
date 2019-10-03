@@ -176,13 +176,14 @@ class Spectrogram:
         The ending argument can be an integer representing the number of points to include,
         or it can be a floating-point number indicating the ending time.
         """
-        if isinstance(ending, int):
-            nSamples = ending
-        else:
+        nSamples = ending
+        if not isinstance(ending, int):
             nSamples = 1 + \
                 self.point_number(ending) - self.point_number(tStart)
 
-        if self.voltage_data == None:
+        if self.voltage_data != None:
+            return self.voltage_data[self.point_number(tStart):int(self.point_number(tStart)+nSamples)]
+        else:
             offset = 1024 if self.digfile else 0
             offset += self.bytes_per_point * self.point_number(tStart)
 
@@ -190,11 +191,13 @@ class Spectrogram:
             with open(self.path, 'rb') as f:
                 f.seek(offset, os.SEEK_SET)
 
-                raw = np.fromfile(self.path, self.data_format)
+                raw = np.fromfile(f, self.data_format) # This may be buggy! Please test!!!!!!
             f.close()
             #raw = np.frombuffer(buff, self.data_format, nSamples, 0)
             self.voltage_data = raw * self.dV + self.V0
-        return self.voltage_data[self.point_number(tStart):int(self.point_number(tStart)+nSamples)]
+            return self.voltage_data[self.point_number(tStart):int(self.point_number(tStart)+nSamples)]
+
+
     def time_values(self, tStart, ending):
         """
         Return an array of time values corresponding to this interval. The arguments
@@ -290,12 +293,56 @@ class Spectrogram:
         }
 
 
-    def extract_velocities(sgram):
+    def extract_velocities(self, sgram):
         """
             Use scipy's peak finding algorithm to calculate the 
             velocity at that time slice.
+        
+            The sgram will come in as a dictionary
+
+            't': times,
+            'v': velocities,
+            'spectrogram': spec,
+            'fftSize': fftSize,
+            'floor': floor            
+        
+
+            spec will be indexed in velocity and then time 
+
+
+            Output:
+                return a list of the velocities of maximum intensity in
+                each time slice.    
         """
-        return
+
+        t = sgram['t']
+        v = sgram['v']
+        spectrogram = sgram['spectrogram']
+        fftSize = sgram['fftSize']
+        floor = sgram['floor']
+
+        # spectrogram needs to be rotated so that it can be indexed with t first.
+
+        timeThenVelocitySpectrogram = np.transpose(spectrogram)
+
+        output = np.zeros(len(t))
+
+        print(v[2048])
+
+        if len(t) != timeThenVelocitySpectrogram.shape[0]:
+            raise ValueError("Our assumption was invalid.")
+
+        for time_index in range(timeThenVelocitySpectrogram.shape[0]):
+            currentVelocityIndex = np.argmax(timeThenVelocitySpectrogram[time_index])
+            
+            print("The current best velocity index is", currentVelocityIndex)
+            print(type(currentVelocityIndex))
+
+            output[time_index] = v[currentVelocityIndex]
+
+        return output
+
+        
     def plot(self, axes, sgram, **kwargs):
         # max_vel=6000, vmin=-200, vmax=100):
         if 'max_vel' in kwargs:
@@ -309,6 +356,11 @@ class Spectrogram:
         title = self.filename.split('/')[-1]
         axes.set_title(title.replace("_", "\\_"))
 
+
+        bestVelocity = self.extract_velocities(sgram)
+
+        fig = plt.figure()
+        plt.plot(sgram['t'], bestVelocity, color = "red")
 
 # if __name__ == '__main__':
 #     sp = Spectrogram('sample.dig')
