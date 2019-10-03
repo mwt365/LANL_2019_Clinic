@@ -57,7 +57,7 @@ class Spectrogram:
         if self.digfile:
             self.load_dig_file()
         else:
-            print(f"I don't understand files with extension {ext}")
+            raise ValueError(f"I don't understand files with extension {ext}")
 
     @property
     def t_final(self):
@@ -102,6 +102,7 @@ class Spectrogram:
         self.bytes_per_point = self.bits // 8
         self.data_format = {1: np.uint8, 2: np.int16,
                             4: np.int32}[self.bytes_per_point]
+        self.voltage_data = None
 
         # We should pay attention to the endian-ness
         # We should probably adjust the datatype when we first decode the header,
@@ -175,23 +176,25 @@ class Spectrogram:
         The ending argument can be an integer representing the number of points to include,
         or it can be a floating-point number indicating the ending time.
         """
-        offset = 1024 if self.digfile else 0
-        offset += self.bytes_per_point * self.point_number(tStart)
         if isinstance(ending, int):
             nSamples = ending
         else:
             nSamples = 1 + \
                 self.point_number(ending) - self.point_number(tStart)
 
-        with open(self.path, 'rb') as f:
-            f.seek(offset)
-            buff = f.read(nSamples * self.bytes_per_point)
+        if self.voltage_data == None:
+            offset = 1024 if self.digfile else 0
+            offset += self.bytes_per_point * self.point_number(tStart)
 
-        raw = np.fromfile(self.path, self.data_format)[self.point_number(tStart):int(self.point_number(tStart)+nSamples)]
+            raw = 0
+            with open(self.path, 'rb') as f:
+                f.seek(offset, os.SEEK_SET)
 
-        #raw = np.frombuffer(buff, self.data_format, nSamples, 0)
-        return raw * self.dV + self.V0
-
+                raw = np.fromfile(self.path, self.data_format)
+            f.close()
+            #raw = np.frombuffer(buff, self.data_format, nSamples, 0)
+            self.voltage_data = raw * self.dV + self.V0
+        return self.voltage_data[self.point_number(tStart):int(self.point_number(tStart)+nSamples)]
     def time_values(self, tStart, ending):
         """
         Return an array of time values corresponding to this interval. The arguments
