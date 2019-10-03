@@ -187,9 +187,9 @@ class Spectrogram:
             f.seek(offset)
             buff = f.read(nSamples * self.bytes_per_point)
 
-        # raw = np.fromfile(self.path, self.data_format)[int(tStart):int(tStart+nSamples)]
+        raw = np.fromfile(self.path, self.data_format)[self.point_number(tStart):int(self.point_number(tStart)+nSamples)]
 
-        raw = np.frombuffer(buff, self.data_format, nSamples, 0)
+        #raw = np.frombuffer(buff, self.data_format, nSamples, 0)
         return raw * self.dV + self.V0
 
     def time_values(self, tStart, ending):
@@ -286,6 +286,13 @@ class Spectrogram:
             'floor': floor
         }
 
+
+    def extract_velocities(sgram):
+        """
+            Use scipy's peak finding algorithm to calculate the 
+            velocity at that time slice.
+        """
+        return
     def plot(self, axes, sgram, **kwargs):
         # max_vel=6000, vmin=-200, vmax=100):
         if 'max_vel' in kwargs:
@@ -300,9 +307,9 @@ class Spectrogram:
         axes.set_title(title.replace("_", "\\_"))
 
 
-if __name__ == '__main__':
-    sp = Spectrogram('sample.dig')
-    print(sp)
-    vals = sp.values(0, 50e-6)
-    normed = sp.normalize(vals)
-    normed.tofile('normed.csv', sep="\n", format="%.6f")
+# if __name__ == '__main__':
+#     sp = Spectrogram('sample.dig')
+#     print(sp)
+#     vals = sp.values(0, 50e-6)
+#     normed = sp.normalize(vals)
+#     normed.tofile('normed.csv', sep="\n", format="%.6f")
