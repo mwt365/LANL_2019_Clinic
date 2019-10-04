@@ -293,7 +293,47 @@ class Spectrogram:
         }
 
 
-    def extract_velocities(self, sgram):
+    def spectrogram_no_log(self, tStart, tEnd,
+                    fftSize=8192,
+                    floor=0,
+                    normalize=False,
+                    remove_dc=False
+                    ):
+        """
+        Compute a spectrogram. This needs work! There need to be
+        lots more options that we either want to supply with
+        default values or decode kwargs. But it should be a start.
+        """
+        vals = self.values(tStart, tEnd)
+        if normalize:
+            vals = self.normalize(
+                vals, chunksize=fftSize, remove_dc=remove_dc)
+        freqs, times, spec = signal.spectrogram(
+            vals,
+            1.0 / self.dt,  # the sample frequency
+            # ('tukey', 0.25),
+            nperseg=fftSize,
+            noverlap=fftSize // 8,
+            detrend="linear",  # could be constant,
+            scaling="spectrum"
+        )
+        times += tStart
+        # Convert to a logarithmic representation and use floor to attempt
+        # to suppress some noise.
+        spec *= 2.0 / (fftSize * self.dt)
+
+        # scale the frequency axis to velocity
+        velocities = freqs * 0.5 * self.wavelength
+        return {
+            't': times,
+            'v': velocities,
+            'spectrogram': spec,
+            'fftSize': fftSize,
+            'floor': floor
+        }
+
+
+    def extract_velocities(self, sgram, threshold_value=.1):
         """
             Use scipy's peak finding algorithm to calculate the 
             velocity at that time slice.
@@ -315,34 +355,25 @@ class Spectrogram:
                 each time slice.    
         """
 
-        t = sgram['t']
-        v = sgram['v']
-        spectrogram = sgram['spectrogram']
-        fftSize = sgram['fftSize']
-        floor = sgram['floor']
+        intensities = np.sum(sgram['spectrogram'], axis=1)
 
-        # spectrogram needs to be rotated so that it can be indexed with t first.
+        max_intensity = np.max(intensities)
 
-        timeThenVelocitySpectrogram = np.transpose(spectrogram)
+        baseline_velocity_index = [np.argmax(intensities)]
+        baseline_velocity = sgram['v'][baseline_velocity_index]
 
-        output = np.zeros(len(t))
+        intensity_threshold = max_intensity*threshold_value
 
-        print(v[2048])
+        threshold_indices = np.where(intensities > intensity_threshold)
 
-        if len(t) != timeThenVelocitySpectrogram.shape[0]:
-            raise ValueError("Our assumption was invalid.")
+        threshold_velocties = [sgram['v'][index] for index in threshold_indices]
 
-        for time_index in range(timeThenVelocitySpectrogram.shape[0]):
-            currentVelocityIndex = np.argmax(timeThenVelocitySpectrogram[time_index])
-            
-            print("The current best velocity index is", currentVelocityIndex)
-            print(type(currentVelocityIndex))
+        print(threshold_velocties)
+        print(baseline_velocity)
 
-            output[time_index] = v[currentVelocityIndex]
-
-        return output
-
-        
+        return intensities, threshold_velocties, baseline_velocity
+    
+    
     def plot(self, axes, sgram, **kwargs):
         # max_vel=6000, vmin=-200, vmax=100):
         if 'max_vel' in kwargs:
@@ -355,16 +386,27 @@ class Spectrogram:
         axes.set_xlabel('Time ($\mu$s)')
         title = self.filename.split('/')[-1]
         axes.set_title(title.replace("_", "\\_"))
+        plt.show()
 
 
-        bestVelocity = self.extract_velocities(sgram)
+if __name__ == '__main__':
+    sp = Spectrogram('GEN3CH_4_009.dig')
 
-        fig = plt.figure()
-        plt.plot(sgram['t'], bestVelocity, color = "red")
+    axes = plt.axes()
 
-# if __name__ == '__main__':
-#     sp = Spectrogram('sample.dig')
-#     print(sp)
+    sgram = sp.spectrogram_no_log(0, 50e-6)
+
+    intensities, interesting_velocites, baseline_velocity = sp.extract_velocities(sgram)
+    velocities = sgram['v']
+
+    plt.plot(velocities, intensities, "r")
+
+    plt.xlim(1800, 2050)
+
+    plt.show()
+
+
+
 #     vals = sp.values(0, 50e-6)
 #     normed = sp.normalize(vals)
 #     normed.tofile('normed.csv', sep="\n", format="%.6f")
