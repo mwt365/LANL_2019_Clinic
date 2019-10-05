@@ -16,8 +16,11 @@ def load_xml(xml):
     try:
         xmldoc = etree.parse(xml)
     except IOError as e:
-        print('The input file is invalid. It must be a colormap xml file. Go to https://sciviscolor.org/home/colormaps/ for some good options')
-        print('Go to https://sciviscolor.org/matlab-matplotlib-pv44/ for an example use of this script.')
+        print("""The input file is invalid. It must be a colormap
+                    xml file. Go to https://sciviscolor.org/home/colormaps/
+                    for some good options""")
+        print("""Go to https://sciviscolor.org/matlab-matplotlib-pv44/
+                    for an example use of this script.""")
         sys.exit()
     data_vals = []
     color_vals = []
@@ -103,14 +106,16 @@ if __name__ == '__main__':
     import argparse
 
     parser = argparse.ArgumentParser(
-        description='Convert ParaView compatible colormaps to Matplotlib or MATLAB compatible colormaps.')
+        description="""'Convert ParaView compatible colormaps to
+        Matplotlib or MATLAB compatible colormaps.'""")
     parser.add_argument(
         '-f',
         '--file-path',
         dest='path',
         required=True,
         type=lambda s: is_xml(s),
-        help='Input file path of .xml colormap with position starting at 0 and ending at 1.')
+        help="""Input file path of .xml colormap with position
+                starting at 0 and ending at 1.""")
     parser.add_argument(
         '-m',
         '--make-matrix',

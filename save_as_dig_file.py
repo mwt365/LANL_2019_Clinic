@@ -11,17 +11,24 @@ def save_as_dig(filename, vvals, datatype, dt=20e-12, initialTime=0,
         Inputs:
             filename: string/path object pointing to where the file is.
             vvals: float/int array of voltage values for the datapoints.
-            datatype: format of the data to input (save as unsigned bytes, signed ints or signed longs)
-                The legal datatypes are unsigned bytes, signed 16 bits, and signed 32 bits.
-            dt: float for the sampling speed of the oscilloscope you are simulating.
+            datatype: format of the data to input (save as unsigned bytes,
+            signed ints or signed longs) The legal datatypes are
+            unsigned bytes, signed 16 bits, and signed 32 bits.
+
+            dt: float for the sampling speed of the
+            oscilloscope you are simulating.
+
             initialTime: float describing the time of the first sample.
-            voltageMultiplier: float for the conversion factor to when reading the data back.
+
+            voltageMultiplier: float for the conversion factor
+            to when reading the data back.
+
             voltageOffset: float for the voltage offset on the detector.
 
 
         Output:
-            1024 ascii header with last 512 bytes containing the notes about how the data
-            is stored.
+            1024 ascii header with last 512 bytes containing the notes
+            about how the data is stored.
 
             The rest of the file will be writing the datapoints in binary.
     """
@@ -57,10 +64,14 @@ def save_as_dig(filename, vvals, datatype, dt=20e-12, initialTime=0,
     with open(filename, 'w') as f:
         f.write(" " * 512)  # write 512 bytes of spaces
         stuff = "\r\n".join([
-            "Fri Sep 20 08:00:00 2019",  # todays date Day Mon NumDay HH:MM:SS: YEAR
-            str(nsamples),  # the number of samples used.
-            str(dataformat),  # format for the data to be read as.
-            str(dt),  # Time step between datapoints.
+            # todays date Day Mon NumDay HH:MM:SS: YEAR
+            "Fri Sep 20 08:00:00 2019",
+            # the number of samples used.
+            str(nsamples),
+            # format for the data to be read as.
+            str(dataformat),
+            # Time step between datapoints.
+            str(dt),
             str(initialTime),
             str(voltageMultiplier),
             str(voltageOffset)  # Voltage zero

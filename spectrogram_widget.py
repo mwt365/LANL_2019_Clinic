@@ -2,7 +2,8 @@
 # coding:utf-8
 """
   Author:  LANL 2019 clinic --<lanl19@cs.hmc.edu>
-  Purpose: To represent a spectrogram in a Jupyter notebook with convenient controls
+  Purpose: To represent a spectrogram in a Jupyter notebook
+  with convenient controls
   Created: 09/26/19
 """
 
@@ -77,8 +78,8 @@ class SpectrogramWidget:
         ipympl is installed, which can be done either with pip3
         or conda install ipympl.
 
-        I also recommend editing ~/.jupyter/custom/custom.css to modify
-        the definition of .container
+        I also recommend editing ~/.jupyter/custom/custom.css to
+        modify the definition of .container
 
         .container {
             width: 100% !important;

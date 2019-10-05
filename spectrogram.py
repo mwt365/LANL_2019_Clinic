@@ -105,11 +105,12 @@ class Spectrogram:
         self.voltage_data = None
 
         # We should pay attention to the endian-ness
-        # We should probably adjust the datatype when we first decode the header,
-        # rather than here. Can someone fix this?
-        # Python stores the machine's endianess at sys.byteorder ('little'|'big')
+        # We should probably adjust the datatype when we first decode
+        # the header, rather than here. Can someone fix this?
+        # Python stores the machine's endianess at sys.byteorder
+        # ('little'|'big')
         # The files we have seen so far are 'LSB', corresponding to 'little'
-        # GEN3_CHANNEL1KEY001.dig header seems to have nothing about byte order
+        # GEN3_CHANNEL1KEY001.dig header seems absent about byte order
         if 'byte_order' in self.notes:
             native_order = 'MSB' if sys.byteorder == 'little' else 'LSB'
             if native_order != self.notes['byte_order']:
@@ -173,9 +174,10 @@ class Spectrogram:
 
     def values(self, tStart, ending):
         """
-        Return a numpy array with the properly normalized voltages corresponding to this segment.
-        The ending argument can be an integer representing the number of points to include,
-        or it can be a floating-point number indicating the ending time.
+        Return a numpy array with the properly normalized voltages
+        corresponding to this segment. The ending argument can be an integer
+        representing the number of points to include, or it can be a
+        floating-point number indicating the ending time.
         """
         nSamples = ending
         if not isinstance(ending, int):
@@ -196,15 +198,15 @@ class Spectrogram:
                 # This may be buggy! Please test!!!!!!
                 raw = np.fromfile(f, self.data_format)
             f.close()
-            #raw = np.frombuffer(buff, self.data_format, nSamples, 0)
+            # raw = np.frombuffer(buff, self.data_format, nSamples, 0)
             self.voltage_data = raw * self.dV + self.V0
             return self.voltage_data[self.point_number(
                 tStart):int(self.point_number(tStart) + nSamples)]
 
     def time_values(self, tStart, ending):
         """
-        Return an array of time values corresponding to this interval. The arguments
-        are the same as for the values method.
+        Return an array of time values corresponding to this interval.
+        The arguments are the same as for the values method.
         """
         if isinstance(ending, int):
             nSamples = ending
