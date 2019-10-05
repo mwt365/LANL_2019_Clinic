@@ -7,4 +7,5 @@ pytest
 scipy 
 matplotlib 
 jupyter 
-pandas 
+pandas
+pep8
