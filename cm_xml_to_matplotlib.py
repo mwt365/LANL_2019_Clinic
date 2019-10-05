@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 #
-# This script converts the .xml(ParaView compatible format) colormaps into Matplotlib or MATLAB format
+# This script converts the .xml(ParaView compatible format) colormaps into
+# Matplotlib or MATLAB format
 import sys
 import os
 import matplotlib as mpl
@@ -15,8 +16,11 @@ def load_xml(xml):
     try:
         xmldoc = etree.parse(xml)
     except IOError as e:
-        print('The input file is invalid. It must be a colormap xml file. Go to https://sciviscolor.org/home/colormaps/ for some good options')
-        print('Go to https://sciviscolor.org/matlab-matplotlib-pv44/ for an example use of this script.')
+        print("""The input file is invalid. It must be a colormap
+                    xml file. Go to https://sciviscolor.org/home/colormaps/
+                    for some good options""")
+        print("""Go to https://sciviscolor.org/matlab-matplotlib-pv44/
+                    for an example use of this script.""")
         sys.exit()
     data_vals = []
     color_vals = []
@@ -26,7 +30,8 @@ def load_xml(xml):
             s.attrib['g']), float(s.attrib['b'])))
     return {'color_vals': color_vals, 'data_vals': data_vals}
 
-# source of this function: http://schubert.atmos.colostate.edu/~cslocum/custom_cmap.html#code
+# source of this function:
+# http://schubert.atmos.colostate.edu/~cslocum/custom_cmap.html#code
 
 
 def make_cmap(xml):
@@ -101,11 +106,23 @@ if __name__ == '__main__':
     import argparse
 
     parser = argparse.ArgumentParser(
-        description='Convert ParaView compatible colormaps to Matplotlib or MATLAB compatible colormaps.')
-    parser.add_argument('-f', '--file-path', dest='path', required=True, type=lambda s: is_xml(
-        s), help='Input file path of .xml colormap with position starting at 0 and ending at 1.')
-    parser.add_argument('-m', '--make-matrix', dest='matrix', action='store_true',
-                        required=False, help='Print a 3xn matrix of rgb values to copy and paste into MATLAB.')
+        description="""'Convert ParaView compatible colormaps to
+        Matplotlib or MATLAB compatible colormaps.'""")
+    parser.add_argument(
+        '-f',
+        '--file-path',
+        dest='path',
+        required=True,
+        type=lambda s: is_xml(s),
+        help="""Input file path of .xml colormap with position
+                starting at 0 and ending at 1.""")
+    parser.add_argument(
+        '-m',
+        '--make-matrix',
+        dest='matrix',
+        action='store_true',
+        required=False,
+        help='Print a 3xn matrix of rgb values to copy and paste into MATLAB.')
 
     args = parser.parse_args()
 
@@ -117,7 +134,7 @@ if __name__ == '__main__':
     print('example rgba value for data value 0 is: ' + str(mycmap(0.0)))
 
     # MATLAB Users: This fuction will output a RGB matrix to use in MATLAB
-    if args.matrix == True:
+    if args.matrix:
         print_cmap_matrix(mycmap)
 
     # Plotting the colormap to test the conversion
