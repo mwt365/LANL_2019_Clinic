@@ -16,7 +16,7 @@ for file in os.listdir(DIR):
         COLORMAPS[base] = cm.make_cmap(os.path.join(DIR, file))
 
 # mycmap = cm.make_cmap(os.path.join(DIR, '3w_gby.xml'))
-# to use colormap: matplotlib.pyplot.imshow(your_image, cmap=matplotlib.pyplot.get_cmap(mycmap))
+# to use colormap: matplotlib.pyplot.imshow(your_image,
+# cmap=matplotlib.pyplot.get_cmap(mycmap))
 
 # cm.plot_cmap(mycmap)  # plot an 8 by 1 copy of the colormap
-

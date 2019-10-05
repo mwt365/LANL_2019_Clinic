@@ -10,11 +10,11 @@ from scipy import signal
 
 class Spectrogram:
     """
-    Representation of a photon Doppler velocimetry file stored in 
+    Representation of a photon Doppler velocimetry file stored in
     the .dig format. On creation, the file header is read and processed;
     information in the top 512 bytes is stored in a notes dictionary.
     Information from the second 512-byte segment is decoded to infer
-    the number of data points, the number of bytes per point, the 
+    the number of data points, the number of bytes per point, the
     start time and sampling interval, and the voltage scaling.
 
     It is not completely transparent to me whether the voltage scaling
@@ -23,7 +23,7 @@ class Spectrogram:
     offset and step values.
 
     The actual data remain on disk and are loaded only as required either
-    to generate a spectrogram for a range in time or a spectrum from a 
+    to generate a spectrogram for a range in time or a spectrum from a
     shorter segment. The values are loaded from disk and decoded using
     the *values* method which takes a start time and either an end time
     or an integer number of points to include.
@@ -149,11 +149,11 @@ class Spectrogram:
                         # Attempt to decode the value
                         try:
                             val = int(val)  # can we convert to an integer?
-                        except:
+                        except BaseException:
                             try:
                                 # if not, can we convert to a float?
                                 val = float(val)
-                            except:
+                            except BaseException:
                                 pass
                         # add the property to ourself
                         self.notes[key] = val
@@ -166,7 +166,8 @@ class Spectrogram:
     def __str__(self):
         return "\n".join([
             self.filename,
-            f"{self.bits} bits" + f" {self.notes['byte_order']} first" if 'byte_order' in self.notes else "",
+            f"{self.bits} bits" +
+            f" {self.notes['byte_order']} first" if 'byte_order' in self.notes else "",
             f"{self.t0*1e6} µs to {(self.t0 + self.dt*self.num_samples)*1e6} µs in steps of {self.dt*1e12} ps"
         ])
 
@@ -181,8 +182,9 @@ class Spectrogram:
             nSamples = 1 + \
                 self.point_number(ending) - self.point_number(tStart)
 
-        if self.voltage_data != None:
-            return self.voltage_data[self.point_number(tStart):int(self.point_number(tStart)+nSamples)]
+        if self.voltage_data is not None:
+            return self.voltage_data[self.point_number(
+                tStart):int(self.point_number(tStart) + nSamples)]
         else:
             offset = 1024 if self.digfile else 0
             offset += self.bytes_per_point * self.point_number(tStart)
@@ -191,12 +193,13 @@ class Spectrogram:
             with open(self.path, 'rb') as f:
                 f.seek(offset, os.SEEK_SET)
 
-                raw = np.fromfile(f, self.data_format) # This may be buggy! Please test!!!!!!
+                # This may be buggy! Please test!!!!!!
+                raw = np.fromfile(f, self.data_format)
             f.close()
             #raw = np.frombuffer(buff, self.data_format, nSamples, 0)
             self.voltage_data = raw * self.dV + self.V0
-            return self.voltage_data[self.point_number(tStart):int(self.point_number(tStart)+nSamples)]
-
+            return self.voltage_data[self.point_number(
+                tStart):int(self.point_number(tStart) + nSamples)]
 
     def time_values(self, tStart, ending):
         """
@@ -292,27 +295,26 @@ class Spectrogram:
             'floor': floor
         }
 
-
     def extract_velocities(self, sgram):
         """
-            Use scipy's peak finding algorithm to calculate the 
+            Use scipy's peak finding algorithm to calculate the
             velocity at that time slice.
-        
+
             The sgram will come in as a dictionary
 
             't': times,
             'v': velocities,
             'spectrogram': spec,
             'fftSize': fftSize,
-            'floor': floor            
-        
+            'floor': floor
 
-            spec will be indexed in velocity and then time 
+
+            spec will be indexed in velocity and then time
 
 
             Output:
                 return a list of the velocities of maximum intensity in
-                each time slice.    
+                each time slice.
         """
 
         t = sgram['t']
@@ -321,7 +323,8 @@ class Spectrogram:
         fftSize = sgram['fftSize']
         floor = sgram['floor']
 
-        # spectrogram needs to be rotated so that it can be indexed with t first.
+        # spectrogram needs to be rotated so that it can be indexed with t
+        # first.
 
         timeThenVelocitySpectrogram = np.transpose(spectrogram)
 
@@ -333,8 +336,9 @@ class Spectrogram:
             raise ValueError("Our assumption was invalid.")
 
         for time_index in range(timeThenVelocitySpectrogram.shape[0]):
-            currentVelocityIndex = np.argmax(timeThenVelocitySpectrogram[time_index])
-            
+            currentVelocityIndex = np.argmax(
+                timeThenVelocitySpectrogram[time_index])
+
             print("The current best velocity index is", currentVelocityIndex)
             print(type(currentVelocityIndex))
 
@@ -342,7 +346,6 @@ class Spectrogram:
 
         return output
 
-        
     def plot(self, axes, sgram, **kwargs):
         # max_vel=6000, vmin=-200, vmax=100):
         if 'max_vel' in kwargs:
@@ -352,15 +355,14 @@ class Spectrogram:
                               sgram['spectrogram'], **kwargs)
         plt.gcf().colorbar(pcm, ax=axes)
         axes.set_ylabel('Velocity (m/s)')
-        axes.set_xlabel('Time ($\mu$s)')
+        axes.set_xlabel(r'Time ($\mu$s)')
         title = self.filename.split('/')[-1]
         axes.set_title(title.replace("_", "\\_"))
-
 
         bestVelocity = self.extract_velocities(sgram)
 
         fig = plt.figure()
-        plt.plot(sgram['t'], bestVelocity, color = "red")
+        plt.plot(sgram['t'], bestVelocity, color="red")
 
 # if __name__ == '__main__':
 #     sp = Spectrogram('sample.dig')

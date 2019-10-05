@@ -5,7 +5,8 @@ import os
 import numpy as np
 
 
-def save_as_dig(filename, vvals, datatype, dt=20e-12, initialTime=0, voltageMultiplier= 6.103516e-5, voltageOffset=0):
+def save_as_dig(filename, vvals, datatype, dt=20e-12, initialTime=0,
+                voltageMultiplier=6.103516e-5, voltageOffset=0):
     """
         Inputs:
             filename: string/path object pointing to where the file is.
@@ -25,7 +26,8 @@ def save_as_dig(filename, vvals, datatype, dt=20e-12, initialTime=0, voltageMult
             The rest of the file will be writing the datapoints in binary.
     """
     dataformat = ""
-    if type(datatype) == type(str("example")) or type(datatype) == type('8'):
+    if isinstance(datatype, type(str("example"))
+                  ) or isinstance(datatype, type('8')):
         if datatype == '8':
             dataformat = '8'
             datatype = np.dtype("ubyte")
@@ -36,7 +38,8 @@ def save_as_dig(filename, vvals, datatype, dt=20e-12, initialTime=0, voltageMult
             dataformat = '32'
             datatype = np.dtype("int32")
         else:
-            raise ValueError("datatype corresponds to an unsupported data type.")
+            raise ValueError(
+                "datatype corresponds to an unsupported data type.")
     elif datatype == np.dtype("ubyte"):
         dataformat = '8'
     elif datatype == np.dtype("int16"):
@@ -50,23 +53,23 @@ def save_as_dig(filename, vvals, datatype, dt=20e-12, initialTime=0, voltageMult
 
     # Now write the header, the important parts of which are
     # nsamples, bits, dt, t0, dv, v0
-    with open(filename, 'w') as f: # This will fail if the file is not already created.
+    # This will fail if the file is not already created.
+    with open(filename, 'w') as f:
         f.write(" " * 512)  # write 512 bytes of spaces
         stuff = "\r\n".join([
-            "Fri Sep 20 08:00:00 2019", # todays date Day Mon NumDay HH:MM:SS: YEAR
-            str(nsamples), # the number of samples used.
-            str(dataformat), # format for the data to be read as.
-            str(dt), # Time step between datapoints.
+            "Fri Sep 20 08:00:00 2019",  # todays date Day Mon NumDay HH:MM:SS: YEAR
+            str(nsamples),  # the number of samples used.
+            str(dataformat),  # format for the data to be read as.
+            str(dt),  # Time step between datapoints.
             str(initialTime),
             str(voltageMultiplier),
-            str(voltageOffset) # Voltage zero
+            str(voltageOffset)  # Voltage zero
         ])
         f.write(stuff + "\r\n")
         f.write(" " * (510 - len(stuff)))
         f.close()
     with open(filename, 'ab') as f:
-        for val in vvals:           
-            vals = np.array(val, dtype = datatype)
+        for val in vvals:
+            vals = np.array(val, dtype=datatype)
             f.write(vals.tobytes())
         f.close()
-

@@ -81,7 +81,7 @@ class SpectrogramWidget:
         the definition of .container
 
         .container {
-            width: 100% !important; 
+            width: 100% !important;
             margin-right: 40px;
             margin-left: 40px;
             }
@@ -213,7 +213,7 @@ class SpectrogramWidget:
         self.colorbar = self.fig.colorbar(self.image, ax=self.axSpectrogram)
 
         self.axSpectrogram.set_title(self.title)
-        self.axSpectrogram.set_xlabel('Time ($\mu$s)')
+        self.axSpectrogram.set_xlabel(r'Time ($\mu$s)')
         self.axSpectrogram.set_xlim(tmin * 1e6, tmax * 1e6)
         self.axSpectrum.set_ylabel('Velocity (m/s)')
         self.update_velocity_range()
@@ -239,7 +239,7 @@ class SpectrogramWidget:
         self.spectrum(t)
 
     def spectrum(self, the_time):
-        if the_time == None:
+        if the_time is None:
             # Initialize the axes
             self.axSpectrum.plot([0, 1], [0, 1], 'r-')
         else:
