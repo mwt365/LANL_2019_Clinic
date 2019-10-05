@@ -8,3 +8,4 @@ scipy
 matplotlib 
 jupyter 
 pandas 
+pep8
