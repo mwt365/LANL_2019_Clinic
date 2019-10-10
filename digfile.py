@@ -173,7 +173,8 @@ class DigFile:
         return "\n".join([
             self.filename,
             f"{self.bits} bits" + f" {self.notes['byte_order']} first" if 'byte_order' in self.notes else "",
-            f"{self.t0*1e6} µs to {(self.t0 + self.dt*self.num_samples)*1e6} µs in steps of {self.dt*1e12} ps"
+            f"{self.t0*1e6} µs to {(self.t0 + self.dt*self.num_samples)*1e6} µs in steps of {self.dt*1e12} ps",
+            f"{self.num_samples} points"
         ])
 
     def raw_values(self, t_start=None, ending=None):
@@ -240,7 +241,21 @@ class DigFile:
         stdevs = chunks.std(axis=1)
         times = np.linspace(self.t0, self.dt *
                             numpts, points)
-        return times, means, stdevs, chunks.min(axis=1), chunks.max(axis=1)
+        d = dict(
+            times=times,
+            means=means,
+            stdevs=stdevs,
+            mins=chunks.min(axis=1),
+            maxs=chunks.max(axis=1)
+        )
+        # Now create a quick-and-dirty thumbnail that
+        # takes successive points alternatively from mins
+        # and maxs, that can be plotted against times to roughly
+        # describe the envelope of values
+        d['peak_to_peak'] = np.asarray([
+            d['mins'][n] if n % 2 else d['maxs'][n] for n in range(len(times))
+        ])
+        return d
 
 
 if __name__ == '__main__':

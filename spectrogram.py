@@ -51,7 +51,7 @@ class Spectrogram:
             self.data = DigFile(digfile)
         else:
             raise TypeError("Unknown file type")
-        self.t_start = t_start
+        self.t_start = t_start if t_start != None else self.data.t0
 
         self.wavelength = wavelength
         self.points_per_spectrum = points_per_spectrum
