@@ -9,4 +9,5 @@ cache: pip
 install: "pip install"
 script: python tests.py
 autopep8 *.py
+pycodestyle *.py
 
