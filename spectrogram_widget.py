@@ -12,7 +12,9 @@ import matplotlib.gridspec as gridspec
 import ipywidgets as widgets
 from IPython.display import display
 
+from digfile import DigFile
 from spectrogram import Spectrogram
+from spectrum import Spectrum
 from plotter import COLORMAPS
 
 DEFMAP = '3w_gby'  # should really be in an .ini file
@@ -69,7 +71,7 @@ class SpectrogramWidget:
     numerous controls to adjust the appearance of the spectrogram.
     """
 
-    def __init__(self, spectrogram, **kwargs):
+    def __init__(self, digfile, **kwargs):
         """
         For the widget to behave in a Jupyter notebook, place
         %matplotlib widget
@@ -86,18 +88,19 @@ class SpectrogramWidget:
             margin-left: 40px;
             }
         """
-        if isinstance(spectrogram, str):
-            sg = self.spectrogram = Spectrogram(spectrogram)
+        if isinstance(digfile, str):
+            self.digfile = DigFile(digfile)
+            # sg = self.spectrogram = Spectrogram(spectrogram)
         else:
             assert isinstance(
-                spectrogram, Spectrogram), "You must pass in a Spectrogram"
-            sg = self.spectrogram = spectrogram
+                digfile, DigFile), "You must pass in a DigFile"
+            self.digfile = digfile
 
-        self.title = sg.filename.split('/')[-1].replace("_", "\\_")
+        self.title = self.digfile.filename.split('/')[-1].replace("_", "\\_")
         # handle the keyword arguments here
 
         # Compute the base spectrogram (do we really need this?)
-        self.sgram = sg.spectrogram(sg.t0, sg.t_final)
+        self.spectrogram = Spectrogram(self.digfile, None, None)
 
         # Create the figure to display this spectrogram
         # It would be nice to make this bigger!
@@ -134,10 +137,9 @@ class SpectrogramWidget:
         Create the controls for this widget and store them in self.controls.
         """
         cd = self.individual_controls  # the dictionary of controls
-        sg = self.spectrogram
-
+        df = self.digfile
         cd['t_range'] = PercentSlider(
-            "Time Range", (0, 25), (sg.t0, sg.t_final))
+            "Time Range", (0, 25), (df.t0, df.t_final))
         cd['t_range'].continuous_update = False
         cd['t_range'].observe(
             lambda x: self.do_update(x), names="value")
@@ -145,8 +147,9 @@ class SpectrogramWidget:
         cd['velocity_range'] = PercentSlider(
             "Velocity Range",
             (0, 50),
-            (0.0, sg.v_max)
+            (0.0, self.spectrogram.v_max)
         )
+        cd['velocity_range'].continuous_update = False
         cd['velocity_range'].observe(lambda x: self.update_velocity_range(),
                                      names="value")
 
@@ -155,6 +158,7 @@ class SpectrogramWidget:
             (40, 70),
             (0, 1)  # really needs to get updated!
         )
+        cd['intensity_range'].continuous_update = False
         cd['intensity_range'].observe(lambda x: self.update_color_range(),
                                       names="value")
 
@@ -189,11 +193,16 @@ class SpectrogramWidget:
         """
         sg = self.spectrogram
         tmin, tmax = self.range('t_range')
-        self.sgram = sg.spectrogram(tmin, tmax)  # this needs many more flags
+        # if the time range hasn't changed, we don't need to recompute?
+        if (tmin, tmax) != (sg.t_start, sg.t_end):
+            self.spectrogram = Spectrogram(self.digfile, tmin, tmax)
+            sg = self.spectrogram
+
+
         # Having recomputed the spectrum, we need to set the yrange
         # of the color map slider
-        cmin, cmax = np.min(self.sgram['spectrogram']), np.max(
-            self.sgram['spectrogram'])
+        cmin = sg.intensity.min()
+        cmax = sg.intensity.max()
         self.individual_controls['intensity_range'].range = (cmin, cmax)
 
         # if we have already displayed an image, remove it
@@ -205,10 +214,7 @@ class SpectrogramWidget:
             self.image = None
 
         self.image = self.axSpectrogram.pcolormesh(
-            self.sgram['t'] * 1e6,  # time, in microseconds
-            self.sgram['v'],
-            self.sgram['spectrogram']
-        )
+            sg.time * 1e6, sg.velocity, sg.intensity)
 
         self.colorbar = self.fig.colorbar(self.image, ax=self.axSpectrogram)
 
@@ -243,7 +249,10 @@ class SpectrogramWidget:
             # Initialize the axes
             self.axSpectrum.plot([0, 1], [0, 1], 'r-')
         else:
-            the_spectrum = self.spectrogram.spectrum(the_time, 8192)
+            the_spectrum = Spectrum(
+                self.digfile.values(the_time, 8192),
+                self.digfile.dt,
+                remove_dc=True)
             line = self.axSpectrum.lines[0]
             intensities = the_spectrum.db
             line.set(xdata=intensities, ydata=the_spectrum.velocities)
