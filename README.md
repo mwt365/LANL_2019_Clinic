@@ -6,4 +6,4 @@
 
 3. Perform FFT to get Intensity(frequency)
 
-4. pip install pycodestyle (for PEP8 linting)
+4. pip install pycodestyle(for PEP8 linting)

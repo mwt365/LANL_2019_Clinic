@@ -2,7 +2,8 @@
 # coding:utf-8
 """
   Author:  LANL 2019 clinic --<lanl19@cs.hmc.edu>
-  Purpose: To represent a spectrogram in a Jupyter notebook with convenient controls
+  Purpose: To represent a spectrogram in a Jupyter notebook
+  with convenient controls
   Created: 09/26/19
 """
 
@@ -79,11 +80,11 @@ class SpectrogramWidget:
         ipympl is installed, which can be done either with pip3
         or conda install ipympl.
 
-        I also recommend editing ~/.jupyter/custom/custom.css to modify
-        the definition of .container
+        I also recommend editing ~/.jupyter/custom/custom.css to
+        modify the definition of .container
 
         .container {
-            width: 100% !important; 
+            width: 100% !important;
             margin-right: 40px;
             margin-left: 40px;
             }
@@ -219,7 +220,7 @@ class SpectrogramWidget:
         self.colorbar = self.fig.colorbar(self.image, ax=self.axSpectrogram)
 
         self.axSpectrogram.set_title(self.title)
-        self.axSpectrogram.set_xlabel('Time ($\mu$s)')
+        self.axSpectrogram.set_xlabel(r'Time ($\mu$s)')
         self.axSpectrogram.set_xlim(tmin * 1e6, tmax * 1e6)
         self.axSpectrum.set_ylabel('Velocity (m/s)')
         self.update_velocity_range()
@@ -245,7 +246,7 @@ class SpectrogramWidget:
         self.spectrum(t)
 
     def spectrum(self, the_time):
-        if the_time == None:
+        if the_time is None:
             # Initialize the axes
             self.axSpectrum.plot([0, 1], [0, 1], 'r-')
         else:
