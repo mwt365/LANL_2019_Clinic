@@ -11,6 +11,8 @@ import numpy as np
 
 
 def make_dig_file(filename, tvals, vvals, dt=20e-12):
+"""Input: 	velocities vval,
+		time tvals, """
     nsamples = 1 + int((tvals[-1] - tvals[0]) / dt)
     dvdt = [(vvals[n + 1] - vvals[n]) / (tvals[n + 1] - tvals[n])
             for n in range(len(tvals) - 1)]

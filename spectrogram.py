@@ -10,6 +10,7 @@ from digfile import DigFile
 
 class Spectrogram:
     """
+
     A Spectrogram takes a DigFile and a time range, as
     well as plenty of options, and generates a spectrogram
     using scipy.signal.spectrogram.
@@ -45,6 +46,20 @@ class Spectrogram:
         intensity: two-dimensional array of (scaled) intensities, which
             is the spectrogram. The first index corresponds to
             frequency/velocity, the second to time.
+
+    Representation of a photon Doppler velocimetry file stored in
+    the .dig format. On creation, the file header is read and processed;
+    information in the top 512 bytes is stored in a notes dictionary.
+    Information from the second 512-byte segment is decoded to infer
+    the number of data points, the number of bytes per point, the
+    start time and sampling interval, and the voltage scaling.
+
+    The actual data remain on disk and are loaded only as required either
+    to generate a spectrogram for a range in time or a spectrum from a
+    shorter segment. The values are loaded from disk and decoded using
+    the *values* method which takes a start time and either an end time
+    or an integer number of points to include.
+
     """
 
     _fields = ("points_per_spectrum",
@@ -280,13 +295,32 @@ if False:
         raw = self.raw_values(self.t0, self.num_samples)
         self.raw = dict(min=np.min(raw), max=np.max(raw), mean=np.mean(raw))
         self.raw['range'] = self.raw['max'] - self.raw['min']
-
+#         instrument_spec_codes = {
+#             'BYT_N': 'binary_data_field_width',
+#             'BIT_N': 'bits',
+#             'ENC': 'encoding',
+#             'BN_F': 'number_format',
+#             'BYT_O': 'byte_order',
+#             'WFI': 'source_trace',
+#             'NR_P': 'number_pixel_bins',
+#             'PT_F': 'point_format',
+#             'XUN': 'x_unit',
+#             'XIN': 'x_interval',
+#             'XZE': 'post_trigger_seconds',
+#             'PT_O': 'pulse_train_output',
+#             'YUN': 'y_unit',
+#             'YMU': 'y_scale_factor',
+#             'YOF': 'y_offset',
+#             'YZE': 'y_component',
+#             'NR_FR': 'NR_FR'
     def __str__(self):
         return "\n".join([
             self.filename,
-            f"{self.bits} bits" + f" {self.notes['byte_order']} first" if 'byte_order' in self.notes else "",
+            f"{self.bits} bits" +
+            f" {self.notes['byte_order']} first" if 'byte_order' in self.notes else "",
             f"{self.t0*1e6} µs to {(self.t0 + self.dt*self.num_samples)*1e6} µs in steps of {self.dt*1e12} ps"
         ])
+
 
     def normalize(self, array, chunksize=4096, remove_dc=True):
         """
@@ -332,7 +366,7 @@ if False:
 
     def extract_velocities(self, sgram):
         """
-            Use scipy's peak finding algorithm to calculate the 
+            Use scipy's peak finding algorithm to calculate the
             velocity at that time slice.
 
             The sgram will come in as a dictionary
@@ -343,13 +377,12 @@ if False:
             'fftSize': fftSize,
             'floor': floor            
 
-
-            spec will be indexed in velocity and then time 
+            spec will be indexed in velocity and then time
 
 
             Output:
                 return a list of the velocities of maximum intensity in
-                each time slice.    
+                each time slice.
         """
 
         t = sgram['t']
@@ -358,7 +391,8 @@ if False:
         fftSize = sgram['fftSize']
         floor = sgram['floor']
 
-        # spectrogram needs to be rotated so that it can be indexed with t first.
+        # spectrogram needs to be rotated so that it can be indexed with t
+        # first.
 
         timeThenVelocitySpectrogram = np.transpose(spectrogram)
 
@@ -384,4 +418,3 @@ if False:
 if __name__ == '__main__':
     sp = Spectrogram('sample.dig', 0, 10e-6)
     print(sp)
-

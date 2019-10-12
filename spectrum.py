@@ -64,10 +64,10 @@ class Spectrum:
         plt.ylabel(y[1])
 
         plt.show()
+
     def save(self):
         """
-        We should provide a sensible way to export. What file formats 
+        We should provide a sensible way to export. What file formats
         should we support?
         """
         pass
-
