@@ -47,6 +47,13 @@ class Spectrogram:
             frequency/velocity, the second to time.
     """
 
+    _fields = ("points_per_spectrum",
+               "shift",
+               "window_function",
+               "form",
+               "use_voltage",
+               "detrend")
+
     def __init__(self,
                  digfile,
                  t_start,
@@ -80,9 +87,20 @@ class Spectrogram:
         self.form = form
         self.use_voltage = convert_to_voltage
         self.detrend = detrend
+
+        # the following will be set by _calculate
+        self.time = None
+        self.frequency = None
+        self.velocity = None
+        self.intensity = None
+
         # deal with kwargs
 
-        self._compute(ending)
+        try:
+            self._load()
+        except:
+            self._compute(ending)
+            # self._save()
 
     def __str__(self):
         return ", ".join(
@@ -92,6 +110,89 @@ class Spectrogram:
               self.form
               ]
              ])
+
+    def _location(self, location, create=False):
+        if location == "":
+            location = os.path.splitext(self.data.path)[0] + \
+                '.spectrogram'
+        if os.path.exists(location) and not os.path.isdir(location):
+            raise FileExistsError
+        if not os.path.exists(location) and create:
+            os.mkdir(location)
+        return location
+
+    def _time_to_point(self, t):
+        "Map a time to a point number"
+        p = (t - self.t_start) / (self.time[1] - self.time[0])
+        p = int(0.5 + p)  # round to an integer
+        if p < 0:
+            return 0
+        return min(p, len(self.time) - 1)
+
+    def _velocity_to_point(self, v):
+        "Map a velocity value to a point number"
+        p = (v - self.velocity[0]) / (self.velocity[1] - self.velocity[0])
+        p = int(0.5 + p)  # round
+        if p < 0:
+            return 0
+        return min(p, -1 + len(self.velocity))
+
+    def slice(self, time_range, velocity_range):
+        """
+        Given a tuple of times and a tuple of velocities, return
+        time, velocity, intensity subarrays
+        """
+        if time_range == None:
+            time0, time1 = 0, len(self.time) - 1
+        else:
+            time0, time1 = [self._time_to_point(t) for t in time_range]
+        if velocity_range == None:
+            vel0, vel1 = 0, len(self.velocity) - 1
+        else:
+            vel0, vel1 = [self._velocity_to_point(v) for v in velocity_range]
+
+        tvals = self.time[time0:time1 + 1]
+        vvals = self.velocity[vel0:vel1 + 1]
+        ivals = self.intensity[vel0:vel1, time0:time1]
+        return tvals, vvals, ivals
+
+    def _save(self, location=""):
+        """
+        Save a representation of this spectrogram.
+        The format is a folder holding the three numpy arrays
+        and a text file with the parameters.
+        If the location is a blank string, the folder has
+        the name of the digfile, with .dig replaced by .spectrogram.
+        """
+        location = self._location(location, True)
+        with open(os.path.join(location, "properties"), 'w') as f:
+            for field in self._fields:
+                f.write(f"{field}\t{getattr(self,field)}\n")
+        np.savez_compressed(
+            os.path.join(location, "vals"),
+            velocity=self.velocity,
+            frequency=self.frequency,
+            time=self.time,
+            intensity=self.intensity)
+
+    def _load(self, location=""):
+        raise Exception("blah")
+        location = self._location(location)
+        if not os.path.isdir(location):
+            raise FileNotFoundError
+        try:
+            with open(os.path.join(
+                    location, "properties"), 'r') as f:
+                for line in f.readlines():
+                    field, value = line.split('\t')
+                    assert value == getattr(self.field)
+            loaded = np.load(os.path.join(location, "vals"))
+            for k, v in loaded.items():
+                setattr(self, k, v)
+            return True
+        except Exception as eeps:
+            print(eeps)
+        return False
 
     def _compute(self, ending):
         """
