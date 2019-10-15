@@ -6,7 +6,7 @@ from fake_data import *
 import os.path
 from os import path
 
-fakeObject = make_dig_file('fake_data_test.dig',
+make_dig_file('fake_data_test.dig',
         [0, 1e-5, 2e-5, 4e-5],
         [1000, 1000, 5000, 3000]
     )
