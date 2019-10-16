@@ -243,13 +243,34 @@ class SpectrogramWidget:
         cd['raw_signal'].observe(
             lambda b: self.show_raw_signal(b), names="value")
 
+        cd['spectrum_size'] = slide = widgets.IntSlider(
+            value=13, min=8, max=18, step=1,
+            description="FFT 2^n"
+        )
+        slide.continuous_update = False
+        slide.observe(lambda x: self.overhaul(points_per_spectrogram=2 ** x['new']),
+                      names="value")
+
+        cd['shift'] = slide = widgets.IntSlider(
+            description='Shift',
+            value=self.spectrogram.points_per_spectrum - self.spectrogram.shift,
+            min=1,
+            max=2 * self.spectrogram.points_per_spectrum,
+            step=1)
+        slide.continuous_update = False
+        slide.observe(lambda x: self.overhaul(
+            shift=self.spectrogram.points_per_spectrum - x['new']),
+            names="value")
+
         self.controls = widgets.HBox([
             widgets.VBox([
-                cd['t_range'], cd['velocity_range'], cd['intensity_range']
+                cd['t_range'], cd['velocity_range'],
+                cd['intensity_range'], cd['spectrum_size']
             ]),
             widgets.VBox([
                 cd['color_map'],
                 cd['raw_signal'],
+                cd['shift']
             ])
         ])
 
@@ -278,7 +299,7 @@ class SpectrogramWidget:
             yscale = 0.2 * (ylims[1] - ylims[0]) / yrange
             vvals = ylims[1] - yscale * (ymax - yvals)
             self.axSpectrogram.plot(tvals, vvals,
-                                    'y-', alpha=0.4)
+                                    'r-', alpha=0.5)
         else:
             try:
                 del self.axSpectrogram.lines[0]
@@ -286,6 +307,14 @@ class SpectrogramWidget:
                 self.fig.canvas.flush_events()
             except:
                 pass
+
+    def overhaul(self, **kwargs):
+        """
+        A parameter affecting the base spectrogram has been changed, so
+        we need to recompute everything.
+        """
+        self.spectrogram.set(**kwargs)
+        self.update_spectrogram()
 
     def update_spectrogram(self):
         """
@@ -342,15 +371,22 @@ class SpectrogramWidget:
         t, v = event.xdata * 1e-6, event.ydata
         # Compute a spectrum
         # we should do better about the length
-        self.spectrum(t)
+        try:
+            self.spectrum(t)
+        except Exception as eeps:
+            pass
 
     def spectrum(self, the_time):
         if the_time is None:
             # Initialize the axes
             self.axSpectrum.plot([0, 1], [0, 1], 'r-')
+            self.axSpectrum.grid(axis='x', which='both', color='b', alpha=0.4)
         else:
+            delta_t = self.spectrogram.points_per_spectrum / 2 * \
+                self.digfile.dt
             the_spectrum = Spectrum(
-                self.digfile.values(the_time, 8192),
+                self.digfile.values(the_time - delta_t,
+                                    the_time + delta_t),
                 self.digfile.dt,
                 remove_dc=True)
             line = self.axSpectrum.lines[0]
@@ -359,6 +395,13 @@ class SpectrogramWidget:
 
             self.axSpectrum.set_xlim(
                 (intensities.mean(), intensities.max()))
+            # We should also add a line to the spectrogram showing where
+            # the spectrum came from.
+            if not self.axSpectrogram.lines:
+                self.axSpectrogram.plot([0, 0], [0, 1], 'r-', alpha=0.33)
+            line = self.axSpectrogram.lines[0] # this won't scale when we add baselines
+            tval = the_time * 1e6 # convert to microseconds
+            line.set(xdata=[tval, tval], ydata=[0, self.spectrogram.v_max])
 
 
 if __name__ == '__main__':
