@@ -17,11 +17,12 @@ class Spectrogram:
 
     Required arguments to the constructor:
         digfile: either an instance of DigFile or the filename of a .dig file
-        t_start: time of the first point to use in the spectrogram
-        ending:  either the time of the last point or a positive integer
-                 representing the number of points to use
 
     Optional arguments and their default values:
+        t_start: (digfile.t0) time of the first point to use in the spectrogram
+        ending:  (None) either the time of the last point or a positive integer
+                 representing the number of points to use; if None, the final
+                 point in the digfile is used.
         wavelength: (1550.0e-9) the wavelength in meters
         points_per_spectrum: (8192) the number of values used to generate
             each spectrum. Should be a power of 2.
@@ -57,8 +58,8 @@ class Spectrogram:
 
     def __init__(self,
                  digfile,
-                 t_start,
-                 ending,
+                 t_start=None,
+                 ending=None,
                  wavelength=1550.0e-9,
                  points_per_spectrum=8192,
                  overlap_shift_factor=3 / 4,
