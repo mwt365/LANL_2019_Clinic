@@ -213,53 +213,40 @@ def within_range(test, percent, base):
 
 if __name__ == "__main__":
 
+    sp = spctgrm.Spectrogram('GEN3CH_4_009.dig')
     sp_nl = spctgrm.Spectrogram('GEN3CH_4_009.dig')
+
     sgram_nl = sp_nl.spectrogram_no_log(0, 50e-6)
 
-    # intensities = [np.sum(sgram_nl['spectrogram'], axis=1)]
-    intensities = []
-
-    for inner_array in sgram_nl['spectrogram']:
-        max_intensity = np.max(inner_array)
-        intensities.append(max_intensity)
-
-    max_intensity = np.max(intensities)
-
-    # baseline_velocity_index = [np.argmax(intensities)]
-    # baseline_velocity = sgram_nl['v'][baseline_velocity_index]
-
-    print(max_intensity)
-    print("\n")
-    print("\n")
-
-    # print(sgram_nl['spectrogram'].shape)
-
-    # print(sgram_nl['v'])
-    # print(sgram_nl['t'])
-    # print(sgram_nl['spectrogram'])
-
-    sp = sgram_nl['spectrogram']
-
-    # indices = find_potential_seams(sp, 30)
-    # print(indices)
-
+    sp_nl = sgram_nl['spectrogram']
     time_length = len(sgram_nl['t'])
 
-    # mock_intensities = generate_random_array(array_dimensions)
-
-    potential_baselines = find_seams(sp, 20, time_length-200)
-
-    # print(potential_baselines[0][0])
+    potential_baselines = find_seams(sp_nl, 20, time_length-200)
 
     baseline_velocity_index = potential_baselines[0][0][0]
     baseline_intensity = potential_baselines[0][0][2]
-
     baseline_velocity = sgram_nl['v'][baseline_velocity_index]
 
     print("baseline velocity: ", baseline_velocity)
     print("baseline intensity: ", baseline_intensity)
 
-    # print(sgram_nl['v'])
+    axes = plt.axes()
+
+    sgram = sp.spectrogram(0, 50e-6)
+
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    cmsh = sp.plot(axes, sgram)
+    cmsh.set_clim((0,80))
+    ax.plot([0,5,10,15,20,25,30,35,40],[baseline_velocity for i in range(9)],'r-')
+    ax.set_ylim(0,4000)
+
+    plt.show()
+
+
     
+
+    sp.plot(axes, sgram)
+
 
         
