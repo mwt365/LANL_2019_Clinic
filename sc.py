@@ -297,22 +297,36 @@ if __name__ == "__main__":
     # indices = find_potential_seams(sp, 30)
     # print(indices)
 
+    sp_nl = sgram_nl['spectrogram']
     time_length = len(sgram_nl['t'])
 
-    # mock_intensities = generate_random_array(array_dimensions)
-
-    potential_baselines = find_seams(sp, 20, time_length-200)
-
-    # print(potential_baselines[0][0])
+    potential_baselines = find_seams(sp_nl, 20, time_length-200)
 
     baseline_velocity_index = potential_baselines[0][0][0]
     baseline_intensity = potential_baselines[0][0][2]
-
     baseline_velocity = sgram_nl['v'][baseline_velocity_index]
 
     print("baseline velocity: ", baseline_velocity)
     print("baseline intensity: ", baseline_intensity)
 
+    axes = plt.axes()
+
+    sgram = sp.spectrogram(0, 50e-6)
+
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+
+    cmsh = axes.pcolormesh(sgram['t'] * 1e6, sgram['v'], sgram['spectrogram'])
+    # plt.gcf().colorbar(cmsh, ax=axes)
+    axes.set_ylabel('Velocity (m/s)')
+    axes.set_xlabel('Time ($\mu$s)')
+
+
+    cmsh.set_clim((0,80))
+    ax.plot([0,5,10,15,20,25,30,35,40],[baseline_velocity for i in range(9)],'r-')
+    ax.set_ylim(0,10000)
+
+    sp.plot(ax, sgram)
 
     # print(sgram_nl['v'])
         
