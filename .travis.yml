@@ -1,0 +1,13 @@
+language: python
+python:
+  - 3.6
+branches:
+  only:
+    - trevor
+    - master
+cache: pip
+install: "pip install"
+script: python tests.py
+autopep8 *.py
+pycodestyle *.py
+
