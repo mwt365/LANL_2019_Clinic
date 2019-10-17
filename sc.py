@@ -54,7 +54,7 @@ def find_potential_seams(two_dimensional_array, num_signals: int):
         # print(row) 
 
     outer_array = len(two_dimensional_array)
-    first_array = two_dimensional_array[0]
+    first_array = two_dimensional_array[20]
     inner_array = len(first_array)
 
     new_first_array = [(first_array[i], i) for i in range(len(first_array))]
@@ -92,7 +92,7 @@ def find_seams(two_dimensional_array: list, num_signals: int, t_end:int):
     for start_of_seam in potential_seams:
 
         # print(start_of_seam)
-        print(rez[0][start_of_seam], "\n")
+        # print(rez[0][start_of_seam], "\n")
 
         # if find_seam(start_of_seam, two_dimensional_array, DP):
 
@@ -112,7 +112,7 @@ def find_seams(two_dimensional_array: list, num_signals: int, t_end:int):
     # print(len(seams))
     # print(len(new_seams))
 
-    return new_seams
+    return seams
 
 
 
@@ -216,11 +216,17 @@ if __name__ == "__main__":
     sp_nl = spctgrm.Spectrogram('GEN3CH_4_009.dig')
     sgram_nl = sp_nl.spectrogram_no_log(0, 50e-6)
 
-    intensities = np.sum(sgram_nl['spectrogram'], axis=1)
+    # intensities = [np.sum(sgram_nl['spectrogram'], axis=1)]
+    intensities = []
+
+    for inner_array in sgram_nl['spectrogram']:
+        max_intensity = np.max(inner_array)
+        intensities.append(max_intensity)
+
     max_intensity = np.max(intensities)
 
-    baseline_velocity_index = [np.argmax(intensities)]
-    baseline_velocity = sgram_nl['v'][baseline_velocity_index]
+    # baseline_velocity_index = [np.argmax(intensities)]
+    # baseline_velocity = sgram_nl['v'][baseline_velocity_index]
 
     print(max_intensity)
     print("\n")
@@ -243,6 +249,17 @@ if __name__ == "__main__":
 
     potential_baselines = find_seams(sp, 20, time_length-200)
 
-    for baseline in potential_baselines:
+    # print(potential_baselines[0][0])
 
-        print(baseline[5][2])
+    baseline_velocity_index = potential_baselines[0][0][0]
+    baseline_intensity = potential_baselines[0][0][2]
+
+    baseline_velocity = sgram_nl['v'][baseline_velocity_index]
+
+    print("baseline velocity: ", baseline_velocity)
+    print("baseline intensity: ", baseline_intensity)
+
+    # print(sgram_nl['v'])
+    
+
+        
