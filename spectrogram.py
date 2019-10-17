@@ -46,20 +46,6 @@ class Spectrogram:
         intensity: two-dimensional array of (scaled) intensities, which
             is the spectrogram. The first index corresponds to
             frequency/velocity, the second to time.
-
-    Representation of a photon Doppler velocimetry file stored in
-    the .dig format. On creation, the file header is read and processed;
-    information in the top 512 bytes is stored in a notes dictionary.
-    Information from the second 512-byte segment is decoded to infer
-    the number of data points, the number of bytes per point, the
-    start time and sampling interval, and the voltage scaling.
-
-    The actual data remain on disk and are loaded only as required either
-    to generate a spectrogram for a range in time or a spectrum from a
-    shorter segment. The values are loaded from disk and decoded using
-    the *values* method which takes a start time and either an end time
-    or an integer number of points to include.
-
     """
 
     _fields = ("points_per_spectrum",
@@ -143,7 +129,8 @@ class Spectrogram:
             [str(x) for x in
              [self.data.filename,
               f"{self.points_per_spectrum} / {self.shift}",
-              self.form
+              self.form,
+              self.intensity.shape
               ]
              ])
 
@@ -265,12 +252,16 @@ class Spectrogram:
             spec = 20 * np.log10(spec)
         elif self.form == 'log':
             spec = np.log10(spec)
-        # scale the frequency axis to velocity
-        self.velocity = freqs * 0.5 * self.wavelength  # velocities
-        self.frequency = freqs
-        self.time = times
         self.intensity = spec  # a two-dimensional array
         # the first index is frequency, the second time
+        
+        self.frequency = freqs
+        self.time = times
+        
+        # scale the frequency axis to velocity
+        self.velocity = freqs * 0.5 * self.wavelength  # velocities
+
+        
 
     @property
     def max(self):
@@ -437,5 +428,5 @@ if False:
 
 
 if __name__ == '__main__':
-    sp = Spectrogram('sample.dig', 0, 10e-6)
+    sp = Spectrogram('../dig/GEN3CH_4_009.dig', None, 1e-5, overlap_shift_factor=3/4)
     print(sp)
