@@ -19,6 +19,7 @@ except FileNotFoundError:
     print("No folder named 'xml color map files' in the source directory.")
 
 # mycmap = cm.make_cmap(os.path.join(DIR, '3w_gby.xml'))
-# to use colormap: matplotlib.pyplot.imshow(your_image, cmap=matplotlib.pyplot.get_cmap(mycmap))
+# to use colormap: matplotlib.pyplot.imshow(your_image,
+# cmap=matplotlib.pyplot.get_cmap(mycmap))
 
 # cm.plot_cmap(mycmap)  # plot an 8 by 1 copy of the colormap

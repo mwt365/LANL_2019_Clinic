@@ -173,7 +173,8 @@ class DigFile:
         return "\n".join([
             self.filename,
             f"{self.bits} bits" + f" {self.notes['byte_order']} first" if 'byte_order' in self.notes else "",
-            f"{self.t0*1e6} µs to {(self.t0 + self.dt*self.num_samples)*1e6} µs in steps of {self.dt*1e12} ps"
+            f"{self.t0*1e6} µs to {(self.t0 + self.dt*self.num_samples)*1e6} µs in steps of {self.dt*1e12} ps",
+            f"{self.num_samples} points"
         ])
 
     def raw_values(self, t_start=None, ending=None):
@@ -227,20 +228,37 @@ class DigFile:
             pEnd = self.num_samples - 1
         return (pStart, pEnd)
 
-    def thumbnail(self, points=1000):
+    def thumbnail(self, t_start=None, t_end=None, points=1000, stdev=False):
         """
         Produce a condensed representation of the data by processing chunks
-        to yield mean and standard deviation as a function of time.
+        to yield mean (and standard deviation) as a function of time.
         """
-        chunk_size = self.num_samples // points
+        p_start, p_end = self._points(t_start, t_end)
+        if t_start == None:
+            t_start = p_start * self.dt + self.t0
+        chunk_size = (p_end - p_start + 1) // points
         numpts = points * chunk_size
-        chunks = self.raw_values(self.t0, numpts)
+        chunks = self.raw_values(t_start, numpts)
         chunks = chunks.reshape((points, chunk_size))
         means = chunks.mean(axis=1)
-        stdevs = chunks.std(axis=1)
-        times = np.linspace(self.t0, self.dt *
+        times = np.linspace(t_start, self.dt *
                             numpts, points)
-        return times, means, stdevs, chunks.min(axis=1), chunks.max(axis=1)
+        d = dict(
+            times=times,
+            means=means,
+            mins=chunks.min(axis=1),
+            maxs=chunks.max(axis=1)
+        )
+        if stdev:
+            d['stdevs'] = chunks.std(axis=1)
+        # Now create a quick-and-dirty thumbnail that
+        # takes successive points alternatively from mins
+        # and maxs, that can be plotted against times to roughly
+        # describe the envelope of values
+        d['peak_to_peak'] = np.asarray([
+            d['mins'][n] if n % 2 else d['maxs'][n] for n in range(len(times))
+        ])
+        return d
 
 
 if __name__ == '__main__':
