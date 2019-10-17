@@ -236,17 +236,17 @@ if __name__ == "__main__":
 
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
-    cmsh = sp.plot(axes, sgram)
+
+    cmsh = axes.pcolormesh(sgram['t'] * 1e6, sgram['v'], sgram['spectrogram'])
+    # plt.gcf().colorbar(cmsh, ax=axes)
+    axes.set_ylabel('Velocity (m/s)')
+    axes.set_xlabel('Time ($\mu$s)')
+
+
     cmsh.set_clim((0,80))
     ax.plot([0,5,10,15,20,25,30,35,40],[baseline_velocity for i in range(9)],'r-')
-    ax.set_ylim(0,4000)
+    ax.set_ylim(0,10000)
 
-    plt.show()
-
-
-    
-
-    sp.plot(axes, sgram)
-
+    sp.plot(ax, sgram)
 
         
