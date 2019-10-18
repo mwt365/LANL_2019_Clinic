@@ -157,6 +157,7 @@ class SpectrogramWidget:
             self.digfile = digfile
 
         self.title = self.digfile.filename.split('/')[-1].replace("_", "\\_")
+        self.baselines = []
         # handle the keyword arguments here
 
         # Compute the base spectrogram (do we really need this?)
@@ -238,7 +239,18 @@ class SpectrogramWidget:
             description='Color Map',
             disabled=False,
         )
-        cd['color_map'].observe(lambda x: self.update_cmap(), names="value")
+        cd['color_map'].observe(lambda x: self.update_cmap(),
+                                names="value")
+
+        cd['baselines'] = widgets.Dropdown(
+            options=('_None_', 'Squash', 'FFT'),
+            value='_None_',
+            description='Baselines',
+            disabled=False
+        )
+        cd['baselines'].observe(
+            lambda x: self.update_baselines(x["new"]),
+            names="value")
 
         cd['raw_signal'] = widgets.Checkbox(
             value=False,
@@ -273,7 +285,8 @@ class SpectrogramWidget:
             widgets.VBox([
                 cd['color_map'],
                 cd['raw_signal'],
-                cd['shift']
+                cd['shift'],
+                cd['baselines']
             ])
         ])
 
@@ -361,8 +374,11 @@ class SpectrogramWidget:
     def update_cmap(self):
         mapname = self.individual_controls['color_map'].value
         if mapname == 'Computed':
-            from generate_map import make_spectrogram_color_map
-            make_spectrogram_color_map(self.spectrogram, 3, mapname)
+            from generate_color_map import make_spectrogram_color_map
+            mapinfo = make_spectrogram_color_map(
+                self.spectrogram, 4, mapname)
+            maprange = (mapinfo['centroids'][1], mapinfo['centroids'][-2])
+            self.individual_controls['intensity_range'].value = maprange
         self.image.set_cmap(COLORMAPS[mapname])
 
     def update_velocity_range(self):
@@ -374,13 +390,64 @@ class SpectrogramWidget:
         self.image.set_clim(self.range('intensity_range'))
 
     def handle_click(self, event):
-        t, v = event.xdata * 1e-6, event.ydata
+        try:
+            t, v = event.xdata * 1e-6, event.ydata
+        except:
+            return 0
         # Compute a spectrum
         # we should do better about the length
+        click_type = int(event.button)
         try:
-            self.spectrum(t)
+            if click_type == 1:
+                self.spectrum(t)
+            else:
+                self.follow(t, v)
+
         except Exception as eeps:
             pass
+
+    def follow(self, t, v):
+        """Attempt to follow the path starting with the clicked
+        point."""
+        from gaussian_follow import gaussian_follow
+        results = gaussian_follow(self.spectrogram, (t, v))
+        self.axSpectrogram.plot(
+            results['time'],
+            results['center'],
+            'y.'
+        )
+
+    def update_baselines(self, method):
+        """
+        Handle the baselines popup menu
+        """
+        from baselines import baselines_by_squash
+        blines = []
+        self.baselines = []  # remove any existing baselines
+        if method == "Squash":
+            peaks, sigs, heights = baselines_by_squash(self.spectrogram)
+            for n in range(len(heights)):
+                if heights[n] > 0.1:
+                    blines.append(peaks[n])
+
+        # Now show the baselines in blines or remove any
+        # if blines is empty
+
+        if not blines:
+            self.baselines = []  # remove them
+        else:
+            edges = (
+                self.spectrogram.intensity.min(),
+                self.spectrogram.intensity.max()
+            )
+            for v in blines:
+                bline = self.axSpectrum.plot(
+                    [edges[0], edges[1]],
+                    [v, v],
+                    'k-',
+                    alpha=0.4
+                )
+                self.baselines.append(bline)
 
     def spectrum(self, the_time):
         if the_time is None:
