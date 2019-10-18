@@ -229,8 +229,11 @@ class SpectrogramWidget:
         slide.observe(lambda x: self.update_color_range(),
                       names="value")
 
+        the_maps = sorted(COLORMAPS.keys())
+        the_maps.append('Computed')
+
         cd['color_map'] = widgets.Dropdown(
-            options=sorted(COLORMAPS.keys()),
+            options=the_maps,
             value='3w_gby',
             description='Color Map',
             disabled=False,
@@ -357,6 +360,9 @@ class SpectrogramWidget:
 
     def update_cmap(self):
         mapname = self.individual_controls['color_map'].value
+        if mapname == 'Computed':
+            from generate_map import make_spectrogram_color_map
+            make_spectrogram_color_map(self.spectrogram, 3, mapname)
         self.image.set_cmap(COLORMAPS[mapname])
 
     def update_velocity_range(self):
@@ -380,7 +386,8 @@ class SpectrogramWidget:
         if the_time is None:
             # Initialize the axes
             self.axSpectrum.plot([0, 1], [0, 1], 'r-')
-            self.axSpectrum.grid(axis='x', which='both', color='b', alpha=0.4)
+            self.axSpectrum.grid(axis='x', which='both',
+                                 color='b', alpha=0.4)
         else:
             delta_t = self.spectrogram.points_per_spectrum / 2 * \
                 self.digfile.dt
@@ -399,8 +406,9 @@ class SpectrogramWidget:
             # the spectrum came from.
             if not self.axSpectrogram.lines:
                 self.axSpectrogram.plot([0, 0], [0, 1], 'r-', alpha=0.33)
-            line = self.axSpectrogram.lines[0] # this won't scale when we add baselines
-            tval = the_time * 1e6 # convert to microseconds
+            # this won't scale when we add baselines
+            line = self.axSpectrogram.lines[0]
+            tval = the_time * 1e6  # convert to microseconds
             line.set(xdata=[tval, tval], ydata=[0, self.spectrogram.v_max])
 
 
