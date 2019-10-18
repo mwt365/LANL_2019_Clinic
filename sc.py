@@ -27,13 +27,19 @@ from scipy import signal
 
 
 def generate_random_array(test_range):
-
+    """
+        Input: test_range: an integer to contruct a 2-dimensional array
+                that can be used for testing purposes on the other 
+                functions in this file. 
+        Output: a 2-dimensional array of size test_range*test_range
+                where the elements are randomly generated floats
+                between 0 and 1. 
+    """
     outer_array = []
 
     for i in range(test_range):
 
         inner_array = [round(random.random(), 5) for i in range(test_range)]
-
         outer_array.append(inner_array)
 
     return outer_array
@@ -41,6 +47,24 @@ def generate_random_array(test_range):
 
 
 def find_potential_seams(two_dimensional_array, num_signals: int):
+    """ Finds the potential starting points in the 2-dimensional array (spectrogram)
+        to perform a seam carving algorithm on. Can return the maximum n intensity points. 
+
+        Input: two_dimensional_array: a spectrogram, or 2-dimensional array with inner arrays
+               indexed with time steps and the collection of all arrays indexed by velocity.
+               Each element corresponds to the intensity value at that time step for that velocity. 
+               See the spectrogram class to see how the spectrogram stores velocities, time, 
+               and intensities as a dictionary. 
+
+               num_signals: integer that can be specified by the user. Will return the first n potential starting
+               starting velocity indicies and their intensity values. The time step for these velocities
+               is assumed to start at time step 0. 
+        
+        Output: Indicies corresponding to the velocities associated with the first n maximum intensity values. 
+                These indicies can be used as a starting point for performing a seam carving algorithm on an input
+                spectrogram.
+
+    """
 
     # assert isinstance(two_dimensional_array, list)
     # assert isinstance(two_dimensional_array[0], list)
@@ -75,6 +99,27 @@ def find_potential_seams(two_dimensional_array, num_signals: int):
 
 
 def find_seams(two_dimensional_array: list, num_signals: int, t_end:int):
+    """
+        Parent function for generating seams of intensity values in a spectrogram.
+
+        Input: two_dimensional_array: a spectrogram, or 2-dimensional array with inner arrays
+               indexed with time steps and the collection of all arrays indexed by velocity.
+               Each element corresponds to the intensity value at that time step for that velocity. 
+               See the spectrogram class to see how the spectrogram stores velocities, time, 
+               and intensities as a dictionary.
+
+               num_signals: integer that can be specified by the user. Will return the first n potential starting
+               starting velocity indicies and their intensity values. The time step for these velocities
+               is assumed to start at time step 0.
+
+               t_end: integer that can be specified by the user. Specifies when to stop the recursive 
+               seam carving algorithm to return the seams. A typical experiment takes about 50 microseconds, 
+               but this value specifies the amount of time steps that will be taken by algorithm.
+
+        Output: Returns a list of seams that correspond to the input spectrogram. Each element in a seam
+                is a tuple that is indexed as (velocity_index, time_step, intensity_at_that_value).
+
+    """
 
     # assert isinstance(two_dimensional_array, list)
     # assert isinstance(two_dimensional_array[0], list)
@@ -126,6 +171,32 @@ two-dim-array: intensity @ velo and time = two_dimensional_array[time][velocity]
 """
 
 def find_seam(velocity:int, time:int, two_dimensional_array:list, seam_trace:list, limit:int):
+    """
+        Recursive function for finding the seams in a spectrogram. Starts at an interesting
+        intensity value, and follows a seam of minimal change up to the time step specified by 
+        the user. 
+
+        Input: velocity -> integer that is used to index into the spectogram's velocity list and to 
+               keep track of where the signal is. 
+
+               time -> integer used to keep track of which time step the intensity value is at. 
+
+               two_dimensional_array -> the spectrogram, or 2-dimensional array with inner arrays
+               indexed with time steps and the collection of all arrays indexed by velocity.
+               Each element corresponds to the intensity value at that time step for that velocity. 
+               See the spectrogram class to see how the spectrogram stores velocities, time, 
+               and intensities as a dictionary.
+
+               seam_trace -> initially an empty array or the array that has all tuples containing
+               information on intensity, time, and velocity values. 
+
+               limit -> when the algorithm should finish and return the seam. Should be lower than
+               the time steps required for the whole experiment. 
+
+        Output: seam_trace, a list of tuples containing intensity values that were traced throughout 
+                the input spectrogram. Can potentially be used to find a baseline velocity or intensity. 
+
+    """
 
     if time > limit:
         return seam_trace
@@ -175,6 +246,14 @@ def find_seam(velocity:int, time:int, two_dimensional_array:list, seam_trace:lis
 
 
 def verify_seam(seam):
+    """ 
+        Determines if a seam is actually a baseline or not in the spectrogram. 
+
+        Input: a list of tuples containing velocity, time, and intensity data. 
+
+        Output: True or False boolean value
+
+    """
 
     seam_length = len(seam)
 
@@ -201,6 +280,20 @@ def verify_seam(seam):
 
 
 def within_range(test, percent, base):
+    """
+        Determines if the test integer is within a certain
+        perecentage of the base integer. 
+
+        Input: test -> integer to test. 
+        
+               percent -> integer, but is thought of as percent. 
+               For example, 10 is ten percent. 
+
+               base -> integer that we want to compare test to. 
+
+        Output: True or False value. 
+
+    """
     decimalPercent = percent / 200.0
     highRange = base * (1.0 + decimalPercent)
     lowRange = base * (1.0 - decimalPercent)
@@ -315,15 +408,16 @@ if __name__ == "__main__":
     ax = fig.add_subplot(1,1,1)
 
     cmsh = axes.pcolormesh(sgram['t'] * 1e6, sgram['v'], sgram['spectrogram'])
-    # plt.gcf().colorbar(cmsh, ax=axes)
+    plt.gcf().colorbar(cmsh, ax=axes)
     axes.set_ylabel('Velocity (m/s)')
     axes.set_xlabel('Time ($\mu$s)')
 
 
-    cmsh.set_clim((0,80))
+    # cmsh.set_clim((0,80))
     ax.plot([0,5,10,15,20,25,30,35,40],[baseline_velocity for i in range(9)],'r-')
     ax.set_ylim(0,10000)
 
     sp.plot(ax, sgram)
+    # plt.show()
 
         
