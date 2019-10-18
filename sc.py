@@ -381,8 +381,7 @@ def within_range(test, percent, base):
 
 #         return velocities
 
-
-if __name__ == "__main__":
+def mainLoop():
     filename = 'GEN3CH_4_009.dig'
     sp = spctgrm.Spectrogram('GEN3CH_4_009.dig')
     sp_nl = spctgrm.Spectrogram('GEN3CH_4_009.dig')
@@ -421,4 +420,8 @@ if __name__ == "__main__":
     ax.set_ylim(0,10000)
 
     sp.plot(ax, sgram)
-    
+
+    return sgram
+
+if __name__ == "__main__":
+    mainLoop()
