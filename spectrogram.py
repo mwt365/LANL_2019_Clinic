@@ -62,7 +62,7 @@ class Spectrogram:
                  ending=None,
                  wavelength=1550.0e-9,
                  points_per_spectrum=8192,
-                 overlap_shift_factor=3 / 4,
+                 overlap_shift_factor=0.25,
                  window_function=None,  # 'hanning',
                  form='db',
                  convert_to_voltage=True,
@@ -249,10 +249,11 @@ class Spectrogram:
         # Convert to a logarithmic representation and use floor to attempt
         # to suppress some noise.
         spec *= 2.0 / (self.points_per_spectrum * self.data.dt)
+        epsilon = 1e-10  # use this to suppress the divide by zero warnings
         if self.form == 'db':
-            spec = 20 * np.log10(spec)
+            spec = 20 * np.log10(spec + epsilon)
         elif self.form == 'log':
-            spec = np.log10(spec)
+            spec = np.log10(spec + epsilon)
         self.intensity = spec  # a two-dimensional array
         # the first index is frequency, the second time
         
@@ -429,5 +430,5 @@ if False:
 
 
 if __name__ == '__main__':
-    sp = Spectrogram('../dig/GEN3CH_4_009.dig', None, 1e-5, overlap_shift_factor=3/4)
+    sp = Spectrogram('../dig/GEN3CH_4_009.dig', None, None, overlap_shift_factor=1/4)
     print(sp)
