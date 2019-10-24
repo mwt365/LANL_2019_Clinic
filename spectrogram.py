@@ -71,8 +71,8 @@ class Spectrogram:
 
     def __init__(self,
                  digfile,
-                 t_start,
-                 ending,
+                 t_start=None,
+                 ending=None,
                  wavelength=1550.0e-9,
                  points_per_spectrum=8192,
                  overlap_shift_factor=1 / 8,
