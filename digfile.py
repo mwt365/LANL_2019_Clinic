@@ -174,7 +174,7 @@ class DigFile:
             self.filename,
             f"{self.bits} bits" + f" {self.notes['byte_order']} first" if 'byte_order' in self.notes else "",
             f"{self.t0*1e6} µs to {(self.t0 + self.dt*self.num_samples)*1e6} µs in steps of {self.dt*1e12} ps",
-            f"{self.num_samples} points"
+            f"{self.num_samples:,} points"
         ])
 
     def raw_values(self, t_start=None, ending=None):
@@ -236,12 +236,13 @@ class DigFile:
         p_start, p_end = self._points(t_start, t_end)
         if t_start == None:
             t_start = p_start * self.dt + self.t0
+        t_end = p_end * self.dt + self.t0
         chunk_size = (p_end - p_start + 1) // points
         numpts = points * chunk_size
         chunks = self.raw_values(t_start, numpts)
         chunks = chunks.reshape((points, chunk_size))
         means = chunks.mean(axis=1)
-        times = np.linspace(t_start, self.dt *
+        times = np.linspace(t_start, t_start + self.dt *
                             numpts, points)
         d = dict(
             times=times,
@@ -270,10 +271,9 @@ if __name__ == '__main__':
             continue
         df = DigFile(f'../dig/{filename}.dig')
         print(df)
-        t, av, sd, mns, mxs = df.thumbnail()
-        # yvals = np.ravel([av - sd, av + sd], order='F')
-        yvals = np.ravel([mns, mxs], order='F')
-        xvals = np.ravel([t, t], order='F')
+        thumb = df.thumbnail(0, 1e-3, stdev=True)
+        xvals = thumb['times']
+        yvals = thumb['stdevs'] # thumb['peak_to_peak']
         plt.plot(xvals * 1e6, yvals)
         plt.xlabel('$t (\\mu \\mathrm{s})$')
         plt.ylabel('amplitude')

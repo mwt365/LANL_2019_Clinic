@@ -157,6 +157,7 @@ class SpectrogramWidget:
             self.digfile = digfile
 
         self.title = self.digfile.filename.split('/')[-1].replace("_", "\\_")
+        self.baselines = []
         # handle the keyword arguments here
 
         # Compute the base spectrogram (do we really need this?)
@@ -229,13 +230,27 @@ class SpectrogramWidget:
         slide.observe(lambda x: self.update_color_range(),
                       names="value")
 
+        the_maps = sorted(COLORMAPS.keys())
+        the_maps.append('Computed')
+
         cd['color_map'] = widgets.Dropdown(
-            options=sorted(COLORMAPS.keys()),
+            options=the_maps,
             value='3w_gby',
             description='Color Map',
             disabled=False,
         )
-        cd['color_map'].observe(lambda x: self.update_cmap(), names="value")
+        cd['color_map'].observe(lambda x: self.update_cmap(),
+                                names="value")
+
+        cd['baselines'] = widgets.Dropdown(
+            options=('_None_', 'Squash', 'FFT'),
+            value='_None_',
+            description='Baselines',
+            disabled=False
+        )
+        cd['baselines'].observe(
+            lambda x: self.update_baselines(x["new"]),
+            names="value")
 
         cd['raw_signal'] = widgets.Checkbox(
             value=False,
@@ -243,13 +258,35 @@ class SpectrogramWidget:
         cd['raw_signal'].observe(
             lambda b: self.show_raw_signal(b), names="value")
 
+        cd['spectrum_size'] = slide = widgets.IntSlider(
+            value=13, min=8, max=18, step=1,
+            description="FFT 2^n"
+        )
+        slide.continuous_update = False
+        slide.observe(lambda x: self.overhaul(points_per_spectrogram=2 ** x['new']),
+                      names="value")
+
+        cd['shift'] = slide = widgets.IntSlider(
+            description='Shift',
+            value=self.spectrogram.points_per_spectrum - self.spectrogram.shift,
+            min=1,
+            max=2 * self.spectrogram.points_per_spectrum,
+            step=1)
+        slide.continuous_update = False
+        slide.observe(lambda x: self.overhaul(
+            shift=self.spectrogram.points_per_spectrum - x['new']),
+            names="value")
+
         self.controls = widgets.HBox([
             widgets.VBox([
-                cd['t_range'], cd['velocity_range'], cd['intensity_range']
+                cd['t_range'], cd['velocity_range'],
+                cd['intensity_range'], cd['spectrum_size']
             ]),
             widgets.VBox([
                 cd['color_map'],
                 cd['raw_signal'],
+                cd['shift'],
+                cd['baselines']
             ])
         ])
 
@@ -278,7 +315,7 @@ class SpectrogramWidget:
             yscale = 0.2 * (ylims[1] - ylims[0]) / yrange
             vvals = ylims[1] - yscale * (ymax - yvals)
             self.axSpectrogram.plot(tvals, vvals,
-                                    'y-', alpha=0.4)
+                                    'r-', alpha=0.5)
         else:
             try:
                 del self.axSpectrogram.lines[0]
@@ -286,6 +323,14 @@ class SpectrogramWidget:
                 self.fig.canvas.flush_events()
             except:
                 pass
+
+    def overhaul(self, **kwargs):
+        """
+        A parameter affecting the base spectrogram has been changed, so
+        we need to recompute everything.
+        """
+        self.spectrogram.set(**kwargs)
+        self.update_spectrogram()
 
     def update_spectrogram(self):
         """
@@ -328,6 +373,12 @@ class SpectrogramWidget:
 
     def update_cmap(self):
         mapname = self.individual_controls['color_map'].value
+        if mapname == 'Computed':
+            from generate_color_map import make_spectrogram_color_map
+            mapinfo = make_spectrogram_color_map(
+                self.spectrogram, 4, mapname)
+            maprange = (mapinfo['centroids'][1], mapinfo['centroids'][-2])
+            self.individual_controls['intensity_range'].value = maprange
         self.image.set_cmap(COLORMAPS[mapname])
 
     def update_velocity_range(self):
@@ -339,18 +390,77 @@ class SpectrogramWidget:
         self.image.set_clim(self.range('intensity_range'))
 
     def handle_click(self, event):
-        t, v = event.xdata * 1e-6, event.ydata
+        try:
+            t, v = event.xdata * 1e-6, event.ydata
+        except:
+            return 0
         # Compute a spectrum
         # we should do better about the length
-        self.spectrum(t)
+        click_type = int(event.button)
+        try:
+            if click_type == 1:
+                self.spectrum(t)
+            else:
+                self.follow(t, v)
+
+        except Exception as eeps:
+            pass
+
+    def follow(self, t, v):
+        """Attempt to follow the path starting with the clicked
+        point."""
+        from gaussian_follow import gaussian_follow
+        results = gaussian_follow(self.spectrogram, (t, v))
+        self.axSpectrogram.plot(
+            results['time'],
+            results['center'],
+            'y.'
+        )
+
+    def update_baselines(self, method):
+        """
+        Handle the baselines popup menu
+        """
+        from baselines import baselines_by_squash
+        blines = []
+        self.baselines = []  # remove any existing baselines
+        if method == "Squash":
+            peaks, sigs, heights = baselines_by_squash(self.spectrogram)
+            for n in range(len(heights)):
+                if heights[n] > 0.1:
+                    blines.append(peaks[n])
+
+        # Now show the baselines in blines or remove any
+        # if blines is empty
+
+        if not blines:
+            self.baselines = []  # remove them
+        else:
+            edges = (
+                self.spectrogram.intensity.min(),
+                self.spectrogram.intensity.max()
+            )
+            for v in blines:
+                bline = self.axSpectrum.plot(
+                    [edges[0], edges[1]],
+                    [v, v],
+                    'k-',
+                    alpha=0.4
+                )
+                self.baselines.append(bline)
 
     def spectrum(self, the_time):
         if the_time is None:
             # Initialize the axes
             self.axSpectrum.plot([0, 1], [0, 1], 'r-')
+            self.axSpectrum.grid(axis='x', which='both',
+                                 color='b', alpha=0.4)
         else:
+            delta_t = self.spectrogram.points_per_spectrum / 2 * \
+                self.digfile.dt
             the_spectrum = Spectrum(
-                self.digfile.values(the_time, 8192),
+                self.digfile.values(the_time - delta_t,
+                                    the_time + delta_t),
                 self.digfile.dt,
                 remove_dc=True)
             line = self.axSpectrum.lines[0]
@@ -359,6 +469,14 @@ class SpectrogramWidget:
 
             self.axSpectrum.set_xlim(
                 (intensities.mean(), intensities.max()))
+            # We should also add a line to the spectrogram showing where
+            # the spectrum came from.
+            if not self.axSpectrogram.lines:
+                self.axSpectrogram.plot([0, 0], [0, 1], 'r-', alpha=0.33)
+            # this won't scale when we add baselines
+            line = self.axSpectrogram.lines[0]
+            tval = the_time * 1e6  # convert to microseconds
+            line.set(xdata=[tval, tval], ydata=[0, self.spectrogram.v_max])
 
 
 if __name__ == '__main__':

@@ -3,7 +3,7 @@
 import cm_xml_to_matplotlib as cm
 import os
 
-DIR = os.path.join(os.path.split(__file__)[0], "xml color map files")
+DIR = os.path.join(os.path.split(__file__)[0], "xml_cm_files")
 
 # make the Matplotlib compatible colormap
 
