@@ -82,7 +82,7 @@ class GaussianFitter:
         powers = self.spectrogram.power(intensities)
 
         # Should we smooth first?
-        if True:
+        # if True:
 
         if len(self.coefficients) != 4:
             avg = np.mean(powers)
@@ -124,7 +124,7 @@ class GaussianFitter:
 
         axes.lines = []
         # plot the data
-        axes.plot(velocities, powers, 'ro', alpha=0.4)
+        axes.plot(velocities, powers, 'ro-', alpha=0.4)
         # compute the fitted curve
         # A, mu, sigma, background = p
         params = [self.results[x][n] for x in

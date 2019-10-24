@@ -17,6 +17,7 @@ from digfile import DigFile
 from spectrogram import Spectrogram
 from spectrum import Spectrum
 from plotter import COLORMAPS
+from gaussian_follow import GaussianFitter
 
 DEFMAP = '3w_gby'  # should really be in an .ini file
 
@@ -404,13 +405,12 @@ class SpectrogramWidget:
             t, v = event.xdata * 1e-6, event.ydata
         except:
             return 0
-        # Compute a spectrum
-        # we should do better about the length
-        click_type = int(event.button)
+        # Look up what we should do with the click
+        action = self.individual_controls['clicker'].value
         try:
-            if click_type == 1:
+            if action == 'Spectrum':
                 self.spectrum(t)
-            else:
+            elif action == 'Gauss':
                 self.follow(t, v)
 
         except Exception as eeps:
@@ -419,16 +419,11 @@ class SpectrogramWidget:
     def follow(self, t, v):
         """Attempt to follow the path starting with the clicked
         point."""
-        from gaussian_follow import GaussianFitter
+        
         fitter = GaussianFitter(self.spectrogram, (t, v))
-        return fitter
-
-        #results = gaussian_follow(self.spectrogram, (t, v))
-        # self.axSpectrogram.plot(
-        # results['time'],
-        # results['center'],
-        # 'y.'
-        # )
+        self.gauss = fitter
+        print("Create a figure and axes, then call self.gauss.show_fit(axes)")
+        
 
     def update_baselines(self, method):
         """
