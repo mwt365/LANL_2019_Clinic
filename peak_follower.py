@@ -8,36 +8,18 @@
 
 import numpy as np
 from spectrogram import Spectrogram
-from scipy.optimize import curve_fit
 from follower import Follower
 
-def _gauss(x, *p):
-    """Gaussian fitting function used by curve_fit"""
-    A, mu, sigma, background = p
-    return background + A * \
-        np.exp(-0.5 * ((x - mu) / sigma)**2)
 
-
-class GaussianFitter(Follower):
+class PeakFollower(Follower):
     """
 
     """
 
-    def __init__(self, spectrogram, start_point, span=80):
+    def __init__(self, spectrogram, start_point, span=30):
         super().__init__(spectrogram, start_point, span)
-        
-        self.params = []
 
-    @property
-    def coefficients(self):
-        return np.array(self.params)
-
-    @coefficients.setter
-    def coefficients(self, params):
-        assert isinstance(params, (list, tuple))
-        self.params = params
-
-    def fit_gaussian(self):
+    def step(self):
         """
         Attempt to fit a gaussian starting from the coeffients
         in the input parameter to intensities vs velocities.
@@ -45,41 +27,33 @@ class GaussianFitter(Follower):
         The order of the parameters in the coefficients array is
         amplitude, center, width, and background.
         """
-        p_start, p_end = self.data_range()
-        velocities = self.velocity[p_start:p_end]
-        intensities = self.intensity[p_start:p_end, self.p_time]
-        # make sure we are dealing with power
-        powers = self.spectrogram.power(intensities)
-
+        velocities, intensities, p_start, p_end = self.data()
+        
         # Should we smooth first?
-        # if True:
-
-        if len(self.coefficients) != 4:
-            avg = np.mean(powers)
-            amp = np.max(powers) - avg
-            # if no center was specified, use the middle
-            # of the range
-            center = velocities[len(velocities) // 2]
-            width = velocities[10] - velocities[0]  # this is strange
-            self.coefficients = [amp, center, width, avg]
-
-        coeff, var_matrix = curve_fit(
-            _gauss, velocities, powers,
-            p0=self.coefficients
-        )
+        if True:
+            smooth = np.zeros(len(intensities))
+            n_window = 3
+            for roll in range(-n_window, n_window+1):
+                smooth += np.roll(intensities, roll)
+            smooth /= 2 * n_window + 1
+            intensities = smooth
+        
+        low_to_high = np.argsort(intensities)
+        
+        v_high = velocities[low_to_high[-1]]
+        
         # We should now determine whether the fit was successful
-        if np.nan in var_matrix:
+        if False:
             print("Failed in gaussian fit")
             return False
         else:
             # add this to our results
+            self.results['v_spans'].append((p_start, p_end))
             self.results['p_times'].append(self.p_time)
             self.results['times'].append(
                 self.spectrogram._point_to_time(self.p_time))
-            self.results['velocities'].append(coeff[1])
-            self.results['widths'].append(coeff[2])
-            self.results['amplitudes'].append(coeff[0])
-            self.results['backgrounds'].append(coeff[3])
+            self.results['velocities'].append(v_high)
+            self.p_time += 1
         return True
 
     def show_fit(self, axes, n=-1):

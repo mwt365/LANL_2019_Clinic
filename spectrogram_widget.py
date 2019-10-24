@@ -18,6 +18,7 @@ from spectrogram import Spectrogram
 from spectrum import Spectrum
 from plotter import COLORMAPS
 from gaussian_follow import GaussianFitter
+from peak_follower import PeakFollower
 
 DEFMAP = '3w_gby'  # should really be in an .ini file
 
@@ -187,21 +188,22 @@ class SpectrogramWidget:
 
         self.individual_controls = dict()
         self.controls = None
-        self.make_controls()
+        self.make_controls(**kwargs)
 
         # create the call-back functions, and then display the controls
 
         display(self.controls)
         self.update_spectrogram()
 
-    def make_controls(self):
+    def make_controls(self, **kwargs):
         """
         Create the controls for this widget and store them in self.controls.
         """
         cd = self.individual_controls  # the dictionary of controls
         df = self.digfile
+        t_range = kwargs.get('t_range', (0, 25))
         cd['t_range'] = slide = ValueSlider(
-            "Time (µs)", (0, 25), (df.t0, df.t_final), 1e6,
+            "Time (µs)", t_range, (df.t0, df.t_final), 1e6,
             readout_format=".1f"
         )
         slide.continuous_update = False
@@ -244,7 +246,7 @@ class SpectrogramWidget:
                                 names="value")
 
         cd['clicker'] = widgets.Dropdown(
-            options=("Spectrum", "Gauss", ),
+            options=("Spectrum", "Peak", "Gauss", ),
             value='Spectrum',
             description="Click",
             disabled=False
@@ -402,6 +404,7 @@ class SpectrogramWidget:
 
     def handle_click(self, event):
         try:
+            # convert time to seconds
             t, v = event.xdata * 1e-6, event.ydata
         except:
             return 0
@@ -410,18 +413,22 @@ class SpectrogramWidget:
         try:
             if action == 'Spectrum':
                 self.spectrum(t)
-            elif action == 'Gauss':
-                self.follow(t, v)
+            else:
+                self.follow(t, v, action)
 
         except Exception as eeps:
             pass
 
-    def follow(self, t, v):
+    def follow(self, t, v, action):
         """Attempt to follow the path starting with the clicked
         point."""
         
-        fitter = GaussianFitter(self.spectrogram, (t, v))
-        self.gauss = fitter
+        if action == "Gauss":
+            fitter = GaussianFitter(self.spectrogram, (t, v))
+            self.gauss = fitter
+        elif action == "Peak":
+            follower = PeakFollower(self.spectrogram, (t, v))
+            self.peak = follower
         print("Create a figure and axes, then call self.gauss.show_fit(axes)")
         
 

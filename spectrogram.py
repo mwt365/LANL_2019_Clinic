@@ -147,7 +147,7 @@ class Spectrogram:
 
     def _point_to_time(self, p):
         "Map a point index to a time"
-        return self.data.t0 + self.data.dt * p
+        return self.time[p]
 
     def _time_to_point(self, t):
         "Map a time to a point number"
