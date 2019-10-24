@@ -1,5 +1,6 @@
 from tkinter import *
 from tkinter import filedialog
+from spectrogram import Spectrogram
 
 class Window(Frame):
 
@@ -23,9 +24,11 @@ class Window(Frame):
         openButton = Button(self, text="Select file", command=self.openFile)
 
         # placing the button on my window
-        quitButton.place(x=0, y=0)
-        openButton.place(x=0,y=0)
+        quitButton.pack(side=RIGHT)
+        openButton.pack(side=LEFT)
 
+    #variables
+    spec = None
 
 
     #methods
@@ -33,8 +36,11 @@ class Window(Frame):
         exit()
 
     def openFile(self):
-        root.filename =  filedialog.askopenfilename(initialdir = "/",title = 
-            "Select file",filetypes = (("jpeg files","*.jpg"),("all files","*.*")))
+        filename =  filedialog.askopenfilename(initialdir = "/documents",title = 
+            "Select file",filetypes = (("dig files","*.dig"),("all files","*.*")))
+        print(filename)
+        self.spec = Spectrogram(filename)
+
 
 root = Tk()
 
