@@ -161,7 +161,7 @@ class SpectrogramWidget:
         # handle the keyword arguments here
 
         # Compute the base spectrogram (do we really need this?)
-        self.spectrogram = Spectrogram(self.digfile, None, None)
+        self.spectrogram = Spectrogram(self.digfile, None, None, **kwargs)
 
         # Create the figure to display this spectrogram
         # It would be nice to make this bigger!
@@ -242,6 +242,13 @@ class SpectrogramWidget:
         cd['color_map'].observe(lambda x: self.update_cmap(),
                                 names="value")
 
+        cd['clicker'] = widgets.Dropdown(
+            options=("Spectrum", "Gauss", ),
+            value='Spectrum',
+            description="Click",
+            disabled=False
+        )
+
         cd['baselines'] = widgets.Dropdown(
             options=('_None_', 'Squash', 'FFT'),
             value='_None_',
@@ -287,6 +294,9 @@ class SpectrogramWidget:
                 cd['raw_signal'],
                 cd['shift'],
                 cd['baselines']
+            ]),
+            widgets.VBox([
+                cd['clicker'],
             ])
         ])
 
@@ -409,13 +419,16 @@ class SpectrogramWidget:
     def follow(self, t, v):
         """Attempt to follow the path starting with the clicked
         point."""
-        from gaussian_follow import gaussian_follow
-        results = gaussian_follow(self.spectrogram, (t, v))
-        self.axSpectrogram.plot(
-            results['time'],
-            results['center'],
-            'y.'
-        )
+        from gaussian_follow import GaussianFitter
+        fitter = GaussianFitter(self.spectrogram, (t, v))
+        return fitter
+
+        #results = gaussian_follow(self.spectrogram, (t, v))
+        # self.axSpectrogram.plot(
+        # results['time'],
+        # results['center'],
+        # 'y.'
+        # )
 
     def update_baselines(self, method):
         """

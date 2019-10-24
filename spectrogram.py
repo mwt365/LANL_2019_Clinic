@@ -145,6 +145,10 @@ class Spectrogram:
             os.mkdir(location)
         return location
 
+    def _point_to_time(self, p):
+        "Map a point index to a time"
+        return self.data.t0 + self.data.dt * p
+
     def _time_to_point(self, t):
         "Map a time to a point number"
         p = (t - self.t_start) / (self.time[1] - self.time[0])
@@ -256,14 +260,12 @@ class Spectrogram:
             spec = np.log10(spec + epsilon)
         self.intensity = spec  # a two-dimensional array
         # the first index is frequency, the second time
-        
+
         self.frequency = freqs
         self.time = times
-        
+
         # scale the frequency axis to velocity
         self.velocity = freqs * 0.5 * self.wavelength  # velocities
-
-        
 
     @property
     def max(self):
@@ -273,6 +275,18 @@ class Spectrogram:
     @property
     def v_max(self):
         return self.wavelength * 0.25 / self.data.dt
+
+    def power(self, values):
+        """
+        Given an np.array of intensity values from the spectrogram,
+        return the corresponding power values (undoing any logarithms,
+        if necessary).
+        """
+        if self.form == 'db':
+            return np.power(10.0, 0.05 * values)
+        if self.form == 'log':
+            return np.power(10.0, values)
+        return values
 
     def plot(self, axes=None, **kwargs):
         # max_vel=6000, vmin=-200, vmax=100):
@@ -430,5 +444,6 @@ if False:
 
 
 if __name__ == '__main__':
-    sp = Spectrogram('../dig/GEN3CH_4_009.dig', None, None, overlap_shift_factor=1/4)
+    sp = Spectrogram('../dig/GEN3CH_4_009.dig', None,
+                     None, overlap_shift_factor=1 / 4)
     print(sp)
