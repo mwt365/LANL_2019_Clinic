@@ -13,10 +13,71 @@ import matplotlib.gridspec as gridspec
 import ipywidgets as widgets
 from IPython.display import display
 
+from digfile import DigFile
 from spectrogram import Spectrogram
+from spectrum import Spectrum
 from plotter import COLORMAPS
 
 DEFMAP = '3w_gby'  # should really be in an .ini file
+
+
+class ValueSlider(widgets.FloatRangeSlider):
+    """
+    A Slider to represent the range that we
+    wish to display. The slider maps linearly over the range
+    specified by yrange = (ymin, ymax). If a multiplier different
+    from 1 is given, then values displayed by the widget
+    will be divided by the multiplier to yield "real" values.
+    So, for example, if "real" time values are in seconds, but
+    we wish to display microseconds, the multiplier is 1e6 and
+    values used internally get divided by 1e6 to yield true
+    values for this parameter.
+    Getters and setters
+    are defined for ymin, ymax, and range.
+    """
+
+    def __init__(self, description,
+                 initial_value,  # express as percentages (0, 50)
+                 yrange,        # in true (not scaled) values
+                 multiplier=1,
+                 **kwargs):
+        super().__init__(
+            description=description,
+            min=yrange[0] * multiplier,
+            max=yrange[1] * multiplier,
+            readout=True,
+            value=[multiplier * (yrange[0] + 0.01 * x * (
+                yrange[1] - yrange[0])) for x in initial_value],
+            layout=widgets.Layout(width='400px'),
+            **kwargs)
+        self.multiplier = multiplier
+        self._ymin = yrange[0] * multiplier
+        self._ymax = yrange[1] * multiplier
+
+    @property
+    def ymin(self):
+        return self._ymin
+
+    @ymin.setter
+    def ymin(self, v):
+        self._ymin = v
+
+    @property
+    def ymax(self):
+        return self._ymax
+
+    @ymax.setter
+    def ymax(self, v):
+        self._ymax = v
+
+    @property
+    def range(self):
+        return [v / self.multiplier for v in self.value]
+
+    @range.setter
+    def range(self, val):  # fix?
+        assert isinstance(val, (list, tuple)) and len(val) == 2
+        self._ymin, self._ymax = val
 
 
 class PercentSlider(widgets.IntRangeSlider):
@@ -70,7 +131,7 @@ class SpectrogramWidget:
     numerous controls to adjust the appearance of the spectrogram.
     """
 
-    def __init__(self, spectrogram, **kwargs):
+    def __init__(self, digfile, **kwargs):
         """
         For the widget to behave in a Jupyter notebook, place
         %matplotlib widget
@@ -87,18 +148,19 @@ class SpectrogramWidget:
             margin-left: 40px;
             }
         """
-        if isinstance(spectrogram, str):
-            sg = self.spectrogram = Spectrogram(spectrogram)
+        if isinstance(digfile, str):
+            self.digfile = DigFile(digfile)
+            # sg = self.spectrogram = Spectrogram(spectrogram)
         else:
             assert isinstance(
-                spectrogram, Spectrogram), "You must pass in a Spectrogram"
-            sg = self.spectrogram = spectrogram
+                digfile, DigFile), "You must pass in a DigFile"
+            self.digfile = digfile
 
-        self.title = sg.filename.split('/')[-1].replace("_", "\\_")
+        self.title = self.digfile.filename.split('/')[-1].replace("_", "\\_")
         # handle the keyword arguments here
 
         # Compute the base spectrogram (do we really need this?)
-        self.sgram = sg.spectrogram(sg.t0, sg.t_final)
+        self.spectrogram = Spectrogram(self.digfile, None, None)
 
         # Create the figure to display this spectrogram
         # It would be nice to make this bigger!
@@ -135,29 +197,37 @@ class SpectrogramWidget:
         Create the controls for this widget and store them in self.controls.
         """
         cd = self.individual_controls  # the dictionary of controls
-        sg = self.spectrogram
-
-        cd['t_range'] = PercentSlider(
-            "Time Range", (0, 25), (sg.t0, sg.t_final))
-        cd['t_range'].continuous_update = False
-        cd['t_range'].observe(
+        df = self.digfile
+        cd['t_range'] = slide = ValueSlider(
+            "Time (µs)", (0, 25), (df.t0, df.t_final), 1e6,
+            readout_format=".1f"
+        )
+        slide.continuous_update = False
+        slide.observe(
             lambda x: self.do_update(x), names="value")
 
-        cd['velocity_range'] = PercentSlider(
-            "Velocity Range",
+        cd['velocity_range'] = slide = ValueSlider(
+            "Velocity (km/s)",
             (0, 50),
-            (0.0, sg.v_max)
+            (0.0, self.spectrogram.v_max), 1e-3,
+            readout_format=".1f",
+            continuous_update=False
         )
-        cd['velocity_range'].observe(lambda x: self.update_velocity_range(),
-                                     names="value")
+        slide.observe(lambda x: self.update_velocity_range(),
+                      names="value")
 
-        cd['intensity_range'] = PercentSlider(
-            "Color Range",
+        imax = self.spectrogram.intensity.max()
+        imin = imax - 200  # ??
+        cd['intensity_range'] = slide = ValueSlider(
+            "Color",
             (40, 70),
-            (0, 1)  # really needs to get updated!
+            (imin, imax),
+            multiplier=1,
+            readout_format=".0f",
+            continuous_update=False
         )
-        cd['intensity_range'].observe(lambda x: self.update_color_range(),
-                                      names="value")
+        slide.observe(lambda x: self.update_color_range(),
+                      names="value")
 
         cd['color_map'] = widgets.Dropdown(
             options=sorted(COLORMAPS.keys()),
@@ -167,12 +237,19 @@ class SpectrogramWidget:
         )
         cd['color_map'].observe(lambda x: self.update_cmap(), names="value")
 
+        cd['raw_signal'] = widgets.Checkbox(
+            value=False,
+            description="Show V(t)")
+        cd['raw_signal'].observe(
+            lambda b: self.show_raw_signal(b), names="value")
+
         self.controls = widgets.HBox([
             widgets.VBox([
                 cd['t_range'], cd['velocity_range'], cd['intensity_range']
             ]),
             widgets.VBox([
                 cd['color_map'],
+                cd['raw_signal'],
             ])
         ])
 
@@ -184,17 +261,48 @@ class SpectrogramWidget:
     def do_update(self, what):
         self.update_spectrogram()
 
+    def show_raw_signal(self, box):
+        if box.new:
+            # display the thumbnail
+            t_range = self.range('t_range')
+            thumb = self.digfile.thumbnail(*t_range)
+            # we have to superpose the thumbnail on the
+            # existing velocity axis, so we need to rescale
+            # the vertical.
+            tvals = thumb['times'] * 1e6  # convert to µs
+            yvals = thumb['peak_to_peak']
+            ylims = self.axSpectrum.get_ylim()
+            # Map the thumbnail to the top 20%
+            ymax = yvals.max()
+            yrange = ymax - yvals.min()
+            yscale = 0.2 * (ylims[1] - ylims[0]) / yrange
+            vvals = ylims[1] - yscale * (ymax - yvals)
+            self.axSpectrogram.plot(tvals, vvals,
+                                    'y-', alpha=0.4)
+        else:
+            try:
+                del self.axSpectrogram.lines[0]
+                self.fig.canvas.draw()
+                self.fig.canvas.flush_events()
+            except:
+                pass
+
     def update_spectrogram(self):
         """
         Recompute and display everything
         """
         sg = self.spectrogram
-        tmin, tmax = self.range('t_range')
-        self.sgram = sg.spectrogram(tmin, tmax)  # this needs many more flags
+        trange = self.range('t_range')
+        vrange = self.range('velocity_range')
+
+        # extract the requisite portions
+        times, velocities, intensities = sg.slice(trange, vrange)
+
         # Having recomputed the spectrum, we need to set the yrange
+
         # of the color map slider
-        cmin, cmax = np.min(self.sgram['spectrogram']), np.max(
-            self.sgram['spectrogram'])
+        cmin = sg.intensity.min()
+        cmax = sg.intensity.max()
         self.individual_controls['intensity_range'].range = (cmin, cmax)
 
         # if we have already displayed an image, remove it
@@ -206,16 +314,13 @@ class SpectrogramWidget:
             self.image = None
 
         self.image = self.axSpectrogram.pcolormesh(
-            self.sgram['t'] * 1e6,  # time, in microseconds
-            self.sgram['v'],
-            self.sgram['spectrogram']
-        )
+            times * 1e6, velocities, intensities)
 
         self.colorbar = self.fig.colorbar(self.image, ax=self.axSpectrogram)
 
         self.axSpectrogram.set_title(self.title)
-        self.axSpectrogram.set_xlabel(r'Time ($\mu$s)')
-        self.axSpectrogram.set_xlim(tmin * 1e6, tmax * 1e6)
+        self.axSpectrogram.set_xlabel('Time ($\mu$s)')
+        self.axSpectrogram.set_xlim(* (np.array(trange) * 1e6))
         self.axSpectrum.set_ylabel('Velocity (m/s)')
         self.update_velocity_range()
         self.update_color_range()
@@ -244,12 +349,16 @@ class SpectrogramWidget:
             # Initialize the axes
             self.axSpectrum.plot([0, 1], [0, 1], 'r-')
         else:
-            the_spectrum = self.spectrogram.spectrum(the_time, 8192)
+            the_spectrum = Spectrum(
+                self.digfile.values(the_time, 8192),
+                self.digfile.dt,
+                remove_dc=True)
             line = self.axSpectrum.lines[0]
             intensities = the_spectrum.db
             line.set(xdata=intensities, ydata=the_spectrum.velocities)
+
             self.axSpectrum.set_xlim(
-                (np.min(intensities), np.max(intensities)))
+                (intensities.mean(), intensities.max()))
 
 
 if __name__ == '__main__':
