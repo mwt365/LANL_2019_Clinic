@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 #coding:utf-8
 """
-  Author:  LANL Clinic 2019 --<lanl19@cs.hymc.edu>
+  Author:  LANL Clinic 2019 --<lanl19@cs.hmc.edu>
   Purpose: To identify baselines in a spectrogram
   Created: 10/10/19
 """
