@@ -9,6 +9,7 @@
 import numpy as np
 from spectrogram import Spectrogram
 
+
 class Follower:
     """
     Given a spectrogram and a starting point (t, v),
@@ -24,7 +25,7 @@ class Follower:
         self.t_start = start_point[0]
         self.v_start = start_point[1]
         self.span = span
-        
+
         # Now establish storage for intermediate results and
         # state. p_time is the index into the spectrogram.intensity
         # along the time axis.
@@ -40,9 +41,15 @@ class Follower:
         self.velocity = self.spectrogram.velocity
         self.time = self.spectrogram.time
         self.intensity = self.spectrogram.intensity
-        
-        # params stores the 
+
+        # params stores the
         # self.params = []
+
+    @property
+    def v_of_t(self):
+        t = np.array(self.results['times'])
+        v = np.array(self.results['velocities'])
+        return t, v
 
     def data_range(self, n=-1):
         "Fetch the span of velocities and intensities to use for fitting"
@@ -54,7 +61,7 @@ class Follower:
         p_start = max(0, p_vel - self.span)
         p_end = min(p_vel + self.span, len(self.spectrogram.velocity))
         return (p_start, p_end)
-    
+
     def data(self, n=-1):
         p_start, p_end = self.data_range(n)
         velocities = self.velocity[p_start:p_end]

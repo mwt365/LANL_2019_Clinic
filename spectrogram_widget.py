@@ -422,15 +422,17 @@ class SpectrogramWidget:
     def follow(self, t, v, action):
         """Attempt to follow the path starting with the clicked
         point."""
-        
+
         if action == "Gauss":
             fitter = GaussianFitter(self.spectrogram, (t, v))
             self.gauss = fitter
         elif action == "Peak":
             follower = PeakFollower(self.spectrogram, (t, v))
             self.peak = follower
+            follower.run()
+            tsec, v = follower.v_of_t
+            self.axSpectrogram.plot(tsec * 1e6, v, 'r.', alpha=0.4)
         print("Create a figure and axes, then call self.gauss.show_fit(axes)")
-        
 
     def update_baselines(self, method):
         """

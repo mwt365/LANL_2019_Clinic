@@ -19,6 +19,13 @@ class PeakFollower(Follower):
     def __init__(self, spectrogram, start_point, span=30):
         super().__init__(spectrogram, start_point, span)
 
+    def run(self):
+        """
+        Repeatedly call step until it fails.
+        """
+        while self.step():
+            pass
+
     def step(self):
         """
         Attempt to fit a gaussian starting from the coeffients
@@ -28,33 +35,37 @@ class PeakFollower(Follower):
         amplitude, center, width, and background.
         """
         velocities, intensities, p_start, p_end = self.data()
-        
+
         # Should we smooth first?
         if True:
             smooth = np.zeros(len(intensities))
             n_window = 3
-            for roll in range(-n_window, n_window+1):
+            for roll in range(-n_window, n_window + 1):
                 smooth += np.roll(intensities, roll)
             smooth /= 2 * n_window + 1
             intensities = smooth
-        
+
         low_to_high = np.argsort(intensities)
-        
+
         v_high = velocities[low_to_high[-1]]
-        
-        # We should now determine whether the fit was successful
-        if False:
-            print("Failed in gaussian fit")
+
+        # add this to our results
+        self.results['v_spans'].append((p_start, p_end))
+        self.results['p_times'].append(self.p_time)
+        self.results['times'].append(
+            self.spectrogram._point_to_time(self.p_time))
+        self.results['velocities'].append(v_high)
+        self.p_time += 1
+        try:
+            acceleration = (v_high - self.results['velocities'][-2])
+            acceleration /= (self.results['times']
+                             [-1] - self.results['times'][-2])
+            return abs(acceleration) < 1e10 and self.p_time < len(self.time)
+        except IndexError:
+            return True
+        except Exception as eeps:
+            print(eeps)
             return False
-        else:
-            # add this to our results
-            self.results['v_spans'].append((p_start, p_end))
-            self.results['p_times'].append(self.p_time)
-            self.results['times'].append(
-                self.spectrogram._point_to_time(self.p_time))
-            self.results['velocities'].append(v_high)
-            self.p_time += 1
-        return True
 
     def show_fit(self, axes, n=-1):
         """
