@@ -75,7 +75,7 @@ class Spectrogram:
                  ending,
                  wavelength=1550.0e-9,
                  points_per_spectrum=8192,
-                 overlap_shift_factor=1 / 8,
+                 overlap_shift_factor=3 / 4,
                  window_function=None,  # 'hanning',
                  form='db',
                  convert_to_voltage=True,
@@ -116,6 +116,27 @@ class Spectrogram:
         except:
             self._compute(ending)
             # self._save()
+
+    def set(self, **kwargs):
+        """
+        Update the spectrogram to use the new parameters
+        specified in the keyword arguments.
+        """
+        fields = (
+            "points_per_spectrum",
+            "shift",
+            "window_function",
+            "form",
+            "use_voltage",
+            "detrend"
+        )
+        changed = False
+        for field in fields:
+            if field in kwargs and kwargs[field] != getattr(self, field):
+                changed = True
+                setattr(self, field, kwargs[field])
+        if changed:
+            self._compute(None)
 
     def __str__(self):
         return ", ".join(
@@ -313,6 +334,7 @@ if False:
 #             'YOF': 'y_offset',
 #             'YZE': 'y_component',
 #             'NR_FR': 'NR_FR'
+
     def __str__(self):
         return "\n".join([
             self.filename,
@@ -320,7 +342,6 @@ if False:
             f" {self.notes['byte_order']} first" if 'byte_order' in self.notes else "",
             f"{self.t0*1e6} µs to {(self.t0 + self.dt*self.num_samples)*1e6} µs in steps of {self.dt*1e12} ps"
         ])
-
 
     def normalize(self, array, chunksize=4096, remove_dc=True):
         """

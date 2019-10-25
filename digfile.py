@@ -177,6 +177,34 @@ class DigFile:
             f"{self.num_samples} points"
         ])
 
+    def extract(self, filename, t_start, ending=None):
+        """
+        Save a .dig file with the portion of the data between the
+        specified limits.
+        """
+        p_start, p_end = self._points(t_start, ending)
+        n_samples = p_end - p_start + 1
+        with open(filename, 'w') as f:
+            f.write(f"Extract from {self.filename}\r\n")
+            f.write(f"{t_start} to {self.t0 + p_end * self.dt}\r\n")
+            f.write(" " * (512 - f.tell()))
+            # Now write the requisite dig file parameters
+            f.write("\r\n".join(
+                [str(x) for x in (n_samples, self.bits,
+                                  self.dt, t_start,
+                                  self.dV, self.V0)]))
+#                                  (self.V0, self.dV, t_start,
+#                                  self.dt, self.bits, n_samples)
+#                                 ]))
+            f.write(" " * (1024 - f.tell()))
+        # Now open in binary mode and copy the data
+        bytes_per_pt = self.bytes_per_point
+
+        with open(filename, 'ab') as outfile:
+            with open(self.path, 'rb') as infile:
+                infile.seek(1024 + p_start * bytes_per_pt, os.SEEK_SET)
+                outfile.write(infile.read(n_samples * bytes_per_pt))
+
     def raw_values(self, t_start=None, ending=None):
         """
         Return a numpy array of the raw values present in this segment

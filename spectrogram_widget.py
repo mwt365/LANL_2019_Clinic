@@ -243,13 +243,32 @@ class SpectrogramWidget:
         cd['raw_signal'].observe(
             lambda b: self.show_raw_signal(b), names="value")
 
+        cd['spectrum_size'] = slide = widgets.IntSlider(
+            value=13, min=8, max=18, step=1)
+        slide.continuous_update = False
+        slide.observe(lambda x: self.overhaul(points_per_spectrogram=2 ** x['new']),
+                      names="value")
+
+        cd['shift'] = slide = widgets.IntSlider(
+            description='Shift',
+            value=self.spectrogram.points_per_spectrum - self.spectrogram.shift,
+            min=1,
+            max=2 * self.spectrogram.points_per_spectrum,
+            step=1)
+        slide.continuous_update = False
+        slide.observe(lambda x: self.overhaul(
+            shift=self.spectrogram.points_per_spectrum - x['new']),
+            names="value")
+
         self.controls = widgets.HBox([
             widgets.VBox([
-                cd['t_range'], cd['velocity_range'], cd['intensity_range']
+                cd['t_range'], cd['velocity_range'],
+                cd['intensity_range'], cd['spectrum_size']
             ]),
             widgets.VBox([
                 cd['color_map'],
                 cd['raw_signal'],
+                cd['shift']
             ])
         ])
 
@@ -286,6 +305,14 @@ class SpectrogramWidget:
                 self.fig.canvas.flush_events()
             except:
                 pass
+
+    def overhaul(self, **kwargs):
+        """
+        A parameter affecting the base spectrogram has been changed, so
+        we need to recompute everything.
+        """
+        self.spectrogram.set(**kwargs)
+        self.update_spectrogram()
 
     def update_spectrogram(self):
         """
