@@ -7,6 +7,7 @@
 """
 
 import numpy as np
+import pandas as pd
 from spectrogram import Spectrogram
 
 
@@ -36,6 +37,7 @@ class Follower:
             times=[],          # the times of the fits
             p_times=[],        # the corresponding point index in the time dimension
             velocities=[],     # the fitted center velocities
+            intensities=[]   # the peak intensity
         )
         # for convenience, install pointers to useful fields in spectrogram
         self.velocity = self.spectrogram.velocity
@@ -68,7 +70,14 @@ class Follower:
         intensities = self.intensity[p_start:p_end, self.p_time]
         return velocities, intensities, p_start, p_end
 
-
+    @property
+    def frame(self):
+        """
+        Return a pandas DataFrame holding the results of the following
+        expedition.
+        """
+        df = pd.DataFrame(self.results, index=self.results['times'])
+        return df
 
 
 

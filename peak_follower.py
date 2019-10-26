@@ -16,7 +16,7 @@ class PeakFollower(Follower):
 
     """
 
-    def __init__(self, spectrogram, start_point, span=30):
+    def __init__(self, spectrogram, start_point, span=60):
         super().__init__(spectrogram, start_point, span)
 
     def run(self):
@@ -46,15 +46,16 @@ class PeakFollower(Follower):
             intensities = smooth
 
         low_to_high = np.argsort(intensities)
-
-        v_high = velocities[low_to_high[-1]]
+        top = low_to_high[-1]
+        v_high = velocities[top]
 
         # add this to our results
         self.results['v_spans'].append((p_start, p_end))
         self.results['p_times'].append(self.p_time)
         self.results['times'].append(
             self.spectrogram._point_to_time(self.p_time))
-        self.results['velocities'].append(v_high)
+        self.results['velocities'].append(velocities[top])
+        self.results['intensities'].append(intensities[top])
         self.p_time += 1
         try:
             acceleration = (v_high - self.results['velocities'][-2])
