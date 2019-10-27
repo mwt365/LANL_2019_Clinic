@@ -149,7 +149,7 @@ class Spectrogram:
         "Map a point index to a time"
         return self.time[p]
 
-    def _time_to_point(self, t):
+    def _time_to_index(self, t):
         "Map a time to a point number"
         p = (t - self.t_start) / (self.time[1] - self.time[0])
         p = int(0.5 + p)  # round to an integer
@@ -157,7 +157,7 @@ class Spectrogram:
             return 0
         return min(p, len(self.time) - 1)
 
-    def _velocity_to_point(self, v):
+    def _velocity_to_index(self, v):
         "Map a velocity value to a point number"
         p = (v - self.velocity[0]) / (self.velocity[1] - self.velocity[0])
         p = int(0.5 + p)  # round
@@ -173,11 +173,11 @@ class Spectrogram:
         if time_range == None:
             time0, time1 = 0, len(self.time) - 1
         else:
-            time0, time1 = [self._time_to_point(t) for t in time_range]
+            time0, time1 = [self._time_to_index(t) for t in time_range]
         if velocity_range == None:
             vel0, vel1 = 0, len(self.velocity) - 1
         else:
-            vel0, vel1 = [self._velocity_to_point(v) for v in velocity_range]
+            vel0, vel1 = [self._velocity_to_index(v) for v in velocity_range]
 
         tvals = self.time[time0:time1 + 1]
         vvals = self.velocity[vel0:vel1 + 1]

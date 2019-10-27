@@ -11,6 +11,7 @@ from spectrogram import Spectrogram
 from scipy.optimize import curve_fit
 from follower import Follower
 
+
 def _gauss(x, *p):
     """Gaussian fitting function used by curve_fit"""
     A, mu, sigma, background = p
@@ -25,7 +26,7 @@ class GaussianFitter(Follower):
 
     def __init__(self, spectrogram, start_point, span=80):
         super().__init__(spectrogram, start_point, span)
-        
+
         self.params = []
 
     @property
@@ -47,7 +48,7 @@ class GaussianFitter(Follower):
         """
         p_start, p_end = self.data_range()
         velocities = self.velocity[p_start:p_end]
-        intensities = self.intensity[p_start:p_end, self.p_time]
+        intensities = self.intensity[p_start:p_end, self.time_index]
         # make sure we are dealing with power
         powers = self.spectrogram.power(intensities)
 
@@ -73,9 +74,9 @@ class GaussianFitter(Follower):
             return False
         else:
             # add this to our results
-            self.results['p_times'].append(self.p_time)
+            self.results['time_index'].append(self.time_index)
             self.results['times'].append(
-                self.spectrogram._point_to_time(self.p_time))
+                self.spectrogram._point_to_time(self.time_index))
             self.results['velocities'].append(coeff[1])
             self.results['widths'].append(coeff[2])
             self.results['amplitudes'].append(coeff[0])
@@ -89,7 +90,7 @@ class GaussianFitter(Follower):
         p_start, p_end = self.data_range(n)
         velocities = self.velocity[p_start:p_end]
         intensities = self.intensity[p_start:p_end,
-                                     self.results['p_times'][n]]
+                                     self.results['time_index'][n]]
         powers = self.spectrogram.power(intensities)
 
         axes.lines = []
@@ -113,11 +114,11 @@ def gaussian_follow(spectrogram, start):
     velocity = spectrogram.velocity
 
     # map the time and velocity to a point
-    p_time = spectrogram._time_to_point(t)
+    p_time = spectrogram._time_to_index(t)
 
     params = []
     try:
-        p_velocity = spectrogram._velocity_to_point(center)
+        p_velocity = spectrogram._velocity_to_index(center)
         start, end = p_velocity - span, p_velocity + span
         params = fit_gaussian(
             velocity[start:end],
