@@ -7,17 +7,23 @@
 """
 
 import numpy as np
-from spectrogram import Spectrogram
 from follower import Follower
 
 
 class PeakFollower(Follower):
     """
-
+    A naive follower implementation that implements a local-region
+    smoothing and then follows the local maximum.
     """
 
-    def __init__(self, spectrogram, start_point, span=60):
+    def __init__(self, spectrogram, start_point, span=60,
+                 smoothing=4,  # average this many points on each side
+                 max_hop=50   # require peaks at successive time steps
+                 # to be within this many velocity indices
+                 ):
         super().__init__(spectrogram, start_point, span)
+        self.smoothing = smoothing
+        self.max_hop = max_hop
 
     def run(self):
         """
@@ -36,94 +42,39 @@ class PeakFollower(Follower):
         """
         velocities, intensities, p_start, p_end = self.data()
 
-        # Should we smooth first?
-        if True:
+        if self.smoothing:
             smooth = np.zeros(len(intensities))
-            n_window = 3
-            for roll in range(-n_window, n_window + 1):
+            for roll in range(-self.smoothing, self.smoothing + 1):
                 smooth += np.roll(intensities, roll)
-            smooth /= 2 * n_window + 1
+            smooth /= 2 * self.smoothing + 1
             intensities = smooth
 
+        # generate an index array to sort the intensities (low to high)
         low_to_high = np.argsort(intensities)
-        top = low_to_high[-1]
+        top = low_to_high[-1]  # index of the tallest intensity peak
         v_high = velocities[top]
 
         # add this to our results
-        self.results['v_spans'].append((p_start, p_end))
-        self.results['p_times'].append(self.p_time)
+        self.results['velocity_index_spans'].append((p_start, p_end))
+        self.results['time_index'].append(self.time_index)
         self.results['times'].append(
-            self.spectrogram._point_to_time(self.p_time))
+            self.spectrogram._point_to_time(self.time_index))
         self.results['velocities'].append(velocities[top])
         self.results['intensities'].append(intensities[top])
-        self.p_time += 1
+        # on success we increment to the next time index
+        self.time_index += 1
+
+        if self.time_index >= len(self.time):
+            return False  # we're out of data
+
         try:
-            acceleration = (v_high - self.results['velocities'][-2])
-            acceleration /= (self.results['times']
-                             [-1] - self.results['times'][-2])
-            return abs(acceleration) < 1e10 and self.p_time < len(self.time)
+            hop = v_high - self.results['velocities'][-2]
+            hop = np.abs(hop / (velocities[1] - velocities[0]))
+            return hop <= self.max_hop
         except IndexError:
             return True
         except Exception as eeps:
             print(eeps)
             return False
-
-    def show_fit(self, axes, n=-1):
-        """
-        Update the axes to show the data and fit corresponding to point n.
-        """
-        p_start, p_end = self.data_range(n)
-        velocities = self.velocity[p_start:p_end]
-        intensities = self.intensity[p_start:p_end,
-                                     self.results['p_times'][n]]
-        powers = self.spectrogram.power(intensities)
-
-        axes.lines = []
-        # plot the data
-        axes.plot(velocities, powers, 'ro-', alpha=0.4)
-        # compute the fitted curve
-        # A, mu, sigma, background = p
-        params = [self.results[x][n] for x in
-                  ('amplitudes', 'velocities', 'widths', 'backgrounds')]
-        curve = _gauss(velocities, *params)
-        axes.plot(velocities, curve, 'b-', alpha=0.8)
-
-
-def gaussian_follow(spectrogram, start):
-    """
-    Pass in a spectrogram and a starting point start=(t, v)
-    """
-    assert isinstance(spectrogram, Spectrogram)
-    t, center = start  # the time and the rough peak position
-    intensity = spectrogram.intensity
-    velocity = spectrogram.velocity
-
-    # map the time and velocity to a point
-    p_time = spectrogram._time_to_point(t)
-
-    params = []
-    try:
-        p_velocity = spectrogram._velocity_to_point(center)
-        start, end = p_velocity - span, p_velocity + span
-        params = fit_gaussian(
-            velocity[start:end],
-            intensity[start:end, p_time],
-            params
-        )
-        values = list(params)
-        values.insert(0, spectrogram.time[p_time])
-        coefficients.append(values)
-        p_time += 1
-    except Exception as eeps:
-        print(eeps)
-    coef = np.array(coefficients)
-    return dict(
-        time=coef[:, 0] * 1e6,  # converted to microseconds
-        amplitude=coef[:, 1],
-        center=coef[:, 2],
-        width=coef[:, 3],
-        background=coef[:, 4]
-    )
-
 
 
