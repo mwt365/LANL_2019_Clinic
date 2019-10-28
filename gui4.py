@@ -1,5 +1,7 @@
 import tkinter as tk                # python 3
 from tkinter import font  as tkfont # python 3
+from tkinter import filedialog
+from spectrogram import Spectrogram
 
 
 from matplotlib.backends.backend_tkagg import (
@@ -25,8 +27,10 @@ class GUI(tk.Tk):
         container.grid_rowconfigure(0, weight=1)
         container.grid_columnconfigure(0, weight=1)
 
+        self.spec = None
+
         self.frames = {}
-        for F in (StartPage, PageOne, PageTwo):
+        for F in (StartPage, display_page, PageTwo): #Name the pages here
             page_name = F.__name__
             frame = F(parent=container, controller=self)
             self.frames[page_name] = frame
@@ -44,6 +48,10 @@ class GUI(tk.Tk):
         frame.tkraise()
 
 
+    #METHODS
+
+
+
 class StartPage(tk.Frame):
 
     def __init__(self, parent, controller):
@@ -51,16 +59,34 @@ class StartPage(tk.Frame):
         self.controller = controller
         label = tk.Label(self, text="This is the start page", font=controller.title_font)
         label.pack(side="top", fill="x", pady=10)
+        
+        openButton = tk.Button(self, text="Load File", command = lambda: self.openFile())
+        openButton.pack()
 
-        button1 = tk.Button(self, text="Go to Page One",
-                            command=lambda: controller.show_frame("PageOne"))
-        button2 = tk.Button(self, text="Go to Page Two",
-                            command=lambda: controller.show_frame("PageTwo"))
-        button1.pack()
-        button2.pack()
+        dispButton = tk.Button(self, text="Display Spectrogram", command = lambda: self.displaySpec())
+        dispButton.pack()
+
+        # button1 = tk.Button(self, text="Go to Page One",
+        #                     command=lambda: controller.show_frame("PageOne"))
+        # button2 = tk.Button(self, text="Go to Page Two",
+        #                     command=lambda: controller.show_frame("PageTwo"))
+        # button1.pack()
+        # button2.pack()
+
+    def openFile(self):
+        filename =  filedialog.askopenfilename(initialdir = "/documents",title = 
+        # changing the title of our master widget      
+            "Select file",filetypes = (("dig files","*.dig"),("all files","*.*")))
+        print(filename)
+        self.controller.spec = Spectrogram(filename)
+
+    def displaySpec(self):
+        self.controller.show_frame("display_page")
 
 
-class PageOne(tk.Frame):
+
+
+class display_page(tk.Frame):
 
     def __init__(self, parent, controller):
         tk.Frame.__init__(self, parent)
