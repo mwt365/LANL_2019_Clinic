@@ -368,7 +368,7 @@ class Spectrogram:
 
         threshold_velocties = [sgram['v'][index] for index in threshold_indices]
 
-        print(threshold_velocties)
+        # print(threshold_velocties)
         print(baseline_velocity)
 
         return intensities, threshold_velocties, baseline_velocity
@@ -390,14 +390,18 @@ class Spectrogram:
 
 
 if __name__ == '__main__':
-    sp = Spectrogram('GEN3CH_4_009.dig')
+    sp = Spectrogram('test.dig')
+    sp_log = Spectrogram('test.dig')
 
     axes = plt.axes()
 
     sgram = sp.spectrogram_no_log(0, 50e-6)
+    sgram_log = sp_log.spectrogram(0,50e-6)
 
     intensities, interesting_velocites, baseline_velocity = sp.extract_velocities(sgram)
     velocities = sgram['v']
+
+    sp.plot(axes, sgram_log)
 
     plt.plot(velocities, intensities, "r")
 
