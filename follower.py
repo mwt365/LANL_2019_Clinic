@@ -9,6 +9,7 @@
 import numpy as np
 import pandas as pd
 from spectrogram import Spectrogram
+from scipy.optimize import curve_fit
 
 
 class Follower:
@@ -95,5 +96,76 @@ class Follower:
         microseconds = np.array(self.results['times']) * 1e6
         return pd.DataFrame(self.results, index=microseconds)
 
+    def estimate_widths(self):
+        """
+        Assuming that some mechanism has been used to populate
+        self.results with a path through the minefield, attempt to
+        determine gaussian widths centered on these peaks, or very
+        near them. There are a number of games we could play.
+        We could alter the number of points used in computing the
+        spectra; we could use finer time steps; we could establish
+        a noise cutoff level...  In any case, I think it is likely
+        most important to use true intensity values, not a logarithmic
+        variant.
+        """
+        res = self.results
+        # Prepare a spot for the uncertainties
+        res['velocity_uncertainty'] = np.zeros(len(res['velocities']))
+        for n in range(len(res['time_index'])):
+            fit_res = self.estimate_width(n)
+            res['velocities'][n] = fit_res['center']
+            res['velocity_uncertainty'][n] = fit_res['width']
+            res['intensities'][n] = fit_res['amplitude']
 
+    def estimate_width(self, n, neighborhood=30):
+        """
+        Estimate the gaussian width of a peak
+        """
+        res = self.results
+        time_index = res['time_index'][n]
+        v_peak = res['velocities'][n]
+        v_peak_index = self.spectrogram._velocity_to_index(v_peak)
+        n_low = max(0, v_peak_index - neighborhood)
+        n_high = min(v_peak_index + neighborhood + 1, len(self.velocity))
+        # fetch the true power values for this column of the spectrogram
+        power = self.spectrogram.power(
+            self.intensity[n_low:n_high, time_index])
+        res = self.fit_gaussian(
+            self.velocity[n_low:n_high], power, v_peak)
+        res['power'] = power
+        res['indices'] = (n_low, n_high)
+        return res
+
+    def fit_gaussian(self, velocities, powers, center):
+        """
+        Given an array of intensities and a rough location of the peak,
+        attempt to fit a gaussian and return the fitting parameters. The
+        independent variable is "index" or "pixel" number. We assume that
+        the noise level is zero, so we first fit to a gaussian with a
+        baseline of 0 and a center of the given location.
+        """
+
+        def just_amp_width(x, *p):
+            "p = (amplitude, width)"
+            return p[0] * np.exp(-((x - center) / p[1])**2)
+
+        def full_fit(x, *p):
+            "p = (amplitude, width, center, background)"
+            return p[3] + p[0] * np.exp(-((x - p[2]) / p[1]) ** 2)
+
+        center_index = len(velocities) // 2
+        dv = velocities[1] - velocities[0]
+        coeffs = [powers[center_index], 4 * dv]  # initial guesses
+        # estimate the amplitude
+        coeff, var_matrix = curve_fit(
+            just_amp_width, velocities, powers, p0=coeffs)
+
+        # append coefficients to coeff for next fit
+        new_coeff = [coeff[0], coeff[1], center, powers.mean()]
+        final_coeff, var_matrix = curve_fit(
+            full_fit, velocities, powers, p0=new_coeff
+        )
+        return dict(width=final_coeff[1],
+                    amplitude=final_coeff[0],
+                    center=final_coeff[2])
 
