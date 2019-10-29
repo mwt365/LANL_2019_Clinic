@@ -174,8 +174,36 @@ class DigFile:
             self.filename,
             f"{self.bits} bits" + f" {self.notes['byte_order']} first" if 'byte_order' in self.notes else "",
             f"{self.t0*1e6} µs to {(self.t0 + self.dt*self.num_samples)*1e6} µs in steps of {self.dt*1e12} ps",
-            f"{self.num_samples} points"
+            f"{self.num_samples:,} points"
         ])
+
+    def extract(self, filename, t_start, ending=None):
+        """
+        Save a .dig file with the portion of the data between the
+        specified limits.
+        """
+        p_start, p_end = self._points(t_start, ending)
+        n_samples = p_end - p_start + 1
+        with open(filename, 'w') as f:
+            f.write(f"Extract from {self.filename}\r\n")
+            f.write(f"{t_start} to {self.t0 + p_end * self.dt}\r\n")
+            f.write(" " * (512 - f.tell()))
+            # Now write the requisite dig file parameters
+            f.write("\r\n".join(
+                [str(x) for x in (n_samples, self.bits,
+                                  self.dt, t_start,
+                                  self.dV, self.V0)]))
+#                                  (self.V0, self.dV, t_start,
+#                                  self.dt, self.bits, n_samples)
+#                                 ]))
+            f.write(" " * (1024 - f.tell()))
+        # Now open in binary mode and copy the data
+        bytes_per_pt = self.bytes_per_point
+
+        with open(filename, 'ab') as outfile:
+            with open(self.path, 'rb') as infile:
+                infile.seek(1024 + p_start * bytes_per_pt, os.SEEK_SET)
+                outfile.write(infile.read(n_samples * bytes_per_pt))
 
     def raw_values(self, t_start=None, ending=None):
         """
@@ -236,12 +264,13 @@ class DigFile:
         p_start, p_end = self._points(t_start, t_end)
         if t_start == None:
             t_start = p_start * self.dt + self.t0
+        t_end = p_end * self.dt + self.t0
         chunk_size = (p_end - p_start + 1) // points
         numpts = points * chunk_size
         chunks = self.raw_values(t_start, numpts)
         chunks = chunks.reshape((points, chunk_size))
         means = chunks.mean(axis=1)
-        times = np.linspace(t_start, self.dt *
+        times = np.linspace(t_start, t_start + self.dt *
                             numpts, points)
         d = dict(
             times=times,
@@ -270,10 +299,9 @@ if __name__ == '__main__':
             continue
         df = DigFile(f'../dig/{filename}.dig')
         print(df)
-        t, av, sd, mns, mxs = df.thumbnail()
-        # yvals = np.ravel([av - sd, av + sd], order='F')
-        yvals = np.ravel([mns, mxs], order='F')
-        xvals = np.ravel([t, t], order='F')
+        thumb = df.thumbnail(0, 1e-3, stdev=True)
+        xvals = thumb['times']
+        yvals = thumb['stdevs'] # thumb['peak_to_peak']
         plt.plot(xvals * 1e6, yvals)
         plt.xlabel('$t (\\mu \\mathrm{s})$')
         plt.ylabel('amplitude')

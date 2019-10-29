@@ -17,11 +17,12 @@ class Spectrogram:
 
     Required arguments to the constructor:
         digfile: either an instance of DigFile or the filename of a .dig file
-        t_start: time of the first point to use in the spectrogram
-        ending:  either the time of the last point or a positive integer
-                 representing the number of points to use
 
     Optional arguments and their default values:
+        t_start: (digfile.t0) time of the first point to use in the spectrogram
+        ending:  (None) either the time of the last point or a positive integer
+                 representing the number of points to use; if None, the final
+                 point in the digfile is used.
         wavelength: (1550.0e-9) the wavelength in meters
         points_per_spectrum: (8192) the number of values used to generate
             each spectrum. Should be a power of 2.
@@ -46,20 +47,6 @@ class Spectrogram:
         intensity: two-dimensional array of (scaled) intensities, which
             is the spectrogram. The first index corresponds to
             frequency/velocity, the second to time.
-
-    Representation of a photon Doppler velocimetry file stored in
-    the .dig format. On creation, the file header is read and processed;
-    information in the top 512 bytes is stored in a notes dictionary.
-    Information from the second 512-byte segment is decoded to infer
-    the number of data points, the number of bytes per point, the
-    start time and sampling interval, and the voltage scaling.
-
-    The actual data remain on disk and are loaded only as required either
-    to generate a spectrogram for a range in time or a spectrum from a
-    shorter segment. The values are loaded from disk and decoded using
-    the *values* method which takes a start time and either an end time
-    or an integer number of points to include.
-
     """
 
     _fields = ("points_per_spectrum",
@@ -71,11 +58,11 @@ class Spectrogram:
 
     def __init__(self,
                  digfile,
-                 t_start,
-                 ending,
+                 t_start=None,
+                 ending=None,
                  wavelength=1550.0e-9,
                  points_per_spectrum=8192,
-                 overlap_shift_factor=3 / 4,
+                 overlap_shift_factor=0.25,
                  window_function=None,  # 'hanning',
                  form='db',
                  convert_to_voltage=True,
@@ -143,7 +130,8 @@ class Spectrogram:
             [str(x) for x in
              [self.data.filename,
               f"{self.points_per_spectrum} / {self.shift}",
-              self.form
+              self.form,
+              self.intensity.shape
               ]
              ])
 
@@ -157,7 +145,11 @@ class Spectrogram:
             os.mkdir(location)
         return location
 
-    def _time_to_point(self, t):
+    def _point_to_time(self, p):
+        "Map a point index to a time"
+        return self.time[p]
+
+    def _time_to_index(self, t):
         "Map a time to a point number"
         p = (t - self.t_start) / (self.time[1] - self.time[0])
         p = int(0.5 + p)  # round to an integer
@@ -165,7 +157,7 @@ class Spectrogram:
             return 0
         return min(p, len(self.time) - 1)
 
-    def _velocity_to_point(self, v):
+    def _velocity_to_index(self, v):
         "Map a velocity value to a point number"
         p = (v - self.velocity[0]) / (self.velocity[1] - self.velocity[0])
         p = int(0.5 + p)  # round
@@ -181,11 +173,11 @@ class Spectrogram:
         if time_range == None:
             time0, time1 = 0, len(self.time) - 1
         else:
-            time0, time1 = [self._time_to_point(t) for t in time_range]
+            time0, time1 = [self._time_to_index(t) for t in time_range]
         if velocity_range == None:
             vel0, vel1 = 0, len(self.velocity) - 1
         else:
-            vel0, vel1 = [self._velocity_to_point(v) for v in velocity_range]
+            vel0, vel1 = [self._velocity_to_index(v) for v in velocity_range]
 
         tvals = self.time[time0:time1 + 1]
         vvals = self.velocity[vel0:vel1 + 1]
@@ -261,16 +253,19 @@ class Spectrogram:
         # Convert to a logarithmic representation and use floor to attempt
         # to suppress some noise.
         spec *= 2.0 / (self.points_per_spectrum * self.data.dt)
+        epsilon = 1e-10  # use this to suppress the divide by zero warnings
         if self.form == 'db':
-            spec = 20 * np.log10(spec)
+            spec = 20 * np.log10(spec + epsilon)
         elif self.form == 'log':
-            spec = np.log10(spec)
-        # scale the frequency axis to velocity
-        self.velocity = freqs * 0.5 * self.wavelength  # velocities
-        self.frequency = freqs
-        self.time = times
+            spec = np.log10(spec + epsilon)
         self.intensity = spec  # a two-dimensional array
         # the first index is frequency, the second time
+
+        self.frequency = freqs
+        self.time = times
+
+        # scale the frequency axis to velocity
+        self.velocity = freqs * 0.5 * self.wavelength  # velocities
 
     @property
     def max(self):
@@ -280,6 +275,18 @@ class Spectrogram:
     @property
     def v_max(self):
         return self.wavelength * 0.25 / self.data.dt
+
+    def power(self, values):
+        """
+        Given an np.array of intensity values from the spectrogram,
+        return the corresponding power values (undoing any logarithms,
+        if necessary).
+        """
+        if self.form == 'db':
+            return np.power(10.0, 0.05 * values)
+        if self.form == 'log':
+            return np.power(10.0, values)
+        return values
 
     def plot(self, axes=None, **kwargs):
         # max_vel=6000, vmin=-200, vmax=100):
@@ -437,5 +444,6 @@ if False:
 
 
 if __name__ == '__main__':
-    sp = Spectrogram('sample.dig', 0, 10e-6)
+    sp = Spectrogram('../dig/GEN3CH_4_009.dig', None,
+                     None, overlap_shift_factor=1 / 4)
     print(sp)
