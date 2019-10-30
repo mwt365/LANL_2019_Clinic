@@ -30,25 +30,22 @@ class GUI(tk.Tk):
         self.spec = None
         self.plottedSpec = None
 
-        self.frames = {}
-        for F in (StartPage, display_page, PageTwo): #Name the pages here
-            page_name = F.__name__
-            frame = F(parent=container, controller=self)
-            self.frames[page_name] = frame
+        # self.frames = {}
+        # for F in (StartPage, display_page, PageTwo): #Name the pages here
+        #     page_name = F.__name__
+        #     frame = F(parent=container, controller=self)
+        #     self.frames[page_name] = frame
 
-            # put all of the pages in the same location;
-            # the one on the top of the stacking order
-            # will be the one that is visible.
-            frame.grid(row=0, column=0, sticky="nsew")
+        #     # put all of the pages in the same location;
+        #     # the one on the top of the stacking order
+        #     # will be the one that is visible.
+        #     frame.grid(row=0, column=0, sticky="nsew")
 
-        self.show_frame("StartPage")
+        # self.show_frame("StartPage")
 
     def show_frame(self, page_name):
         '''Show a frame for the given page name'''
-        frame = self.frames[page_name]
-        frame.update()
-        frame.tkraise()
-
+        window = tk.toplevel(page)
 
     #METHODS
 

@@ -293,6 +293,7 @@ class Spectrogram:
         axes.set_xlabel('Time ($\mu$s)')
         title = self.data.filename.split('/')[-1]
         axes.set_title(title.replace("_", "\\_"))
+        plt.show()
         return pcm
 
         # bestVelocity = self.extract_velocities(sgram)
