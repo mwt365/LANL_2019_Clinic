@@ -93,35 +93,23 @@ class StartPage(tk.Frame):
     def openFile(self):
 
         if self.filename is None:
-
-            self.filename =  filedialog.askopenfilename(initialdir=PATH_TO_DIR, title="Select dig file", filetypes=(("dig files","*.dig"),("all files","*.*")))
-            digfile_name = os.path.basename(os.path.normpath(self.filename))
-
-            self.open_file_helper(digfile_name)
-
-
+            self.open_file_helper()
         else:
-
             for tkobject in self.tkobjects:
                 tkobject.destroy()
-
-            self.filename =  filedialog.askopenfilename(initialdir=PATH_TO_DIR, title="Select dig file", filetypes=(("dig files","*.dig"),("all files","*.*")))
-            digfile_name = os.path.basename(os.path.normpath(self.filename))
-
-            self.open_file_helper(digfile_name)
-
-
-            # self.parent.children.clear()
-
+            self.open_file_helper()
         
 
-    def open_file_helper(self, filename):
+    def open_file_helper(self):
+
+        self.filename =  filedialog.askopenfilename(initialdir=PATH_TO_DIR, title="Select dig file", filetypes=(("dig files","*.dig"),("all files","*.*")))
+        digfile_name = os.path.basename(os.path.normpath(self.filename))
 
         try:
-            sp = Spectrogram(filename)
-            assert isinstance(filename, str)
+            sp = Spectrogram(digfile_name)
+            assert isinstance(digfile_name, str)
             assert isinstance(sp, Spectrogram)
-            display_text = "loaded dig file: "+filename
+            display_text = "loaded dig file: "+digfile_name
             successlabel = tk.Label(self, text=display_text, font=LARGE_FONT)
 
             successlabel.pack(pady=10,padx=10)
@@ -139,7 +127,6 @@ class StartPage(tk.Frame):
 
             errorlabel.pack(pady=10,padx=10)
             return
-
 
 
     def analyzeDig(self, sp):
