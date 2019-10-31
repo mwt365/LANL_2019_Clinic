@@ -369,12 +369,28 @@ class Spectrogram:
         threshold_velocties = [sgram['v'][index] for index in threshold_indices]
 
         # print(threshold_velocties)
-        print(baseline_velocity)
+        # print(baseline_velocity)
 
-        return intensities, threshold_velocties, baseline_velocity
+        # threshold_velocties = np.sort(threshold_velocties, kind='mergesort')
+
+        return intensities, threshold_velocties, baseline_velocity[0]
     
     
     def plot(self, axes, sgram, **kwargs):
+        # max_vel=6000, vmin=-200, vmax=100):
+        if 'max_vel' in kwargs:
+            axes.set_ylim(top=kwargs['max_vel'])
+            del kwargs['max_vel']
+        pcm = axes.pcolormesh(sgram['t'] * 1e6, sgram['v'],
+                              sgram['spectrogram'], **kwargs)
+        plt.gcf().colorbar(pcm, ax=axes)
+        axes.set_ylabel('Velocity (m/s)')
+        axes.set_xlabel('Time ($\mu$s)')
+        title = self.filename.split('/')[-1]
+        axes.set_title(title.replace("_", "\\_"))
+        plt.show()
+
+    def tkplot(self, axes, sgram, **kwargs):
         # max_vel=6000, vmin=-200, vmax=100):
         if 'max_vel' in kwargs:
             axes.set_ylim(top=kwargs['max_vel'])
