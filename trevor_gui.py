@@ -159,7 +159,7 @@ class StartPage(tk.Frame):
         self.tkobjects.append(dispButton)
         dispButton.pack()
 
-        
+
     def displayDig(self, sp, sgram):
 
         axes = plt.axes()
