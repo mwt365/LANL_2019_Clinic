@@ -24,7 +24,7 @@ PATH_TO_DIR = "/Users/trevorwalker/Desktop/Clinic/LANL_2019_Clinic/"
 
 # customizable window-specific preferences
 LARGE_FONT= ("Verdana", 12)
-WINDOW_SIZE = "500x500"
+WINDOW_SIZE = "600x500"
 WINDOW_TITLE = "PDV Extraction User Interface"
 
 # color and other user preferences
@@ -78,11 +78,13 @@ class StartPage(tk.Frame):
     def __init__(self, parent, controller):
         tk.Frame.__init__(self, parent)
         self.controller = controller
+        self.filename = None
+        self.tkobjects = []
 
         label = tk.Label(self, text="Los Alamos National Laboratory, Velocity Extraction GUI", font=controller.title_font)
         label.pack(side="top", fill="x", pady=10)
         
-        openButton = tk.Button(self, text="Load File", command = lambda: self.openFile())
+        openButton = tk.Button(self, text="Select File", command = lambda: self.openFile())
         openButton.pack()
 
         print("application ready")
@@ -90,23 +92,53 @@ class StartPage(tk.Frame):
 
     def openFile(self):
 
-        self.filename =  filedialog.askopenfilename(initialdir=PATH_TO_DIR, title="Select dig file", filetypes=(("dig files","*.dig"),("all files","*.*")))
-        digfile_name = os.path.basename(os.path.normpath(self.filename))
+        if self.filename is None:
+
+            self.filename =  filedialog.askopenfilename(initialdir=PATH_TO_DIR, title="Select dig file", filetypes=(("dig files","*.dig"),("all files","*.*")))
+            digfile_name = os.path.basename(os.path.normpath(self.filename))
+
+            self.open_file_helper(digfile_name)
+
+
+        else:
+
+            for tkobject in self.tkobjects:
+                tkobject.destroy()
+
+            self.filename =  filedialog.askopenfilename(initialdir=PATH_TO_DIR, title="Select dig file", filetypes=(("dig files","*.dig"),("all files","*.*")))
+            digfile_name = os.path.basename(os.path.normpath(self.filename))
+
+            self.open_file_helper(digfile_name)
+
+
+            # self.parent.children.clear()
+
+        
+
+    def open_file_helper(self, filename):
 
         try:
-            sp = Spectrogram(digfile_name)
-            assert isinstance(digfile_name, str)
+            sp = Spectrogram(filename)
+            assert isinstance(filename, str)
             assert isinstance(sp, Spectrogram)
-            display_text = "loaded dig file: "+digfile_name
+            display_text = "loaded dig file: "+filename
             successlabel = tk.Label(self, text=display_text, font=LARGE_FONT)
+
             successlabel.pack(pady=10,padx=10)
+            dispButton = tk.Button(self, text="Analyze Spectrogram", command = lambda: self.analyzeDig(sp))
+            
+            self.tkobjects.append(dispButton)
+            self.tkobjects.append(successlabel)
+
+            dispButton.pack()
+
         except TypeError:
             errorlabel = tk.Label(self, text="Error: file type is not dig format", font=LARGE_FONT)
+
+            self.tkobjects.append(errorlabel)
+
             errorlabel.pack(pady=10,padx=10)
             return
-
-        dispButton = tk.Button(self, text="Analyze Spectrogram", command = lambda: self.analyzeDig(sp))
-        dispButton.pack()
 
 
 
@@ -125,16 +157,19 @@ class StartPage(tk.Frame):
             assert isinstance(baseline_velocity, float)
             assert isinstance(interesting_velocites, list)
             assert isinstance(intensities, spectrogram.np.ndarray)
-            baseline_text = "baseline velocity: " + str(baseline_velocity)
+            baseline_text = "baseline velocity: " + str(baseline_velocity) + " m/s"
             baseline_label = tk.Label(self, text=baseline_text, font=LARGE_FONT)
+            self.tkobjects.append(baseline_label)
             baseline_label.pack()
 
         except TypeError:
-            errorlabel = tk.Label(self, text="Error: spectrogram data could not be extracted", font=LARGE_FONT)
-            errorlabel.pack(pady=10,padx=10)
+            error_label = tk.Label(self, text="Error: spectrogram data could not be extracted", font=LARGE_FONT)
+            self.tkobjects.append(error_label)
+            error_label.pack(pady=10,padx=10)
             return 
 
         dispButton = tk.Button(self, text="Display Spectrogram", command = lambda: self.displayDig(sp, sgram_log))
+        self.tkobjects.append(dispButton)
         dispButton.pack()
 
         
