@@ -295,7 +295,7 @@ class Spectrogram:
         if 'max_vel' in kwargs:
             axes.set_ylim(top=kwargs['max_vel'])
             del kwargs['max_vel']
-
+        axes.set_xlim(right=50)
         pcm = axes.pcolormesh(
             self.time * 1e6,
             self.velocity,
@@ -442,8 +442,9 @@ if False:
 
         return output
 
-
+"""
 if __name__ == '__main__':
     sp = Spectrogram('../dig/GEN3CH_4_009.dig', None,
                      None, overlap_shift_factor=1 / 4)
     print(sp)
+"""
