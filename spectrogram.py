@@ -402,7 +402,7 @@ class Spectrogram:
         axes.set_xlabel('Time ($\mu$s)')
         title = self.filename.split('/')[-1]
         axes.set_title(title.replace("_", "\\_"))
-        plt.show()
+        # plt.show()
 
 
 if __name__ == '__main__':
