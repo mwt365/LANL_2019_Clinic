@@ -1,4 +1,6 @@
 import numpy as np
+import matplotlib.pyplot as plt
+from scipy.spatial import distance
 
 def extractSignal(intensityMatrix, velocities, lowerVelocityThreshold, upperVelocityThreshold, plotAbove):
     """
@@ -39,7 +41,7 @@ def extractSignal(intensityMatrix, velocities, lowerVelocityThreshold, upperVelo
     return dataPoints
 
     
-def seamExtraction(intensityMatrix, startTime:int, stopTime:int, width:int, signalJump:int=50, bottomIndex:int=0, topIndex:int=None, metricFunction = None):
+def seamExtraction(intensityMatrix, startTime:int, stopTime:int, width:int, signalJump:int=50, bottomIndex:int=0, topIndex:int=None, order = 2):
     """
         Input:
             intensityMatrix: a 2d array [velocity][time] and each cell 
@@ -57,11 +59,11 @@ def seamExtraction(intensityMatrix, startTime:int, stopTime:int, width:int, sign
             bottomIndex: Upper bound on the velocity. 
                 Assumed to be a valid index for sgram's intensity array.
                 Defaults to zero
-            metricFunction: function that will be minimized to determine the most 
-                well connected signal. 
-                Defaults to None:
-                    minimizing the Manhattan distance between neighboring pixels.
-                Needs to take two numbers and return a number.
+            order: the order of the minkowski distance function that will be minimized 
+                to determine the most well connected signal. 
+                Defaults to 2:
+                    minimizing the Euclidean distance between neighboring pixels.
+                
     Output:
         list of indices that should be plotted as the signal as an array of indices
         indicating the intensity values that correspond to the most 
@@ -71,12 +73,6 @@ def seamExtraction(intensityMatrix, startTime:int, stopTime:int, width:int, sign
     if stopTime <= startTime:
         raise ValueError("Stop Time is assumed to be greater than start time.")
 
-    if metricFunction != None:
-        # Check if metricFunction is a function that takes in two numbers and returns a number
-        if not callable(metricFunction):
-            raise ValueError("metricFunction must either be None or a function \
-                that takes two numbers and returns a number.")
-        raise TypeError("Method has not been implemented to take arbitrary functions.")
     else:
         if width % 2 == 1:
             width += 1
@@ -85,6 +81,8 @@ def seamExtraction(intensityMatrix, startTime:int, stopTime:int, width:int, sign
 
         velocities = np.zeros(tableHeight, dtype = np.int64)
         # This will hold the answers that we are looking for to return.
+        print(len(velocities))
+
 
         halfFan = width//2
 
@@ -99,13 +97,19 @@ def seamExtraction(intensityMatrix, startTime:int, stopTime:int, width:int, sign
 
         startIndex = np.argmax(transposedIntensities[startTime][bottomIndex+signalJump:topIndex+1])+bottomIndex+signalJump
 
-
         top = min(startIndex + (stopTime - startTime)*halfFan, topIndex)
             # to get it to round up to 1 if it is 0.5
         bottomDP = max(startIndex - (stopTime - startTime)*halfFan, bottomIndex + 1) 
             # to get it to round up to 1 if it is 0.5
 
-        tableWidth = top - bottomDP+1
+        # transposedTimeAndVelSlice = sliceTimeAndVelocity(transposedIntensities, startTime, bottomDP, stopTime, top) 
+        # normalized = normalize(transposedTimeAndVelSlice)
+
+        normalized = sliceTimeAndVelocity(normalize(transposedIntensities), startTime, bottomDP, stopTime, top)
+
+        print(normalized.shape)
+
+        tableHeight, tableWidth = normalized.shape
         
         print("Top", top)
         print("bottomDP", bottomDP)
@@ -133,19 +137,18 @@ def seamExtraction(intensityMatrix, startTime:int, stopTime:int, width:int, sign
 
         for timeIndex in range(2, tableHeight + 1):
             dpTime = tableHeight - timeIndex
-            intensityTime = stopTime-timeIndex
-            for velocityIndex in range(top, bottomDP-1, -1):
+            for velocityIndex in range(tableWidth):
                 bestSoFar = np.Infinity
                 bestPointer = None
                 for testIndex in range(-halfFan, halfFan+1): # The + 1 is so that you get a balanced window.
-                    if velocityIndex + testIndex >= bottomDP and velocityIndex + testIndex <= top:
+                    if velocityIndex + testIndex >= 0 and velocityIndex + testIndex < tableWidth:
                         # then we have a valid index to test from.                
-                        current = np.abs(intensityMatrix[testIndex+velocityIndex][intensityTime+1] - intensityMatrix[velocityIndex][intensityTime]) + DPTable[dpTime+1][velocityIndex+testIndex-bottomDP]
+                        current = distance.minkowski(normalized[dpTime+1][testIndex+velocityIndex], normalized[dpTime][velocityIndex], order) + DPTable[dpTime+1][velocityIndex+testIndex]
                         if current < bestSoFar:
                             bestSoFar = current
-                            bestPointer = velocityIndex + testIndex - bottomDP                            
-                DPTable[dpTime][velocityIndex-bottomDP] = bestSoFar
-                parentTable[dpTime][velocityIndex-bottomDP] = bestPointer
+                            bestPointer = velocityIndex + testIndex                            
+                DPTable[dpTime][velocityIndex] = bestSoFar
+                parentTable[dpTime][velocityIndex] = bestPointer
 
 
                 # print("Just finished computing the answer for (v,t): (", velocityIndex,",", dpTime, ")")
@@ -158,7 +161,7 @@ def seamExtraction(intensityMatrix, startTime:int, stopTime:int, width:int, sign
 
         velocities = reconstruction(parentTable, currentPointer, bottomDP)
 
-        return velocities, parentTable, DPTable
+        return velocities, parentTable, DPTable, bottomDP, top
 
 
 def reconstruction(parentTable, startPoint, bottomDP):
@@ -171,3 +174,69 @@ def reconstruction(parentTable, startPoint, bottomDP):
         startPoint = parentTable[timeIndex][startPoint]
 
     return velocities
+
+def normalize(timeVelocityIntensity):
+    """
+        Time Vs Velocity intensity values.
+
+        Subtract out the min at each time step. Then, find
+        the maximum at that time step. Normalize the intensity
+        at velocity along this time step by the maximum intensity
+        at this time step. Return the normalized array.
+    """
+    newArray = np.zeros(timeVelocityIntensity.shape, dtype = np.float32)
+    for timeInd in range(timeVelocityIntensity.shape[0]):
+        minValue = np.min(timeVelocityIntensity[timeInd])
+        timeVelocityIntensity[timeInd] += -1*minValue
+        maxValue = np.max(timeVelocityIntensity[timeInd])
+        for velInd in range(timeVelocityIntensity.shape[1]):
+            curr = timeVelocityIntensity[timeInd][velInd]
+            newValue = curr/maxValue
+            newArray[timeInd][velInd] = newValue
+
+    return newArray
+
+def sliceTimeAndVelocity(timeVelocityIntensity, startTime:int=0, minVel:int=0, stopTime:int = None, maxVel:int=None):
+    """
+        Input:
+            timeVelocityIntensity - the array to be sliced.
+            startTime - index that is the first row to be included
+                in the returned array.
+            stopTime - index that is the last row to be included
+                in the returned array (inclusive).
+            minVel - the index of the minimum velocity that is to be
+                included in the returned array.
+            maxVel - the index of the maximum velocity that is to be
+                included in the returned array (inclusive).
+        Output:
+            timeVelocityIntensity[startTime:stopTime+1][minVel:maxVel+1]
+    """
+    if stopTime == None:
+        stopTime = timeVelocityIntensity.shape[0]-1
+    if maxVel == None:
+        maxVel = timeVelocityIntensity.shape[1]-1
+    if startTime > stopTime:
+        raise ValueError("Cannot slice backwards in time")
+    elif stopTime < 0:
+        raise ValueError("Please use positive indices only")
+    if minVel > maxVel:
+        raise ValueError("Cannot slice backwards in velocity")
+    elif maxVel < 0:
+        raise ValueError("Please use positive indices only")
+    TimeSlice = timeVelocityIntensity[startTime:stopTime+1]
+    print(TimeSlice)
+    TimeAndVelSlice = np.transpose(np.transpose(TimeSlice)[minVel:maxVel+1])
+    return TimeAndVelSlice
+
+def mainTest(intensityMatrix, velocities, startTime:int, stopTime:int, signalJump:int=50, bottomIndex:int=0, topIndex:int=None, order = 2):
+    widths = [1,3,5,11,21]
+    for width in widths:
+        signal, p_table, dp_table, botVel, topVel = seamExtraction(intensityMatrix, startTime, stopTime, width, signalJump, bottomIndex, topIndex)
+
+        plt.plot(velocities[botVel:topVel+1], dp_table[0])
+        plt.title("Total Minkowski" + str(order) +" Order Cost diagram with a window size of " +str(width) +" normalized cut second")
+        plt.xlabel("Starting velocity of the trace (m/s)")
+        plt.ylabel("Minimum value of the sum minkowski distance(p_i, p_{i-1}," + str(order) + ") along the path")
+        plt.show()
+
+    
