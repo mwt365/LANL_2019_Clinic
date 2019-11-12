@@ -1,4 +1,12 @@
-#! /usr/bin/env python3
+# coding:utf-8
+
+"""
+::
+
+   Author:  LANL Clinic 2019 --<lanl19@cs.hmc.edu>
+   Purpose: Compute a spectrogram from a DigFile
+   Created: 9/20/19
+"""
 
 import os
 import numpy as np
@@ -18,35 +26,37 @@ class Spectrogram:
     Required arguments to the constructor:
         digfile: either an instance of DigFile or the filename of a .dig file
 
-    Optional arguments and their default values:
-        t_start: (digfile.t0) time of the first point to use in the spectrogram
-        ending:  (None) either the time of the last point or a positive integer
-                 representing the number of points to use; if None, the final
-                 point in the digfile is used.
-        wavelength: (1550.0e-9) the wavelength in meters
-        points_per_spectrum: (8192) the number of values used to generate
-            each spectrum. Should be a power of 2.
-        overlap_shift_factor: (1/8) the fraction of points_per_spectrum
-            that defines the offset of successive spectra. An
-            overlap_shift_factor of 1 means that each sample is used
-            in only one spectrum. The default value means that successive
-            spectra share 7/8 of their source samples.
-        window_function: (None) the window function used by signal.spectrogram.
-            The default value implies a ('tukey', 0.25) window.
-        form: ('db') whether to use power values ('power'), decibels ('db'),
-            or log(power) ('log') in reporting spectral intensities.
-        convert_to_voltage: (True) scale the integer values stored in the
-            .dig file to voltage before computing the spectrogram. If False,
-            the raw integral values are used.
-        detrend: ("linear") the background subtraction method.
+    **Optional arguments and their default values**
 
-    Computed fields:
-        t: array of times at which the spectra are computed
-        f: array of frequencies present in each spectrum
-        v: array of velocities corresponding to each spectrum
-        intensity: two-dimensional array of (scaled) intensities, which
-            is the spectrogram. The first index corresponds to
-            frequency/velocity, the second to time.
+    t_start: (digfile.t0) time of the first point to use in the spectrogram
+    ending:  (None) either the time of the last point or a positive integer
+             representing the number of points to use; if None, the final
+             point in the digfile is used.
+    wavelength: (1550.0e-9) the wavelength in meters
+    points_per_spectrum: (8192) the number of values used to generate
+        each spectrum. Should be a power of 2.
+    overlap_shift_factor: (1/8) the fraction of points_per_spectrum
+        that defines the offset of successive spectra. An
+        overlap_shift_factor of 1 means that each sample is used
+        in only one spectrum. The default value means that successive
+        spectra share 7/8 of their source samples.
+    window_function: (None) the window function used by signal.spectrogram.
+        The default value implies a ('tukey', 0.25) window.
+    form: ('db') whether to use power values ('power'), decibels ('db'),
+        or log(power) ('log') in reporting spectral intensities.
+    convert_to_voltage: (True) scale the integer values stored in the
+        .dig file to voltage before computing the spectrogram. If False,
+        the raw integral values are used.
+    detrend: ("linear") the background subtraction method.
+
+    **Computed fields**
+
+    t:         array of times at which the spectra are computed
+    f:         array of frequencies present in each spectrum
+    v:         array of velocities corresponding to each spectrum
+    intensity: two-dimensional array of (scaled) intensities, which
+               is the spectrogram. The first index corresponds to
+               frequency/velocity, the second to time.
     """
 
     _fields = ("points_per_spectrum",
@@ -72,12 +82,13 @@ class Spectrogram:
         """
         TODO: We are currently not handling kwargs
         """
+        if isinstance(digfile, str):
+            digfile = DigFile(digfile)
         if isinstance(digfile, DigFile):
             self.data = digfile
-        elif isinstance(digfile, str):
-            self.data = DigFile(digfile)
         else:
             raise TypeError("Unknown file type")
+
         self.t_start = t_start if t_start != None else self.data.t0
         p_start, p_end = self.data._points(self.t_start, ending)
         self.t_end = self.t_start + self.data.dt * (p_end - p_start + 1)
@@ -99,128 +110,13 @@ class Spectrogram:
         # deal with kwargs
 
         try:
-            self._load()
+            if False:
+                self._load()
+            else:
+                raise Exception()
         except:
             self._compute(ending)
             # self._save()
-
-    def set(self, **kwargs):
-        """
-        Update the spectrogram to use the new parameters
-        specified in the keyword arguments.
-        """
-        fields = (
-            "points_per_spectrum",
-            "shift",
-            "window_function",
-            "form",
-            "use_voltage",
-            "detrend"
-        )
-        changed = False
-        for field in fields:
-            if field in kwargs and kwargs[field] != getattr(self, field):
-                changed = True
-                setattr(self, field, kwargs[field])
-        if changed:
-            self._compute(None)
-
-    def __str__(self):
-        return ", ".join(
-            [str(x) for x in
-             [self.data.filename,
-              f"{self.points_per_spectrum} / {self.shift}",
-              self.form,
-              self.intensity.shape
-              ]
-             ])
-
-    def _location(self, location, create=False):
-        if location == "":
-            location = os.path.splitext(self.data.path)[0] + \
-                '.spectrogram'
-        if os.path.exists(location) and not os.path.isdir(location):
-            raise FileExistsError
-        if not os.path.exists(location) and create:
-            os.mkdir(location)
-        return location
-
-    def _point_to_time(self, p):
-        "Map a point index to a time"
-        return self.time[p]
-
-    def _time_to_index(self, t):
-        "Map a time to a point number"
-        p = (t - self.t_start) / (self.time[1] - self.time[0])
-        p = int(0.5 + p)  # round to an integer
-        if p < 0:
-            return 0
-        return min(p, len(self.time) - 1)
-
-    def _velocity_to_index(self, v):
-        "Map a velocity value to a point number"
-        p = (v - self.velocity[0]) / (self.velocity[1] - self.velocity[0])
-        p = int(0.5 + p)  # round
-        if p < 0:
-            return 0
-        return min(p, -1 + len(self.velocity))
-
-    def slice(self, time_range, velocity_range):
-        """
-        Given a tuple of times and a tuple of velocities, return
-        time, velocity, intensity subarrays
-        """
-        if time_range == None:
-            time0, time1 = 0, len(self.time) - 1
-        else:
-            time0, time1 = [self._time_to_index(t) for t in time_range]
-        if velocity_range == None:
-            vel0, vel1 = 0, len(self.velocity) - 1
-        else:
-            vel0, vel1 = [self._velocity_to_index(v) for v in velocity_range]
-
-        tvals = self.time[time0:time1 + 1]
-        vvals = self.velocity[vel0:vel1 + 1]
-        ivals = self.intensity[vel0:vel1, time0:time1]
-        return tvals, vvals, ivals
-
-    def _save(self, location=""):
-        """
-        Save a representation of this spectrogram.
-        The format is a folder holding the three numpy arrays
-        and a text file with the parameters.
-        If the location is a blank string, the folder has
-        the name of the digfile, with .dig replaced by .spectrogram.
-        """
-        location = self._location(location, True)
-        with open(os.path.join(location, "properties"), 'w') as f:
-            for field in self._fields:
-                f.write(f"{field}\t{getattr(self,field)}\n")
-        np.savez_compressed(
-            os.path.join(location, "vals"),
-            velocity=self.velocity,
-            frequency=self.frequency,
-            time=self.time,
-            intensity=self.intensity)
-
-    def _load(self, location=""):
-        raise Exception("blah")
-        location = self._location(location)
-        if not os.path.isdir(location):
-            raise FileNotFoundError
-        try:
-            with open(os.path.join(
-                    location, "properties"), 'r') as f:
-                for line in f.readlines():
-                    field, value = line.split('\t')
-                    assert value == getattr(self.field)
-            loaded = np.load(os.path.join(location, "vals"))
-            for k, v in loaded.items():
-                setattr(self, k, v)
-            return True
-        except Exception as eeps:
-            print(eeps)
-        return False
 
     def _compute(self, ending):
         """
@@ -266,6 +162,129 @@ class Spectrogram:
 
         # scale the frequency axis to velocity
         self.velocity = freqs * 0.5 * self.wavelength  # velocities
+
+    def set(self, **kwargs):
+        """
+        Update the spectrogram to use the new parameters
+        specified in the keyword arguments. If any changes cause
+        the underlying values to change, recompute the spectrogram.
+        """
+        fields = (
+            "points_per_spectrum",
+            "shift",
+            "window_function",
+            "form",
+            "use_voltage",
+            "detrend"
+        )
+        changed = False
+        for field in fields:
+            if field in kwargs and kwargs[field] != getattr(self, field):
+                changed = True
+                setattr(self, field, kwargs[field])
+        if changed:
+            self._compute(None)
+
+    def __str__(self):
+        return ", ".join(
+            [str(x) for x in
+             [self.data.filename,
+              f"{self.points_per_spectrum} / {self.shift}",
+              self.form,
+              self.intensity.shape
+              ]
+             ])
+
+    def _point_to_time(self, p):
+        "Map a point index to a time"
+        return self.time[p]
+
+    def _time_to_index(self, t):
+        "Map a time to a point number"
+        p = (t - self.t_start) / (self.time[1] - self.time[0])
+        p = int(0.5 + p)  # round to an integer
+        if p < 0:
+            return 0
+        return min(p, len(self.time) - 1)
+
+    def _velocity_to_index(self, v):
+        "Map a velocity value to a point number"
+        p = (v - self.velocity[0]) / (self.velocity[1] - self.velocity[0])
+        p = int(0.5 + p)  # round
+        if p < 0:
+            return 0
+        return min(p, -1 + len(self.velocity))
+
+    def slice(self, time_range, velocity_range):
+        """
+        Given a tuple of times and a tuple of velocities, return
+        time, velocity, intensity subarrays
+        """
+        if time_range == None:
+            time0, time1 = 0, len(self.time) - 1
+        else:
+            time0, time1 = [self._time_to_index(t) for t in time_range]
+        if velocity_range == None:
+            vel0, vel1 = 0, len(self.velocity) - 1
+        else:
+            vel0, vel1 = [self._velocity_to_index(v) for v in velocity_range]
+
+        tvals = self.time[time0:time1 + 1]
+        vvals = self.velocity[vel0:vel1 + 1]
+        ivals = self.intensity[vel0:vel1, time0:time1]
+        return tvals, vvals, ivals
+
+    # Routines to archive the computed spectrogram and reload from disk
+
+    def _location(self, location, create=False):
+        """
+
+        """
+        if location == "":
+            location = os.path.splitext(self.data.path)[0] + \
+                '.spectrogram'
+        if os.path.exists(location) and not os.path.isdir(location):
+            raise FileExistsError
+        if not os.path.exists(location) and create:
+            os.mkdir(location)
+        return location
+
+    def _save(self, location=""):
+        """
+        Save a representation of this spectrogram.
+        The format is a folder holding the three numpy arrays
+        and a text file with the parameters.
+        If the location is a blank string, the folder has
+        the name of the digfile, with .dig replaced by .spectrogram.
+        """
+        location = self._location(location, True)
+        with open(os.path.join(location, "properties"), 'w') as f:
+            for field in self._fields:
+                f.write(f"{field}\t{getattr(self,field)}\n")
+        np.savez_compressed(
+            os.path.join(location, "vals"),
+            velocity=self.velocity,
+            frequency=self.frequency,
+            time=self.time,
+            intensity=self.intensity)
+
+    def _load(self, location=""):
+        location = self._location(location)
+        if not os.path.isdir(location):
+            raise FileNotFoundError
+        try:
+            with open(os.path.join(
+                    location, "properties"), 'r') as f:
+                for line in f.readlines():
+                    field, value = line.split('\t')
+                    assert value == getattr(self.field)
+            loaded = np.load(os.path.join(location, "vals"))
+            for k, v in loaded.items():
+                setattr(self, k, v)
+            return True
+        except Exception as eeps:
+            print(eeps)
+        return False
 
     @property
     def max(self):

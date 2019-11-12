@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 # coding:utf-8
 """
+::
+
   Author:  LANL 2019 clinic --<lanl19@cs.hmc.edu>
   Purpose: To represent a spectrogram in a Jupyter notebook
   with convenient controls
@@ -131,25 +133,46 @@ class SpectrogramWidget:
     """
     A Jupyter notebook widget to represent a spectrogram, along with
     numerous controls to adjust the appearance of the spectrogram.
-    """
+    For the widget to behave in a Jupyter notebook, place::
 
-    def __init__(self, digfile, **kwargs):
-        """
-        For the widget to behave in a Jupyter notebook, place
         %matplotlib widget
-        at the top of the notebook. This requires that the package
-        ipympl is installed, which can be done either with pip3
-        or conda install ipympl.
 
-        I also recommend editing ~/.jupyter/custom/custom.css to
-        modify the definition of .container
+    at the top of the notebook. This requires that the package
+    ipympl is installed, which can be done either with pip3
+    or conda install ipympl.
+
+    I also recommend editing ~/.jupyter/custom/custom.css to
+    modify the definition of .container::
 
         .container {
             width: 100% !important;
             margin-right: 40px;
             margin-left: 40px;
             }
-        """
+
+    **Inputs**
+
+    - digfile: either a string or DigFile
+    - kwargs: optional keyword arguments. These are passed to
+      the Spectrogram constructor and to the routine that
+      creates the control widgets.
+
+    **Data members**
+
+    - digfile: the source data DigFile
+    - title: the title displayed above the spectrogram
+    - baselines: a list of baseline velocities
+    - spectrogram: a Spectrogram object deriving from digfile
+    - fig:
+    - axSpectrum:
+    - axSpectrogram:
+    - image:
+    - colorbar:
+    - individual_controls: dictionary of widgets
+    - controls:
+    """
+
+    def __init__(self, digfile, **kwargs):
         if isinstance(digfile, str):
             self.digfile = DigFile(digfile)
             # sg = self.spectrogram = Spectrogram(spectrogram)
@@ -158,6 +181,8 @@ class SpectrogramWidget:
                 digfile, DigFile), "You must pass in a DigFile"
             self.digfile = digfile
 
+        # If LaTeX is enabled in matplotlib, underscores in the title
+        # cause problems in displaying the histogram
         self.title = self.digfile.filename.split('/')[-1].replace("_", "\\_")
         self.baselines = []
         # handle the keyword arguments here
@@ -274,12 +299,13 @@ class SpectrogramWidget:
         )
 
         slide.continuous_update = False
-        slide.observe(lambda x: self.overhaul(points_per_spectrogram=2 ** x['new']),
-                      names="value")
+        slide.observe(lambda x: self.overhaul(
+            points_per_spectrogram=2 ** x['new']), names="value")
 
         cd['shift'] = slide = widgets.IntSlider(
             description='Shift',
-            value=self.spectrogram.points_per_spectrum - self.spectrogram.shift,
+            value=self.spectrogram.points_per_spectrum -
+            self.spectrogram.shift,
             min=1,
             max=2 * self.spectrogram.points_per_spectrum,
             step=1)
@@ -305,6 +331,7 @@ class SpectrogramWidget:
         ])
 
     def range(self, var):
+        "Return the range of the named control, or None if not found."
         if var in self.individual_controls:
             return self.individual_controls[var].range
         return None
@@ -313,6 +340,10 @@ class SpectrogramWidget:
         self.update_spectrogram()
 
     def show_raw_signal(self, box):
+        """
+        Display or remove the thumbnail of the time series data
+        at the top of the spectrogram window.
+        """
         if box.new:
             # display the thumbnail
             t_range = self.range('t_range')
@@ -386,6 +417,9 @@ class SpectrogramWidget:
         self.update_cmap()
 
     def update_cmap(self):
+        """
+        Update the color map used to display the spectrogram
+        """
         mapname = self.individual_controls['color_map'].value
         if mapname == 'Computed':
             from generate_color_map import make_spectrogram_color_map
@@ -396,6 +430,10 @@ class SpectrogramWidget:
         self.image.set_cmap(COLORMAPS[mapname])
 
     def update_velocity_range(self):
+        """
+        Update the displayed velocity range using values obtained
+        from the 'velocity_range' slider.
+        """
         vmin, vmax = self.range('velocity_range')
         self.axSpectrogram.set_ylim(vmin, vmax)
         self.axSpectrum.set_ylim(vmin, vmax)
@@ -468,6 +506,10 @@ class SpectrogramWidget:
                 self.baselines.append(bline)
 
     def spectrum(self, the_time):
+        """
+        Display a spectrum in the left axes corresponding to the
+        passed value of the_time (which is in seconds).
+        """
         if the_time is None:
             # Initialize the axes
             self.axSpectrum.plot([0, 1], [0, 1], 'r-')
@@ -495,7 +537,3 @@ class SpectrogramWidget:
             line = self.axSpectrogram.lines[0]
             tval = the_time * 1e6  # convert to microseconds
             line.set(xdata=[tval, tval], ydata=[0, self.spectrogram.v_max])
-
-
-if __name__ == '__main__':
-    pass  # unittest.main()

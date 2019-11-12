@@ -1,9 +1,18 @@
-#! /usr/bin/env python3
+# coding:utf-8
 
+"""
+::
+
+  Author:  LANL Clinic 2019 --<lanl19@cs.hmc.edu>
+  Purpose: Load a .dig file
+  Created: 9/18/19
+"""
 import os
 import sys
 import re
 import numpy as np
+import pandas as pd
+from scipy.optimize import curve_fit
 
 
 class DigFile:
@@ -18,24 +27,27 @@ class DigFile:
     The actual data remain on disk and are loaded only as required either
     to generate a spectrogram for a range in time or a spectrum from a 
     shorter segment. The values are loaded from disk and decoded using
-    the *values* method which takes a start time and either an end time
+    the **values** method which takes a start time and either an end time
     or an integer number of points to include. Alternatively, the raw values
-    may be returned with the *raw_values* method. For either, the corresponding
-    sample times are available from *time_values*.
+    may be returned with the **raw_values** method. For either, the
+    corresponding sample times are available from **time_values**.
+
+    We assume that the first 1024 bytes of the file contain ascii text
+    describing the data in the file. The first 512 bytes may vary, but
+    the second 512-byte chunk should include (in order) the following:
+    - the number of samples
+    - the format (8, 16, or 32)
+    - the sample period (s)
+    - the start time
+    - the voltage step
+    - offset voltage
     """
 
     def __init__(self, filename):
         """
-        We assume that the first 1024 bytes of the file contain ascii text
-        describing the data in the file. The first 512 bytes may vary, but
-        the second 512-byte chunk should include (in order) the following:
-            the number of samples
-            the format (8, 16, or 32)
-            the sample period (s)
-            the start time
-            the voltage step
-            offset voltage
         """
+        if not filename.endswith('.dig'):
+            filename += '.dig'
         self.filename = filename
         self.path = os.path.realpath(filename)
         _, ext = os.path.splitext(filename)
@@ -55,11 +67,15 @@ class DigFile:
 
     @property
     def t_final(self):
+        "The time of the last sample in the DigFile."
         return self.t0 + self.dt * (self.num_samples - 1)
 
     @property
     def frequency_max(self):
-        return 0.5 / self.dt
+        r"""The Nyquist frequency, corresponding to :math:`\frac{1}{2 \Delta t}`,
+        where :math:`\Delta t` is the sampling period (typically between 20 and
+        50 ps).
+        """
 
     def load_dig_file(self):
         """
@@ -96,7 +112,16 @@ class DigFile:
 
     def set_data_format(self):
         """
-        Determine the endianness of the data and adjust the data_format accordingly.
+        Determine the endianness of the data and adjust the **data_format** accordingly.
+        Most of the files we have seen have an entry of the form BYT_O: LSB in the
+        first 512 bytes of the header. This seems to decode to the order of the bytes
+        in the file being most-significant to least significant. If the file uses
+        more than one byte per data point and this ordering disagrees with the native
+        integer format, as determined by **sys.byteorder**, the data_format is swapped.
+        In the case that no information can be found in the header, but more than one
+        byte is used for storing the data, both orders are tried for the first
+        nvals = 10000 values in the file and the ordering that yields the smoothest
+        curve :math:`V(t)` is chosen.
         """
         if 'byte_order' in self.notes:
             native_order = 'MSB' if sys.byteorder == 'little' else 'LSB'
@@ -120,11 +145,13 @@ class DigFile:
                 self.swap_byte_order()  # we want to go with the smaller average
 
     def swap_byte_order(self):
+        """Exchange the byte ordering in self.data_format."""
         self.data_format = self.data_format.newbyteorder('S')
 
     def decode_dig_header(self, tList):
         """
-        Maybe some help here?
+        TODO: I would like Trevor or Max (whoever wrote the original code) to
+        supply some further information here.
         """
         instrument_spec_codes = {
             'BYT_N': 'binary_data_field_width',
@@ -180,7 +207,7 @@ class DigFile:
     def extract(self, filename, t_start, ending=None):
         """
         Save a .dig file with the portion of the data between the
-        specified limits.
+        specified time limits.
         """
         p_start, p_end = self._points(t_start, ending)
         n_samples = p_end - p_start + 1
@@ -291,8 +318,15 @@ class DigFile:
 
 
 if __name__ == '__main__':
-
     import matplotlib.pyplot as plt
+
+    df = DigFile('../dig/GEN3CH_4_009.dig')
+    tmp = df.fiducials()
+    plt.plot(*tmp)
+    plt.xlim(2.5e-6, 4e-6)
+    plt.show()
+    raise Exception("Done")
+
     for file in os.listdir('../dig/'):
         filename = os.path.splitext(file)[0]
         if filename != 'GEN3_CHANNEL1KEY001':
@@ -301,7 +335,7 @@ if __name__ == '__main__':
         print(df)
         thumb = df.thumbnail(0, 1e-3, stdev=True)
         xvals = thumb['times']
-        yvals = thumb['stdevs'] # thumb['peak_to_peak']
+        yvals = thumb['stdevs']  # thumb['peak_to_peak']
         plt.plot(xvals * 1e6, yvals)
         plt.xlabel('$t (\\mu \\mathrm{s})$')
         plt.ylabel('amplitude')

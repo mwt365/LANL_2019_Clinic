@@ -1,6 +1,8 @@
-#!/usr/bin/env python3
 # coding:utf-8
+
 """
+::
+
   Author:  LANL Clinic 2019 --<lanl19@cs.hmc.edu>
   Purpose: Attempt to follow a peak.
   Created: 10/18/19
