@@ -119,7 +119,7 @@ class Follower:
             res['velocity_uncertainty'][n] = fit_res['width']
             res['intensities'][n] = fit_res['amplitude']
 
-    def estimate_width(self, n, neighborhood=30):
+    def estimate_width(self, n, neighborhood=32):
         """
         Estimate the gaussian width of a peak
         """
@@ -127,16 +127,51 @@ class Follower:
         time_index = res['time_index'][n]
         v_peak = res['velocities'][n]
         v_peak_index = self.spectrogram._velocity_to_index(v_peak)
-        n_low = max(0, v_peak_index - neighborhood)
-        n_high = min(v_peak_index + neighborhood + 1, len(self.velocity))
-        # fetch the true power values for this column of the spectrogram
-        power = self.spectrogram.power(
-            self.intensity[n_low:n_high, time_index])
-        res = self.fit_gaussian(
-            self.velocity[n_low:n_high], power, v_peak)
-        res['power'] = power
-        res['indices'] = (n_low, n_high)
+        
+        hoods, means, stdevs = [], [], []
+        hood = neighborhood
+        while hood > 1:
+            n_low = max(0, v_peak_index - hood)
+            n_high = min(v_peak_index + hood + 1, len(self.velocity))
+            # fetch the true power values for this column of the spectrogram
+            power = self.spectrogram.power(
+                self.intensity[n_low:n_high, time_index])
+            velocities = self.velocity[n_low:n_high]
+            if hood == neighborhood:
+                res = self.fit_gaussian(
+                    self.velocity[n_low:n_high], power, v_peak)
+                res['power'] = power
+                res['indices'] = (n_low, n_high)
+            mean, stdev = self.moments(velocities, power)
+            hoods.append(hood)
+            means.append(mean)
+            stdevs.append(stdev)
+            hood = hood // 2
+        print(stdevs)
+        # 
+        
         return res
+    
+    def moments(self, x, y):
+        """
+        Give an array x with equally spaced points and an
+        array y holding corresponding intensities, with a 
+        peak allegedly near the middle, use the first
+        moment to estimate the center and the second moment
+        to estimate the width of the peak
+        """
+        # Let's attempt to remove noise by axing points
+        # below 5% of the peak
+        threshold = y.max() * 0.05
+        clean = np.array(y)
+        clean[clean < threshold] = 0
+        zero = clean.sum()
+        one = np.sum(x * clean)
+        two = np.sum(x * x * clean)
+        mean = one / zero
+        var = two / zero - mean**2
+        stdev = np.sqrt(var)
+        return (mean, stdev)
 
     def fit_gaussian(self, velocities, powers, center):
         """
