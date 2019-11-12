@@ -1,6 +1,7 @@
 # coding:utf-8
 """
 ::
+
   Author:  LANL Clinic 2019 --<lanl19@cs.hmc.edu>
   Purpose: Look through a dig file for timing fiducials
   Created: 11/10/19
@@ -90,7 +91,7 @@ class Fiducials:
         identified."""
         return self.marks
 
-    def smooth(self, t_from, dt):
+    def smooth(self, t_from: float, dt: float):
         """
         Prepare a smoothed version of the time data from t_from
         to t_from + dt, and a finite difference version from the
@@ -261,8 +262,9 @@ class Fiducials:
 
 
 if __name__ == "__main__":
-    df = DigFile('../dig/GEN3CH_4_009')
+    # df = DigFile('../dig/GEN3CH_4_009')
+    # fid = Fiducials(df)
+    # print(fid.values)
+    df = DigFile('../dig/GEN3_CHANNEL1KEY001')
     fid = Fiducials(df)
     print(fid.values)
-
-

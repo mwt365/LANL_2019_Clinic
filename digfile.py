@@ -105,8 +105,8 @@ class DigFile:
         self.bits = int(bottom[-5])  # 8, 16, or 32
         self.num_samples = int(bottom[-6])
         self.bytes_per_point = self.bits // 8
-        self.data_format = np.dtype({1: np.uint8, 2: np.int16,
-                                     4: np.int32}[self.bytes_per_point])
+        self.data_format = np.dtype({1: np.uint8, 2: np.uint16,
+                                     4: np.uint32}[self.bytes_per_point])
         if self.bits > 8:
             self.set_data_format()
 
@@ -137,7 +137,8 @@ class DigFile:
             nvals = 10000
             for n in range(2):
                 vals = self.raw_values(None, nvals)
-                shifts = np.abs(vals - np.roll(vals, 1))
+                shifts = np.abs(np.asarray(
+                    vals, dtype=np.float32) - np.roll(vals, 1))
                 # we should omit the two end points in computing the mean
                 order[n] = np.mean(shifts[1:-2])
                 self.swap_byte_order()
@@ -172,37 +173,45 @@ class DigFile:
             'YZE': 'y_component',
             'NR_FR': 'NR_FR'
         }
-        for line in tList:
-            if any(s in line for s in instrument_spec_codes):
-                for xstr in line.split(';'):
-                    m = re.match(r'([^ ]*) (.*)', xstr)
-                    if m and m.group(1) in instrument_spec_codes:
-                        key, val = instrument_spec_codes[m.group(
-                            1)], m.group(2)
-                        # Attempt to decode the value
-                        try:
-                            val = int(val)  # can we convert to an integer?
-                        except:
+        if len(tList) > 1:
+            for line in tList:
+                if any(s in line for s in instrument_spec_codes):
+                    for xstr in line.split(';'):
+                        m = re.match(r'([^ ]*) (.*)', xstr)
+                        if m and m.group(1) in instrument_spec_codes:
+                            key, val = instrument_spec_codes[m.group(
+                                1)], m.group(2)
+                            # Attempt to decode the value
                             try:
-                                # if not, can we convert to a float?
-                                val = float(val)
+                                # can we convert to an integer?
+                                val = int(val)
                             except:
-                                pass
-                        # add the property to ourself
-                        self.notes[key] = val
-                        # print(f"{key} ==> {val}")
+                                try:
+                                    # if not, can we convert to a float?
+                                    val = float(val)
+                                except:
+                                    pass
+                            # add the property to ourself
+                            self.notes[key] = val
+        else:
+            self.header_args = [x.strip() for x in tList[0].split(',')]
 
     def point_number(self, time):
         "Return the point number corresponding to the given time"
         return int((time - self.t0) / self.dt)
 
     def __str__(self):
-        return "\n".join([
+        headerinfo = [f"{key}: {val}" for key, val in self.notes.items()]
+        if hasattr(self, "header_args"):
+            headerinfo.extend(self.header_args)
+        datainfo = [
             self.filename,
             f"{self.bits} bits" + f" {self.notes['byte_order']} first" if 'byte_order' in self.notes else "",
             f"{self.t0*1e6} µs to {(self.t0 + self.dt*self.num_samples)*1e6} µs in steps of {self.dt*1e12} ps",
-            f"{self.num_samples:,} points"
-        ])
+            f"{self.num_samples:,} points",
+        ]
+        datainfo.extend(headerinfo)
+        return "\n".join(datainfo)
 
     def extract(self, filename, t_start, ending=None):
         """
