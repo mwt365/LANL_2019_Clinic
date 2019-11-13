@@ -41,6 +41,10 @@ class DigFile:
     - the start time
     - the voltage step
     - offset voltage
+
+    It strongly seems that despite the documentation we received, the
+    integers stored in the binary portion of the file are unsigned
+    whether 8 or 16 bits. We have no 32-bit examples.
     """
 
     def __init__(self, filename):
@@ -105,8 +109,9 @@ class DigFile:
         self.bits = int(bottom[-5])  # 8, 16, or 32
         self.num_samples = int(bottom[-6])
         self.bytes_per_point = self.bits // 8
-        self.data_format = np.dtype({1: np.uint8, 2: np.int16,
-                                     4: np.int32}[self.bytes_per_point])
+        # Should np.int32 be np.uint32? Don't know. No data.
+        self.data_format = np.dtype(
+            {1: np.uint8, 2: np.uint16, 4: np.uint32}[self.bytes_per_point])
         if self.bits > 8:
             self.set_data_format()
 
