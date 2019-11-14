@@ -35,11 +35,10 @@ class Spectrogram:
     wavelength: (1550.0e-9) the wavelength in meters
     points_per_spectrum: (8192) the number of values used to generate
         each spectrum. Should be a power of 2.
-    overlap_shift_factor: (1/8) the fraction of points_per_spectrum
-        that defines the offset of successive spectra. An
-        overlap_shift_factor of 1 means that each sample is used
+    overlap: (1/4) the fraction of points_per_spectrum to overlap in
+        successive spectra. An overlap of 0 means that each sample is used
         in only one spectrum. The default value means that successive
-        spectra share 7/8 of their source samples.
+        spectra share 1/4 of their source samples.
     window_function: (None) the window function used by signal.spectrogram.
         The default value implies a ('tukey', 0.25) window.
     form: ('db') whether to use power values ('power'), decibels ('db'),
@@ -60,7 +59,7 @@ class Spectrogram:
     """
 
     _fields = ("points_per_spectrum",
-               "shift",
+               "overlap",
                "window_function",
                "form",
                "use_voltage",
@@ -72,7 +71,7 @@ class Spectrogram:
                  ending=None,
                  wavelength=1550.0e-9,
                  points_per_spectrum=8192,
-                 overlap_shift_factor=0.25,
+                 overlap=0.25,
                  window_function=None,  # 'hanning',
                  form='db',
                  convert_to_voltage=True,
@@ -95,7 +94,7 @@ class Spectrogram:
 
         self.wavelength = wavelength
         self.points_per_spectrum = points_per_spectrum
-        self.shift = int(points_per_spectrum * overlap_shift_factor)
+        self.overlap = overlap
         self.window_function = window_function
         self.form = form
         self.use_voltage = convert_to_voltage
@@ -138,7 +137,7 @@ class Spectrogram:
             window=self.window_function if self.window_function else (
                 'tukey', 0.25),
             nperseg=self.points_per_spectrum,
-            noverlap=self.shift,
+            noverlap=int(self.overlap * self.points_per_spectrum),
             detrend=self.detrend,  # could be constant,
             scaling="spectrum"
         )
@@ -169,16 +168,8 @@ class Spectrogram:
         specified in the keyword arguments. If any changes cause
         the underlying values to change, recompute the spectrogram.
         """
-        fields = (
-            "points_per_spectrum",
-            "shift",
-            "window_function",
-            "form",
-            "use_voltage",
-            "detrend"
-        )
         changed = False
-        for field in fields:
+        for field in self._fields:
             if field in kwargs and kwargs[field] != getattr(self, field):
                 changed = True
                 setattr(self, field, kwargs[field])
