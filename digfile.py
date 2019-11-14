@@ -143,9 +143,8 @@ class DigFile:
         curve :math:`V(t)` is chosen.
         """
         if 'byte_order' in self.notes:
-            native_order = 'MSB' if sys.byteorder == 'little' else 'LSB'
-            if native_order != self.notes['byte_order']:
-                self.swap_byte_order()
+            order = "<" if self.notes['byte_order'] == 'LSB' else ">"
+            self.data_format = np.dtype(f"{order}u{self.bits//8}")
         else:
             # We need to try both and figure it out! The current strategy is
             # to look at the absolute differences between successive elements
