@@ -41,7 +41,7 @@ def extractSignal(intensityMatrix, velocities, lowerVelocityThreshold, upperVelo
     return dataPoints
 
     
-def seamExtraction(intensityMatrix, startTime:int, stopTime:int, width:int, signalJump:int=50, bottomIndex:int=0, topIndex:int=None, order = 2):
+def seamExtraction(intensityMatrix, startTime:int, stopTime:int, width:int, signalJump:int=50, bottomIndex:int=0, topIndex:int=None, order:int = 2):
     """
         Input:
             intensityMatrix: a 2d array [velocity][time] and each cell 
