@@ -81,7 +81,7 @@ class Fiducials:
         if self.width_test and self.snr_test:
             # Look for the next one
             self.find_fiducial(self.t_fiducial + self.window * 0.9,
-                               0.1 * self.window)
+                               0.2 * self.window)
             if self.width_test and self.snr_test:
                 self.propagate()
 
@@ -202,7 +202,7 @@ class Fiducials:
         dic = dict(zip(self._columns, np.zeros(len(self._columns))))
 
         # Fetch a minimal range of data around the best guess
-        dt = 2e-9
+        dt = 4e-9
         vals = self.digfile.values(
             self.t_fiducial - dt, self.t_fiducial + dt)
         tvals = self.digfile.time_values(self.t_fiducial - dt,
@@ -262,9 +262,9 @@ class Fiducials:
 
 
 if __name__ == "__main__":
-    # df = DigFile('../dig/GEN3CH_4_009')
+    df = DigFile('../dig/GEN3CH_4_009')
     # fid = Fiducials(df)
     # print(fid.values)
-    df = DigFile('../dig/GEN3_CHANNEL1KEY001')
+    # df = DigFile('../dig/GEN3_CHANNEL1KEY001')
     fid = Fiducials(df)
     print(fid.values)

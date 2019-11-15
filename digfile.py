@@ -99,6 +99,20 @@ class DigFile:
             "\000", "").split('\r\n') if x.strip()]
         self.headers = top
 
+        htext = text.replace("\000", "").split("\r\n")
+        adjusted = []
+        for row in htext:
+            if len(row) > 80:
+                adjusted.append(row[:80])
+                row = row[80:]
+                while len(row) > 78:
+                    adjusted.append("  " + row[:78])
+                    row = row[78:]
+                if row.strip():
+                    adjusted.append("  " + row.strip())
+            else:
+                adjusted.append(row)
+        self.header_text = "\n".join(adjusted)
         # These fields are pretty short, but I think they're quite
         # descriptive. Do people think we should bulk them up?
 
@@ -129,9 +143,8 @@ class DigFile:
         curve :math:`V(t)` is chosen.
         """
         if 'byte_order' in self.notes:
-            native_order = 'MSB' if sys.byteorder == 'little' else 'LSB'
-            if native_order != self.notes['byte_order']:
-                self.swap_byte_order()
+            order = "<" if self.notes['byte_order'] == 'LSB' else ">"
+            self.data_format = np.dtype(f"{order}u{self.bits//8}")
         else:
             # We need to try both and figure it out! The current strategy is
             # to look at the absolute differences between successive elements
@@ -308,7 +321,7 @@ class DigFile:
         t_end = p_end * self.dt + self.t0
         chunk_size = (p_end - p_start + 1) // points
         numpts = points * chunk_size
-        chunks = self.raw_values(t_start, numpts)
+        chunks = self.values(t_start, numpts)
         chunks = chunks.reshape((points, chunk_size))
         means = chunks.mean(axis=1)
         times = np.linspace(t_start, t_start + self.dt *
@@ -334,7 +347,9 @@ class DigFile:
 if __name__ == '__main__':
     import matplotlib.pyplot as plt
 
-    df = DigFile('../dig/GEN3CH_4_009.dig')
+    df = DigFile('../dig/GEN3_CHANNEL1KEY001')
+    print(df)
+
     tmp = df.fiducials()
     plt.plot(*tmp)
     plt.xlim(2.5e-6, 4e-6)

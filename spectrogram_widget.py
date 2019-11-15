@@ -302,16 +302,14 @@ class SpectrogramWidget:
         slide.observe(lambda x: self.overhaul(
             points_per_spectrogram=2 ** x['new']), names="value")
 
-        cd['shift'] = slide = widgets.IntSlider(
-            description='Shift',
-            value=self.spectrogram.points_per_spectrum -
-            self.spectrogram.shift,
-            min=1,
-            max=2 * self.spectrogram.points_per_spectrum,
-            step=1)
+        cd['overlap'] = slide = widgets.FloatSlider(
+            description='Overlap %',
+            value=100.0 * self.spectrogram.overlap,
+            min=0,
+            max=100)
         slide.continuous_update = False
         slide.observe(lambda x: self.overhaul(
-            shift=self.spectrogram.points_per_spectrum - x['new']),
+            overlap=x['new'] * 0.01),
             names="value")
 
         self.controls = widgets.HBox([
@@ -322,7 +320,7 @@ class SpectrogramWidget:
             widgets.VBox([
                 cd['color_map'],
                 cd['raw_signal'],
-                cd['shift'],
+                cd['overlap'],
                 cd['baselines']
             ]),
             widgets.VBox([
@@ -471,7 +469,7 @@ class SpectrogramWidget:
             follower.run()
             tsec, v = follower.v_of_t
             self.axSpectrogram.plot(tsec * 1e6, v, 'r.', alpha=0.4)
-        print("Create a figure and axes, then call self.gauss.show_fit(axes)")
+        # print("Create a figure and axes, then call self.gauss.show_fit(axes)")
 
     def update_baselines(self, method):
         """
