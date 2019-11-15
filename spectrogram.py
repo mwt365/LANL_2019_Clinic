@@ -217,8 +217,16 @@ class Spectrogram:
 
     def slice(self, time_range, velocity_range):
         """
-        Given a tuple of times and a tuple of velocities, return
-        time, velocity, intensity subarrays
+        Input:
+            time_range: Array/Tuple/List of times (t0, t1)
+                t0 should be greater than t1 but we will handle the other case
+            velocity_range: Array/Tuple/List of velocities (v0, v1)
+                v0 should be greater than v1 but we will handle the other case
+        Output:
+            3 arrays time, velocity, intensity
+            time: the time values used in the measurement from t0 to t1 inclusive.
+            velocity: the velocity values measured from v0 to v1 inclusive.
+            intensity: the corresponding intensity values that we measured.
         """
         if time_range == None:
             time0, time1 = 0, len(self.time) - 1
@@ -228,10 +236,19 @@ class Spectrogram:
             vel0, vel1 = 0, len(self.velocity) - 1
         else:
             vel0, vel1 = [self._velocity_to_index(v) for v in velocity_range]
-
+        if time0 > time1:
+            # Then we will just swap them.
+            tmp = time0
+            time0 = time1
+            time1 = time0
+        if vel0 > vel1:
+            # Then we will just swap them so that we can index normally.
+            tmp = vel0
+            vel0 = vel1
+            vel1 = tmp
         tvals = self.time[time0:time1 + 1]
         vvals = self.velocity[vel0:vel1 + 1]
-        ivals = self.intensity[vel0:vel1, time0:time1]
+        ivals = self.intensity[vel0:vel1+1, time0:time1+1]
         return tvals, vvals, ivals
 
     # Routines to archive the computed spectrogram and reload from disk
@@ -277,7 +294,7 @@ class Spectrogram:
                     location, "properties"), 'r') as f:
                 for line in f.readlines():
                     field, value = line.split('\t')
-                    assert value == getattr(self.field)
+                    assert value == getattr(field)
             loaded = np.load(os.path.join(location, "vals"))
             for k, v in loaded.items():
                 setattr(self, k, v)
