@@ -193,12 +193,22 @@ class SpectrogramWidget:
         # Create the figure to display this spectrogram
         # It would be nice to make this bigger!
         gspec = {
-            'width_ratios': [1.5, 6],
-            'height_ratios': [5, ],
+            'width_ratios': [1.25, 6],
+            'height_ratios': [1],
+            'wspace': 0.05,
+            'left': 0.05,
+            'right': 1,
         }
         self.fig, axes = plt.subplots(nrows=1, ncols=2, sharey=True,
                                       squeeze=True, gridspec_kw=gspec)
         self.axSpectrum, self.axSpectrogram = axes
+
+        # self.subfig, axes = plt.subplots(nrows=1, ncols=2, sharey=True,
+        #                                 squeeze = True, gridspec_kw = gspec)
+        # self.axSpare, self.axTrack = axes
+        self.subfig = None
+        self.axTrack = None
+        self.axSpare = None
 
         # At the moment, clicking on the image updates the spectrum
         # shown on the left axes. It would be nice to be more sophisticated and
@@ -206,10 +216,17 @@ class SpectrogramWidget:
         # to display more than one spectrum.
         self.fig.canvas.mpl_connect(
             'button_press_event', lambda x: self.handle_click(x))
-        self.spectrum(None)
+        self.fig.canvas.mpl_connect(
+            'key_press_event', lambda x: self.handle_key(x))
+
+        self.spectrum(None, "")
 
         self.image = None     # we will set in update_spectrogram
         self.colorbar = None  # we will set this on updating, based on the
+
+        self.peak_followers = []  # will hold any PeakFollowers
+        self.spectra = []         # will hold spectra displayed at right
+        self.spectra_in_db = True  # should spectra be displayed in db?
 
         self.individual_controls = dict()
         self.controls = None
@@ -226,6 +243,8 @@ class SpectrogramWidget:
         """
         cd = self.individual_controls  # the dictionary of controls
         df = self.digfile
+
+        # Time range
         t_range = kwargs.get('t_range', (0, 25))
         cd['t_range'] = slide = ValueSlider(
             "Time (µs)", t_range, (df.t0, df.t_final), 1e6,
@@ -235,6 +254,7 @@ class SpectrogramWidget:
         slide.observe(
             lambda x: self.do_update(x), names="value")
 
+        # Velocity range
         cd['velocity_range'] = slide = ValueSlider(
             "Velocity (km/s)",
             (0, 50),
@@ -245,6 +265,7 @@ class SpectrogramWidget:
         slide.observe(lambda x: self.update_velocity_range(),
                       names="value")
 
+        # Color range
         imax = self.spectrogram.intensity.max()
         imin = imax - 200  # ??
         cd['intensity_range'] = slide = ValueSlider(
@@ -258,9 +279,9 @@ class SpectrogramWidget:
         slide.observe(lambda x: self.update_color_range(),
                       names="value")
 
+        # Color map selector
         the_maps = sorted(COLORMAPS.keys())
         the_maps.append('Computed')
-
         cd['color_map'] = widgets.Dropdown(
             options=the_maps,
             value='3w_gby',
@@ -270,13 +291,15 @@ class SpectrogramWidget:
         cd['color_map'].observe(lambda x: self.update_cmap(),
                                 names="value")
 
+        # What to do when registering a click in the spectrogram
         cd['clicker'] = widgets.Dropdown(
-            options=("Spectrum", "Peak", "Gauss", ),
-            value='Spectrum',
+            options=("Spectrum (dB)", "Spectrum", "Peak", "Gauss", ),
+            value='Spectrum (dB)',
             description="Click",
             disabled=False
         )
 
+        # Computing baselines
         cd['baselines'] = widgets.Dropdown(
             options=('_None_', 'Squash', 'FFT'),
             value='_None_',
@@ -287,21 +310,23 @@ class SpectrogramWidget:
             lambda x: self.update_baselines(x["new"]),
             names="value")
 
+        # Display a thumbnail of the raw signal
         cd['raw_signal'] = widgets.Checkbox(
             value=False,
             description="Show V(t)")
         cd['raw_signal'].observe(
             lambda b: self.show_raw_signal(b), names="value")
 
+        # Set the size of each spectrum
         cd['spectrum_size'] = slide = widgets.IntSlider(
-            value=13, min=8, max=18, step=1,
+            value=12, min=8, max=18, step=1,
             description="FFT 2^n"
         )
-
         slide.continuous_update = False
         slide.observe(lambda x: self.overhaul(
             points_per_spectrogram=2 ** x['new']), names="value")
 
+        # Set the overlap percentage of successive time intervals
         cd['overlap'] = slide = widgets.FloatSlider(
             description='Overlap %',
             value=100.0 * self.spectrogram.overlap,
@@ -404,7 +429,8 @@ class SpectrogramWidget:
         self.image = self.axSpectrogram.pcolormesh(
             times * 1e6, velocities, intensities)
 
-        self.colorbar = self.fig.colorbar(self.image, ax=self.axSpectrogram)
+        self.colorbar = self.fig.colorbar(self.image, ax=self.axSpectrogram,
+                                          fraction=0.08)
 
         self.axSpectrogram.set_title(self.title)
         self.axSpectrogram.set_xlabel('Time ($\mu$s)')
@@ -448,13 +474,29 @@ class SpectrogramWidget:
         # Look up what we should do with the click
         action = self.individual_controls['clicker'].value
         try:
-            if action == 'Spectrum':
-                self.spectrum(t)
+            if 'Spectrum' in action:
+                self.spectrum(t, action)
             else:
                 self.follow(t, v, action)
 
         except Exception as eeps:
             pass
+
+    def handle_key(self, event):
+        try:
+            # convert time to seconds
+            t, v = event.xdata * 1e-6, event.ydata
+        except:
+            pass
+        char = event.key
+        if char == 'x':
+            # remove the all spectra
+            for x in self.spectra:
+                self.axSpectrogram.lines.remove(x['marker'])
+                self.axSpectrum.lines.remove(x['line'])
+            self.spectra = []
+            self.fig.canvas.draw()
+            self.fig.canvas.flush_events()
 
     def follow(self, t, v, action):
         """Attempt to follow the path starting with the clicked
@@ -465,10 +507,11 @@ class SpectrogramWidget:
             self.gauss = fitter
         elif action == "Peak":
             follower = PeakFollower(self.spectrogram, (t, v))
-            self.peak = follower
+            # self.peak = follower
+            self.peak_followers.append(follower)
             follower.run()
             tsec, v = follower.v_of_t
-            self.axSpectrogram.plot(tsec * 1e6, v, 'r.', alpha=0.4)
+            self.axSpectrogram.plot(tsec * 1e6, v, 'r-', alpha=0.4)
         # print("Create a figure and axes, then call self.gauss.show_fit(axes)")
 
     def update_baselines(self, method):
@@ -503,14 +546,15 @@ class SpectrogramWidget:
                 )
                 self.baselines.append(bline)
 
-    def spectrum(self, the_time):
+    def spectrum(self, the_time: float, form: str):
         """
         Display a spectrum in the left axes corresponding to the
         passed value of the_time (which is in seconds).
         """
+        _colors = ["r", "g", "b", "y"]
         if the_time is None:
             # Initialize the axes
-            self.axSpectrum.plot([0, 1], [0, 1], 'r-')
+            # self.axSpectrum.plot([0, 1], [0, 1], 'r-')
             self.axSpectrum.grid(axis='x', which='both',
                                  color='b', alpha=0.4)
         else:
@@ -521,17 +565,57 @@ class SpectrogramWidget:
                                     the_time + delta_t),
                 self.digfile.dt,
                 remove_dc=True)
+            # compute the level of the 90th percentile
+            spec = dict(spectrum=the_spectrum)
+            levels = sorted(the_spectrum.db)
+            n = -10
+            spec['90'] = levels[n]
+            spec['max'] = levels[-1]
+
+            # We need to worry about the format of the spectrum
+            db = ('dB' in form)
+            field = 'db' if db else 'power'
+            the_line = self.axSpectrum.plot(
+                getattr(the_spectrum, field),
+                the_spectrum.velocities,
+                _colors[len(self.spectra)],
+                alpha=0.33
+            )
+            spec['line'] = the_line[0]
+
+            tval = the_time * 1e6  # convert to microseconds
+            marker = self.axSpectrogram.plot(
+                [tval, tval],
+                [0, self.spectrogram.v_max],
+                _colors[len(self.spectra)],
+                alpha=0.33)
+            spec['marker'] = marker[0]
+
+            self.spectra.append(spec)
+
+            if db != self.spectra_in_db:
+                self.spectra_in_db = db  # switch our mode
+                # and replot all the spectra
+                for sp, li in self.spectra:
+                    li.set(xdata=getattr(sp, field), ydata=sp.velocities)
+
+            self.axSpectrum.set_xlabel("Power (dB)" if db else "Power")
+            if db:
+                # we should order the values and set a limit at something
+                # like the strongest decile
+                ninety = max([x['90'] for x in self.spectra])
+                peak = max([x['max'] for x in self.spectra])
+                self.axSpectrum.set_xlim(ninety, peak)
+            return 0
             line = self.axSpectrum.lines[0]
             intensities = the_spectrum.db
             line.set(xdata=intensities, ydata=the_spectrum.velocities)
 
-            self.axSpectrum.set_xlim(
-                (intensities.mean(), intensities.max()))
             # We should also add a line to the spectrogram showing where
             # the spectrum came from.
             if not self.axSpectrogram.lines:
                 self.axSpectrogram.plot([0, 0], [0, 1], 'r-', alpha=0.33)
             # this won't scale when we add baselines
             line = self.axSpectrogram.lines[0]
-            tval = the_time * 1e6  # convert to microseconds
+
             line.set(xdata=[tval, tval], ydata=[0, self.spectrogram.v_max])
