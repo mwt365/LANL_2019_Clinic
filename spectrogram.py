@@ -50,9 +50,9 @@ class Spectrogram:
 
     **Computed fields**
 
-    t:         array of times at which the spectra are computed
-    f:         array of frequencies present in each spectrum
-    v:         array of velocities corresponding to each spectrum
+    time:      array of times at which the spectra are computed
+    frequency: array of frequencies present in each spectrum
+    velocity:  array of velocities corresponding to each spectrum
     intensity: two-dimensional array of (scaled) intensities, which
                is the spectrogram. The first index corresponds to
                frequency/velocity, the second to time.
@@ -70,7 +70,7 @@ class Spectrogram:
                  t_start=None,
                  ending=None,
                  wavelength=1550.0e-9,
-                 points_per_spectrum=8192,
+                 points_per_spectrum=4096,
                  overlap=0.25,
                  window_function=None,  # 'hanning',
                  form='db',
