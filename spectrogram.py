@@ -208,8 +208,16 @@ class Spectrogram:
 
     def slice(self, time_range, velocity_range):
         """
-        Given a tuple of times and a tuple of velocities, return
-        time, velocity, intensity subarrays
+        Input:
+            time_range: Array/Tuple/List of times (t0, t1)
+                t0 should be greater than t1 but we will handle the other case
+            velocity_range: Array/Tuple/List of velocities (v0, v1)
+                v0 should be greater than v1 but we will handle the other case
+        Output:
+            3 arrays time, velocity, intensity
+            time: the time values used in the measurement from t0 to t1 inclusive.
+            velocity: the velocity values measured from v0 to v1 inclusive.
+            intensity: the corresponding intensity values that we measured.
         """
         if time_range == None:
             time0, time1 = 0, len(self.time) - 1
@@ -219,11 +227,21 @@ class Spectrogram:
             vel0, vel1 = 0, len(self.velocity) - 1
         else:
             vel0, vel1 = [self._velocity_to_index(v) for v in velocity_range]
-
+        if time0 > time1:
+            # Then we will just swap them.
+            tmp = time0
+            time0 = time1
+            time1 = time0
+        if vel0 > vel1:
+            # Then we will just swap them so that we can index normally.
+            tmp = vel0
+            vel0 = vel1
+            vel1 = tmp
         tvals = self.time[time0:time1 + 1]
         vvals = self.velocity[vel0:vel1 + 1]
-        ivals = self.intensity[vel0:vel1, time0:time1]
+        ivals = self.intensity[vel0:vel1+1, time0:time1+1]
         return tvals, vvals, ivals
+
 
     # Routines to archive the computed spectrogram and reload from disk
 
@@ -268,7 +286,7 @@ class Spectrogram:
                     location, "properties"), 'r') as f:
                 for line in f.readlines():
                     field, value = line.split('\t')
-                    assert value == getattr(self.field)
+                    assert value == getattr(field)
             loaded = np.load(os.path.join(location, "vals"))
             for k, v in loaded.items():
                 setattr(self, k, v)
@@ -401,56 +419,6 @@ if False:
             tStart = self.t0
         raw = self.values(tStart, nSamples)
         return Spectrum(raw, self.dt, remove_dc)
-
-    def extract_velocities(self, sgram):
-        """
-            Use scipy's peak finding algorithm to calculate the
-            velocity at that time slice.
-
-            The sgram will come in as a dictionary
-
-            't': times,
-            'v': velocities,
-            'spectrogram': spec,
-            'fftSize': fftSize,
-            'floor': floor            
-
-            spec will be indexed in velocity and then time
-
-
-            Output:
-                return a list of the velocities of maximum intensity in
-                each time slice.
-        """
-
-        t = sgram['t']
-        v = sgram['v']
-        spectrogram = sgram['spectrogram']
-        fftSize = sgram['fftSize']
-        floor = sgram['floor']
-
-        # spectrogram needs to be rotated so that it can be indexed with t
-        # first.
-
-        timeThenVelocitySpectrogram = np.transpose(spectrogram)
-
-        output = np.zeros(len(t))
-
-        print(v[2048])
-
-        if len(t) != timeThenVelocitySpectrogram.shape[0]:
-            raise ValueError("Our assumption was invalid.")
-
-        for time_index in range(timeThenVelocitySpectrogram.shape[0]):
-            currentVelocityIndex = np.argmax(
-                timeThenVelocitySpectrogram[time_index])
-
-            print("The current best velocity index is", currentVelocityIndex)
-            print(type(currentVelocityIndex))
-
-            output[time_index] = v[currentVelocityIndex]
-
-        return output
 
 
 if __name__ == '__main__':
