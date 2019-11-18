@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-#coding:utf-8
+# coding:utf-8
 """
   Author:  LANL Clinic 2019 --<lanl19@cs.hmc.edu>
   Purpose: To identify baselines in a spectrogram
@@ -11,19 +11,20 @@ from spectrogram import Spectrogram
 from scipy.signal import find_peaks
 from scipy.fftpack import fft
 
-def baselines_by_squash(spectrogram):
+
+def baselines_by_squash(spectrogram: Spectrogram):
     """
     Return a list of baseline velocities and their uncertainties.
-    
+
     Inputs:
         spectrogram: an instance of Spectrogram
-        
+
     Outputs:
         peaks: an array of peaks, in descending order of strength
         widths: an array of uncertainty values for the peaks
         heights: corresponding peak heights, normalized to
             the greatest height
-    
+
     Observations:
         This routine probably does a poor job of discriminating against
         lone peaks arising from an anomalously large value at a fairly
@@ -31,8 +32,23 @@ def baselines_by_squash(spectrogram):
         intervals and insist on a significant peak in each.
     """
     assert isinstance(spectrogram, Spectrogram)
-    # Collapse along the time axis
-    combined_spectrum = spectrogram.intensity.sum(axis=1)
+    # Collapse along the time axis, making sure to use power,
+    # not dB
+    powers = spectrogram.power(spectrogram.intensity)
+    # We'd like to squash into about 8 distinct segments
+    # along axis 1 and then make sure that we get consistent
+    # values before calling a peak a baseline
+    segments = 8
+    boundaries = list(range(0, len(spectrogram.time),
+                            len(spectrogram.time) // segments))
+    boundaries.append(len(spectrogram.time))
+    squash = []
+    for n in range(segments):
+        squash.append(
+            powers[:, boundaries[n]:boundaries[n + 1]].mean(axis=1))
+
+    combined_spectrum = spectrogram.power(
+        spectrogram.intensity).sum(axis=1)
     tallest = combined_spectrum.max()
     peaks, properties = find_peaks(
         combined_spectrum,
@@ -52,16 +68,16 @@ def baselines_by_squash(spectrogram):
 def baselines_by_fft(spectrogram):
     """
     Return a list of baseline velocities and their uncertainties.
-    
+
     Inputs:
         spectrogram: an instance of Spectrogram
-        
+
     Outputs:
         peaks: an array of peaks, in descending order of strength
         widths: an array of uncertainty values for the peaks
         heights: corresponding peak heights, normalized to
             the greatest height
-    
+
     Observations:
         This routine probably does a poor job of discriminating against
         lone peaks arising from an anomalously large value at a fairly
@@ -90,7 +106,7 @@ def baselines_by_fft(spectrogram):
     # narrow spikes. Let's normalize the array of powers
     peak_power = powers.max()
     powers /= peak_power
-    
+
     peaks, properties = find_peaks(
         powers,
         height=0.001,   # peaks must be this tall to count
@@ -103,7 +119,6 @@ def baselines_by_fft(spectrogram):
     # sort the peaks and heights into descending order
     peaks, heights = peaks[ordering], heights[ordering]
 
-
     neighborhoods = []
     width = 50
     for peak_center in peaks:
@@ -111,15 +126,6 @@ def baselines_by_fft(spectrogram):
                         width), min(len(powers) - 1, peak_center + width)
         neighborhoods.append([velocities[low:high], powers[low:high]])
     return neighborhoods
-
-    if False:
-            
-        peak_positions = peaks[ordering]
-        peaks = spectrogram.velocity[peak_positions]
-        heights = heights[ordering]
-        
-        dv = spectrogram.velocity[1] - spectrogram.velocity[0]
-        return peaks, np.ones(len(peaks)) * dv, heights
 
 
 if __name__ == '__main__':
@@ -135,4 +141,4 @@ if __name__ == '__main__':
         for j in range(len(v)):
             print(f"{v[j]:.4f}\t{i[j]:.4f}")
         print("\n")
-    
+
