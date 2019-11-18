@@ -10,6 +10,7 @@
 
 import numpy as np
 from follower import Follower
+from baselines import baselines_by_squash as bline
 
 
 class PeakFollower(Follower):
@@ -32,14 +33,16 @@ class PeakFollower(Follower):
 
     """
 
-    def __init__(self, spectrogram, start_point, span=60,
+    def __init__(self, spectrogram, start_point, span=80,
                  smoothing=4,  # average this many points on each side
-                 max_hop=50   # require peaks at successive time steps
+                 max_hop=70   # require peaks at successive time steps
                  # to be within this many velocity indices
                  ):
         super().__init__(spectrogram, start_point, span)
         self.smoothing = smoothing
         self.max_hop = max_hop
+        peaks, dv, heights = bline(spectrogram)
+        self.baselines = np.array(peaks)
 
     def run(self):
         """
@@ -67,7 +70,17 @@ class PeakFollower(Follower):
 
         # generate an index array to sort the intensities (low to high)
         low_to_high = np.argsort(intensities)
-        top = low_to_high[-1]  # index of the tallest intensity peak
+
+        # remove any peaks that are too close to the baseline
+        n = -1
+        while True:
+            mingap = np.min(
+                np.abs(self.baselines - velocities[low_to_high[n]]))
+            if mingap > 100:
+                break
+            n -= 1
+
+        top = low_to_high[n]  # index of the tallest intensity peak
         v_high = velocities[top]
 
         # add this to our results
