@@ -66,16 +66,16 @@ class Spectrogram:
                "detrend")
 
     def __init__(self,
-                 digfile,
+                 digfile: DigFile,
                  t_start=None,
                  ending=None,
-                 wavelength=1550.0e-9,
-                 points_per_spectrum=4096,
-                 overlap=0.25,
+                 wavelength: float = 1550.0e-9,
+                 points_per_spectrum: int = 4096,
+                 overlap: float = 0.25,
                  window_function=None,  # 'hanning',
-                 form='db',
-                 convert_to_voltage=True,
-                 detrend="linear",
+                 form: str = 'db',
+                 convert_to_voltage: bool = True,
+                 detrend: str = "linear",
                  **kwargs
                  ):
         """
@@ -186,11 +186,11 @@ class Spectrogram:
               ]
              ])
 
-    def _point_to_time(self, p):
+    def _point_to_time(self, p: int):
         "Map a point index to a time"
         return self.time[p]
 
-    def _time_to_index(self, t):
+    def _time_to_index(self, t: float):
         "Map a time to a point number"
         p = (t - self.t_start) / (self.time[1] - self.time[0])
         p = int(0.5 + p)  # round to an integer
@@ -198,7 +198,7 @@ class Spectrogram:
             return 0
         return min(p, len(self.time) - 1)
 
-    def _velocity_to_index(self, v):
+    def _velocity_to_index(self, v: float):
         "Map a velocity value to a point number"
         p = (v - self.velocity[0]) / (self.velocity[1] - self.velocity[0])
         p = int(0.5 + p)  # round
@@ -210,9 +210,9 @@ class Spectrogram:
         """
         Input:
             time_range: Array/Tuple/List of times (t0, t1)
-                t0 should be greater than t1 but we will handle the other case
+                t1 should be greater than t0 but we will handle the other case
             velocity_range: Array/Tuple/List of velocities (v0, v1)
-                v0 should be greater than v1 but we will handle the other case
+                v1 should be greater than v0 but we will handle the other case
         Output:
             3 arrays time, velocity, intensity
             time: the time values used in the measurement from t0 to t1 inclusive.
@@ -228,20 +228,14 @@ class Spectrogram:
         else:
             vel0, vel1 = [self._velocity_to_index(v) for v in velocity_range]
         if time0 > time1:
-            # Then we will just swap them.
-            tmp = time0
-            time0 = time1
-            time1 = time0
+            time0, time1 = time1, time0  # Then we will just swap them.
         if vel0 > vel1:
             # Then we will just swap them so that we can index normally.
-            tmp = vel0
-            vel0 = vel1
-            vel1 = tmp
+            vel0, vel1 = vel1, vel0
         tvals = self.time[time0:time1 + 1]
         vvals = self.velocity[vel0:vel1 + 1]
-        ivals = self.intensity[vel0:vel1+1, time0:time1+1]
+        ivals = self.intensity[vel0:vel1, time0:time1]
         return tvals, vvals, ivals
-
 
     # Routines to archive the computed spectrogram and reload from disk
 
@@ -336,89 +330,6 @@ class Spectrogram:
         title = self.data.filename.split('/')[-1]
         axes.set_title(title.replace("_", "\\_"))
         return pcm
-
-        # bestVelocity = self.extract_velocities(sgram)
-
-        # fig = plt.figure()
-        # plt.plot(sgram['t'], bestVelocity, color="red")
-
-
-if False:
-    def scan_data(self):
-        """
-        Load the entire file and determine the range of raw integer values
-        """
-        raw = self.raw_values(self.t0, self.num_samples)
-        self.raw = dict(min=np.min(raw), max=np.max(raw), mean=np.mean(raw))
-        self.raw['range'] = self.raw['max'] - self.raw['min']
-#         instrument_spec_codes = {
-#             'BYT_N': 'binary_data_field_width',
-#             'BIT_N': 'bits',
-#             'ENC': 'encoding',
-#             'BN_F': 'number_format',
-#             'BYT_O': 'byte_order',
-#             'WFI': 'source_trace',
-#             'NR_P': 'number_pixel_bins',
-#             'PT_F': 'point_format',
-#             'XUN': 'x_unit',
-#             'XIN': 'x_interval',
-#             'XZE': 'post_trigger_seconds',
-#             'PT_O': 'pulse_train_output',
-#             'YUN': 'y_unit',
-#             'YMU': 'y_scale_factor',
-#             'YOF': 'y_offset',
-#             'YZE': 'y_component',
-#             'NR_FR': 'NR_FR'
-
-    def __str__(self):
-        return "\n".join([
-            self.filename,
-            f"{self.bits} bits" +
-            f" {self.notes['byte_order']} first" if 'byte_order' in self.notes else "",
-            f"{self.t0*1e6} µs to {(self.t0 + self.dt*self.num_samples)*1e6} µs in steps of {self.dt*1e12} ps"
-        ])
-
-    def normalize(self, array, chunksize=4096, remove_dc=True):
-        """
-        Given an array of periodically sampled points, normalize to a
-        peak amplitude of 1, possibly after removing dc in segments of
-        chunksize.
-        """
-        if remove_dc:
-            num_chunks, num_leftovers = divmod(len(array), chunksize)
-            if num_leftovers:
-                leftovers = array[-num_leftovers:]
-                chunks = array[:num_chunks *
-                               chunksize].reshape((num_chunks, chunksize))
-                avg = np.mean(leftovers)
-                leftovers -= avg
-            else:
-                chunks = array.reshape((num_chunks, chunksize))
-            # compute the average of each chunk
-            averages = np.mean(chunks, axis=1)
-            # shift each chunk to have zero mean
-            for n in range(num_chunks):
-                chunks[n, :] -= averages[n]
-            flattened = chunks.reshape(num_chunks * chunksize)
-            if num_leftovers:
-                flattened = np.concatenate((flattened, leftovers))
-        else:
-            flattened = array
-
-        # Now normalize, making the largest magnitude 1
-        peak = np.max(np.abs(array))
-        return flattened / peak
-
-    def spectrum(self, t, nSamples, remove_dc=True):
-        """
-        Compute a spectrum from nSamples centered at time t
-        """
-        from spectrum import Spectrum
-        tStart = t - nSamples // 2 * self.dt
-        if tStart < self.t0:
-            tStart = self.t0
-        raw = self.values(tStart, nSamples)
-        return Spectrum(raw, self.dt, remove_dc)
 
 
 if __name__ == '__main__':
