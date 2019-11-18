@@ -19,6 +19,7 @@ from digfile import DigFile
 from spectrogram import Spectrogram
 from spectrum import Spectrum
 from plotter import COLORMAPS
+from gaussian import Gaussian
 from gaussian_follow import GaussianFitter
 from peak_follower import PeakFollower
 
@@ -171,6 +172,13 @@ class SpectrogramWidget:
     - individual_controls: dictionary of widgets
     - controls:
     """
+    _gspec = {
+        'width_ratios': [1.25, 6],
+        'height_ratios': [1],
+        'wspace': 0.05,
+        'left': 0.05,
+        'right': 1,
+    }
 
     def __init__(self, digfile, **kwargs):
         if isinstance(digfile, str):
@@ -192,20 +200,12 @@ class SpectrogramWidget:
 
         # Create the figure to display this spectrogram
         # It would be nice to make this bigger!
-        gspec = {
-            'width_ratios': [1.25, 6],
-            'height_ratios': [1],
-            'wspace': 0.05,
-            'left': 0.05,
-            'right': 1,
-        }
-        self.fig, axes = plt.subplots(nrows=1, ncols=2, sharey=True,
-                                      squeeze=True, gridspec_kw=gspec)
+
+        self.fig, axes = plt.subplots(
+            nrows=1, ncols=2, sharey=True,
+            squeeze=True, gridspec_kw=self._gspec)
         self.axSpectrum, self.axSpectrogram = axes
 
-        # self.subfig, axes = plt.subplots(nrows=1, ncols=2, sharey=True,
-        #                                 squeeze = True, gridspec_kw = gspec)
-        # self.axSpare, self.axTrack = axes
         self.subfig = None
         self.axTrack = None
         self.axSpare = None
@@ -299,6 +299,12 @@ class SpectrogramWidget:
             disabled=False
         )
 
+        # Clear spectra
+        cd['clear_spectra'] = widgets.Button(
+            description="Clear Spectra"
+        )
+        cd['clear_spectra'].on_click(lambda b: self.clear_spectra())
+
         # Computing baselines
         cd['baselines'] = widgets.Dropdown(
             options=('_None_', 'Squash', 'FFT'),
@@ -324,7 +330,7 @@ class SpectrogramWidget:
         )
         slide.continuous_update = False
         slide.observe(lambda x: self.overhaul(
-            points_per_spectrogram=2 ** x['new']), names="value")
+            points_per_spectrum=2 ** x['new']), names="value")
 
         # Set the overlap percentage of successive time intervals
         cd['overlap'] = slide = widgets.FloatSlider(
@@ -350,6 +356,7 @@ class SpectrogramWidget:
             ]),
             widgets.VBox([
                 cd['clicker'],
+                cd['clear_spectra'],
             ])
         ])
 
@@ -491,12 +498,22 @@ class SpectrogramWidget:
         char = event.key
         if char == 'x':
             # remove the all spectra
-            for x in self.spectra:
-                self.axSpectrogram.lines.remove(x['marker'])
-                self.axSpectrum.lines.remove(x['line'])
-            self.spectra = []
-            self.fig.canvas.draw()
-            self.fig.canvas.flush_events()
+            self.clear_spectra()
+        if char in "0123456789":
+            n = int(char)
+            # self.fan_out(int(char))
+            self.gauss_out(n)
+
+    def clear_spectra(self):
+        """Remove all spectra from axSpectrum and the corresponding
+        markers from axSpectrogram
+        """
+        for x in self.spectra:
+            self.axSpectrogram.lines.remove(x['marker'])
+            self.axSpectrum.lines.remove(x['line'])
+        self.spectra = []
+        self.fig.canvas.draw()
+        self.fig.canvas.flush_events()
 
     def follow(self, t, v, action):
         """Attempt to follow the path starting with the clicked
@@ -513,6 +530,104 @@ class SpectrogramWidget:
             tsec, v = follower.v_of_t
             self.axSpectrogram.plot(tsec * 1e6, v, 'r-', alpha=0.4)
         # print("Create a figure and axes, then call self.gauss.show_fit(axes)")
+
+    def gauss_out(self, n: int):
+        if n >= len(self.peak_followers):
+            return 0
+        pf = self.peak_followers[n]
+        times, centers, widths, amps = [], [], [], []
+        vind = pf.frame['velocity_index_spans'].to_numpy()
+        tind = pf.frame['time_index'].to_numpy()
+        sp = self.spectrogram
+        for j in range(len(tind)):
+            t = sp.time[tind[j]] * 1e6
+            vfrom, vto = vind[j]
+            powers = sp.power(sp.intensity[vfrom:vto, tind[j]])
+            speeds = sp.velocity[vfrom:vto]
+
+            gus = Gaussian(speeds, powers)
+            if gus.valid:
+                times.append(t)
+                centers.append(gus.center)
+                widths.append(gus.width)
+                amps.append(gus.amplitude)
+        fig, axes = plt.subplots(nrows=1, ncols=3, squeeze=True)
+        ax1, ax2, ax3 = axes
+        ax1.errorbar(times, centers, fmt='b-', yerr=widths)
+        ax1.set_xlabel(r'$t$ ($\mu$s)')
+        ax1.set_ylabel(r'$v$ (m/s)')
+
+        ax2.plot(times, widths, 'r-')
+        ax2.set_xlabel(r'$t$ ($\mu$s)')
+        ax2.set_ylabel(r'$\delta v$ (m/s)')
+
+        ax3.plot(times, amps, 'g-')
+        ax3.set_xlabel(r'$t$ ($\mu$s)')
+        ax3.set_ylabel('Amplitude')
+
+        # Store the values for later access
+        if not hasattr(self, "gauss_outs"):
+            self.gauss_outs = [None for x in range(len(self.peak_followers))]
+        else:
+            while len(self.gauss_outs) < len(self.peak_followers):
+                self.gauss_outs.append(None)
+        self.gauss_outs[n] = dict(
+            time=np.array(times),
+            center=np.array(centers),
+            width=np.array(widths),
+            amplitude=np.array(amps)
+        )
+
+    def fan_out(self, n: int):
+        """Produce a zoomed in version of this trace, showing
+        the neighborhood around the determined peak.
+        """
+        if n >= len(self.peak_followers):
+            return 0
+        pf = self.peak_followers[n]
+        vind = pf.frame['velocity_index_spans'].to_numpy()
+        tind = pf.frame['time_index'].to_numpy()
+        self.subfig, axes = plt.subplots(
+            nrows=1, ncols=2, sharey=True,
+            squeeze=True, gridspec_kw=self._gspec)
+        self.axSpare, self.axTrack = axes
+
+        # We will create a "waterfall" of curves surrounding
+        # the peaks, each offset by a bit. The x axis will
+        # represent intensity, with subsequent time traces offset
+        # by an amount I need to determine. The y axis
+        # is velocity.
+
+        spans = []
+        vvec = self.spectrogram.velocity  # shortcut to velocity vector
+        tvec = self.spectrogram.time
+        ivec = self.spectrogram.intensity
+
+        # pre-extract a bunch of one-dimensional curves
+        # and be sure to convert to power
+        for n in range(len(tind)):
+            vfrom, vto = vind[n]
+            spans.append({
+                'v': vvec[vfrom:vto],
+                'power': self.spectrogram.power(ivec[vfrom:vto, tind[n]]),
+                't': tvec[tind[n]] * 1e6,
+            })
+
+        maxima = np.array([np.max(x['power']) for x in spans])
+        maxpower = maxima.max()
+        # Let's set the offset between times to be one tenth of
+        # the maxpower
+        offset = 0.025 * maxpower
+
+        for n in reversed(list(range(len(spans)))):
+            span = spans[n]
+            self.axTrack.plot(
+                span['power'] + n * offset,
+                span['v'],
+                'b-',
+                alpha=0.33
+            )
+        self.axTrack.set_ylabel('$v$')
 
     def update_baselines(self, method):
         """
@@ -531,6 +646,8 @@ class SpectrogramWidget:
         # if blines is empty
 
         if not blines:
+            for b in self.baselines:
+                self.axSpectrum.lines.remove(b['line'])
             self.baselines = []  # remove them
         else:
             edges = (
@@ -544,7 +661,7 @@ class SpectrogramWidget:
                     'k-',
                     alpha=0.4
                 )
-                self.baselines.append(bline)
+                self.baselines.append(dict(v=v, line=bline))
 
     def spectrum(self, the_time: float, form: str):
         """
@@ -567,10 +684,17 @@ class SpectrogramWidget:
                 remove_dc=True)
             # compute the level of the 90th percentile
             spec = dict(spectrum=the_spectrum)
-            levels = sorted(the_spectrum.db)
-            n = -10
-            spec['90'] = levels[n]
-            spec['max'] = levels[-1]
+            vals = the_spectrum.db
+            ordering = np.argsort(vals)
+            if self.baselines:
+                blines = [x['v'] for x in self.baselines]
+                n = -1
+                while the_spectrum.velocities[ordering[n]] in blines:
+                    n -= 1
+            else:
+                n = -1
+            spec['max'] = vals[ordering[n]]
+            spec['90'] = vals[ordering[n - 20]]
 
             # We need to worry about the format of the spectrum
             db = ('dB' in form)
