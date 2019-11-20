@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 # coding: utf-8
 
-import os
 import numpy as np
 
 
 def save_as_dig(filename, vvals, datatype, dt=20e-12, initialTime=0,
-                voltageMultiplier=6.103516e-5, voltageOffset=0):
+                voltageMultiplier=6.103516e-5, voltageOffset=0,
+                top_header=""):
     """
         Inputs:
             filename: string/path object pointing to where the file is.
@@ -40,18 +40,18 @@ def save_as_dig(filename, vvals, datatype, dt=20e-12, initialTime=0,
             datatype = np.dtype("ubyte")
         elif datatype == '16':
             dataformat = '16'
-            datatype = np.dtype("int16")
+            datatype = np.dtype(">uint16")
         elif datatype == '32':
             dataformat = '32'
-            datatype = np.dtype("int32")
+            datatype = np.dtype(">uint32")
         else:
             raise ValueError(
                 "datatype corresponds to an unsupported data type.")
     elif datatype == np.dtype("ubyte"):
         dataformat = '8'
-    elif datatype == np.dtype("int16"):
+    elif datatype == np.dtype(">uint16"):
         dataformat = '16'
-    elif datatype == np.dtype("int32"):
+    elif datatype == np.dtype(">uint32"):
         dataformat = '32'
     else:
         raise ValueError("datatype corresponds to an unsupported data type.")
@@ -62,7 +62,9 @@ def save_as_dig(filename, vvals, datatype, dt=20e-12, initialTime=0,
     # nsamples, bits, dt, t0, dv, v0
     # This will fail if the file is not already created.
     with open(filename, 'w') as f:
-        f.write(" " * 512)  # write 512 bytes of spaces
+        if len(top_header) < 512:
+            top_header += " " * (512 - len(top_header))
+        f.write(top_header)  # write 512 bytes of spaces
         stuff = "\r\n".join([
             # todays date Day Mon NumDay HH:MM:SS: YEAR
             "Fri Sep 20 08:00:00 2019",
@@ -80,7 +82,4 @@ def save_as_dig(filename, vvals, datatype, dt=20e-12, initialTime=0,
         f.write(" " * (510 - len(stuff)))
         f.close()
     with open(filename, 'ab') as f:
-        for val in vvals:
-            vals = np.array(val, dtype=datatype)
-            f.write(vals.tobytes())
-        f.close()
+        f.write(np.array(vvals, dtype=datatype).tobytes())

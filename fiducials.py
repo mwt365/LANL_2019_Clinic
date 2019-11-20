@@ -11,6 +11,8 @@ import numpy as np
 from scipy.optimize import curve_fit
 import pandas as pd
 from digfile import DigFile
+from save_as_dig_file import save_as_dig
+import os
 
 
 class Fiducials:
@@ -259,6 +261,47 @@ class Fiducials:
                 t = self.t_fiducial
             else:
                 t += 0.01 * spacing
+
+    def split(self, basename=""):
+        """
+        Prepare a subdirectory filled with the segments that
+        go from one timing fiducial to the next. If no basename
+        is supplied, use the name of the source file before the
+        .dig extension.
+        """
+        if not basename:
+            base = os.path.split(self.digfile.path)[1]
+            basename = os.path.splitext(base)[0]
+        # Make the directory
+        home, filename = os.path.split(self.digfile.path)
+        folder = os.path.join(home, basename)
+        if not os.path.exists(folder):
+            os.makedirs(folder)
+        times = self.marks['t_start'].to_numpy()
+        # Prepare the top 512-byte header
+        df = self.digfile
+        text = open(df.path, 'rb').read(512).decode('ascii')
+        text = text.replace("\000", "").strip()
+        header = "Segment {0:02d}\r\n" + text
+        kwargs = dict(
+            dt=df.dt,
+            initialTime=0,
+            voltageMultiplier=df.dV,
+            voltageOffset=df.V0
+        )
+        for n in range(len(times)):
+            head = header.format(n)
+            t_start = times[n]
+            try:
+                t_stop = times[n + 1]
+            except:
+                t_stop = df.t_final
+            vals = df.raw_values(t_start, t_stop)
+            name = f"{basename}_{n:02d}.dig"
+            save_as_dig(os.path.join(folder, name),
+                        vals, df.data_format,
+                        top_header=head, **kwargs)
+            # df.extract(os.path.join(folder, name), t_start, t_stop)
 
 
 if __name__ == "__main__":

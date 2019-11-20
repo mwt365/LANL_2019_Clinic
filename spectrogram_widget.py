@@ -13,6 +13,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 import ipywidgets as widgets
+from matplotlib import widgets as mwidgets
 from IPython.display import display
 
 from digfile import DigFile
@@ -230,6 +231,8 @@ class SpectrogramWidget:
 
         self.individual_controls = dict()
         self.controls = None
+        self.selecting = False    # we are not currently selecting a ROI
+        self.roi = []             # and we have no regions of interest
         self.make_controls(**kwargs)
 
         # create the call-back functions, and then display the controls
@@ -244,88 +247,12 @@ class SpectrogramWidget:
         cd = self.individual_controls  # the dictionary of controls
         df = self.digfile
 
-        # Time range
-        t_range = kwargs.get('t_range', (0, 25))
-        cd['t_range'] = slide = ValueSlider(
-            "Time (µs)", t_range, (df.t0, df.t_final), 1e6,
-            readout_format=".1f"
-        )
-        slide.continuous_update = False
-        slide.observe(
-            lambda x: self.do_update(x), names="value")
-
-        # Velocity range
-        cd['velocity_range'] = slide = ValueSlider(
-            "Velocity (km/s)",
-            (0, 50),
-            (0.0, self.spectrogram.v_max), 1e-3,
-            readout_format=".1f",
-            continuous_update=False
-        )
-        slide.observe(lambda x: self.update_velocity_range(),
-                      names="value")
-
-        # Color range
-        imax = self.spectrogram.intensity.max()
-        imin = imax - 200  # ??
-        cd['intensity_range'] = slide = ValueSlider(
-            "Color",
-            (40, 70),
-            (imin, imax),
-            multiplier=1,
-            readout_format=".0f",
-            continuous_update=False
-        )
-        slide.observe(lambda x: self.update_color_range(),
-                      names="value")
-
-        # Color map selector
-        the_maps = sorted(COLORMAPS.keys())
-        the_maps.append('Computed')
-        cd['color_map'] = widgets.Dropdown(
-            options=the_maps,
-            value='3w_gby',
-            description='Color Map',
-            disabled=False,
-        )
-        cd['color_map'].observe(lambda x: self.update_cmap(),
-                                names="value")
-
-        # What to do when registering a click in the spectrogram
-        cd['clicker'] = widgets.Dropdown(
-            options=("Spectrum (dB)", "Spectrum", "Peak", "Gauss", ),
-            value='Spectrum (dB)',
-            description="Click",
-            disabled=False
-        )
-
-        # Clear spectra
-        cd['clear_spectra'] = widgets.Button(
-            description="Clear Spectra"
-        )
-        cd['clear_spectra'].on_click(lambda b: self.clear_spectra())
-
-        # Computing baselines
-        cd['baselines'] = widgets.Dropdown(
-            options=('_None_', 'Squash', 'FFT'),
-            value='_None_',
-            description='Baselines',
-            disabled=False
-        )
-        cd['baselines'].observe(
-            lambda x: self.update_baselines(x["new"]),
-            names="value")
-
-        # Display a thumbnail of the raw signal
-        cd['raw_signal'] = widgets.Checkbox(
-            value=False,
-            description="Show V(t)")
-        cd['raw_signal'].observe(
-            lambda b: self.show_raw_signal(b), names="value")
-
+        # FFT size  ###########################################
         # Set the size of each spectrum
+        pps = kwargs.get('points_per_spectrum', 8192)
+        val = int(np.log2(pps))
         cd['spectrum_size'] = slide = widgets.IntSlider(
-            value=12, min=8, max=18, step=1,
+            value=val, min=8, max=18, step=1,
             description="FFT 2^n"
         )
         slide.continuous_update = False
@@ -342,6 +269,97 @@ class SpectrogramWidget:
         slide.observe(lambda x: self.overhaul(
             overlap=x['new'] * 0.01),
             names="value")
+
+        # Time range ###########################################
+        t_range = kwargs.get('t_range', (0, 25))
+        cd['t_range'] = slide = ValueSlider(
+            "Time (µs)", t_range, (df.t0, df.t_final), 1e6,
+            readout_format=".1f"
+        )
+        slide.continuous_update = False
+        slide.observe(
+            lambda x: self.do_update(x), names="value")
+
+        # Velocity range ###########################################
+        cd['velocity_range'] = slide = ValueSlider(
+            "Velocity (km/s)",
+            (0, 50),
+            (0.0, self.spectrogram.v_max), 1e-3,
+            readout_format=".1f",
+            continuous_update=False
+        )
+        slide.observe(lambda x: self.update_velocity_range(),
+                      names="value")
+
+        # Color range ###########################################
+        imax = self.spectrogram.intensity.max()
+        imin = imax - 200  # ??
+        cd['intensity_range'] = slide = ValueSlider(
+            "Color",
+            (40, 70),
+            (imin, imax),
+            multiplier=1,
+            readout_format=".0f",
+            continuous_update=False
+        )
+        slide.observe(lambda x: self.update_color_range(),
+                      names="value")
+
+        # Color map selector ###########################################
+        the_maps = sorted(COLORMAPS.keys())
+        the_maps.append('Computed')
+        cd['color_map'] = widgets.Dropdown(
+            options=the_maps,
+            value='3w_gby',
+            description='Color Map',
+            disabled=False,
+        )
+        cd['color_map'].observe(lambda x: self.update_cmap(),
+                                names="value")
+
+        # Click selector  ###########################################
+        # What to do when registering a click in the spectrogram
+        cd['clicker'] = widgets.Dropdown(
+            options=("Spectrum (dB)", "Spectrum", "Peak", "Gauss", ),
+            value='Spectrum (dB)',
+            description="Click",
+            disabled=False
+        )
+
+        cd['marquee'] = mwidgets.RectangleSelector(
+            self.axSpectrogram,
+            lambda eclick, erelease: self.RSelect(eclick, erelease),
+            interactive=True,
+            useblit=True,
+            rectprops=dict(facecolor='yellow', edgecolor='red',
+                           alpha=0.2, fill=True),
+            drawtype='box',
+        )
+
+        # Clear spectra ###########################################
+        cd['clear_spectra'] = widgets.Button(
+            description="Clear Spectra"
+        )
+        cd['clear_spectra'].on_click(lambda b: self.clear_spectra())
+
+        # Computing baselines ###########################################
+        cd['baselines'] = widgets.Dropdown(
+            options=('_None_', 'Squash', 'FFT'),
+            value='_None_',
+            description='Baselines',
+            disabled=False
+        )
+        cd['baselines'].observe(
+            lambda x: self.update_baselines(x["new"]),
+            names="value")
+
+        # Thumbnail  ###########################################
+        # Display a thumbnail of the raw signal
+        cd['raw_signal'] = widgets.Checkbox(
+            value=False,
+            description="Show V(t)")
+        cd['raw_signal'].observe(
+            lambda b: self.show_raw_signal(b), names="value")
 
         self.controls = widgets.HBox([
             widgets.VBox([
@@ -365,6 +383,17 @@ class SpectrogramWidget:
         if var in self.individual_controls:
             return self.individual_controls[var].range
         return None
+
+    def RSelect(self, eclick, erelease):
+        t0, t1 = eclick.xdata, erelease.xdata
+        v0, v1 = eclick.ydata, erelease.ydata
+
+        # make sure they are in the right order
+        if t1 < t0:
+            t0, t1 = t1, t0
+        if v1 < v0:
+            v0, v1 = v1, v0
+        self.roi = (t0, t1), (v0, v1)
 
     def do_update(self, what):
         self.update_spectrogram()
@@ -478,6 +507,8 @@ class SpectrogramWidget:
             t, v = event.xdata * 1e-6, event.ydata
         except:
             return 0
+        if self.selecting:
+            return 0
         # Look up what we should do with the click
         action = self.individual_controls['clicker'].value
         try:
@@ -499,6 +530,9 @@ class SpectrogramWidget:
         if char == 'x':
             # remove the all spectra
             self.clear_spectra()
+        if char in ('m', 'M'):
+            self.selecting = not self.selecting
+            self.individual_controls['marquee'].set_active(self.selecting)
         if char in "0123456789":
             n = int(char)
             # self.fan_out(int(char))

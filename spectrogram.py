@@ -70,7 +70,7 @@ class Spectrogram:
                  t_start=None,
                  ending=None,
                  wavelength: float = 1550.0e-9,
-                 points_per_spectrum: int = 4096,
+                 points_per_spectrum: int = 8192,
                  overlap: float = 0.25,
                  window_function=None,  # 'hanning',
                  form: str = 'db',
