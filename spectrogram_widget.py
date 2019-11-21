@@ -387,13 +387,12 @@ class SpectrogramWidget:
     def RSelect(self, eclick, erelease):
         t0, t1 = eclick.xdata, erelease.xdata
         v0, v1 = eclick.ydata, erelease.ydata
-
         # make sure they are in the right order
         if t1 < t0:
             t0, t1 = t1, t0
         if v1 < v0:
             v0, v1 = v1, v0
-        self.roi = (t0, t1), (v0, v1)
+        self.roi.append(dict(time=(t0, t1), velocity=(v0, v1)))
 
     def do_update(self, what):
         self.update_spectrogram()
@@ -537,6 +536,8 @@ class SpectrogramWidget:
             n = int(char)
             # self.fan_out(int(char))
             self.gauss_out(n)
+        if char in ('a','A') and self.roi:
+            self.analyze_roi()
 
     def clear_spectra(self):
         """Remove all spectra from axSpectrum and the corresponding
@@ -611,6 +612,13 @@ class SpectrogramWidget:
             width=np.array(widths),
             amplitude=np.array(amps)
         )
+
+    def analyze_roi(self):
+        """
+        Extract the region(s) of interest and process them
+        """
+        for roi in self.roi:
+            analyze_region(self.spectrogram, roi['time'])
 
     def fan_out(self, n: int):
         """Produce a zoomed in version of this trace, showing

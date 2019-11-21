@@ -28,29 +28,34 @@ class Gaussian:
         - width
         """
         assert len(x) == len(y)
-        self.x = x
-        self.y = y
-        # sort y and use the boundaries to estimate
-        # the background and amplitude
-        ysorted = sorted(y)
-        # the gaussian could be a peak or a dip
-        midpt = ysorted[len(y) // 2]
-        peak = (ysorted[-1] - midpt) > (midpt - ysorted[0])
-        amplitude = (ysorted[-1] - ysorted[len(y) // 8]
-                     ) * (1 if peak else -1)
-        background = ysorted[len(
-            y) // 8] if peak else ysorted[(7 * len(y)) // 8]
-        center = x[y.argmax()]
-        self.p0 = [
-            kwargs.get('amplitude', amplitude),
-            kwargs.get('center', center),
-            kwargs.get('width', 0),
-            kwargs.get('background', background)
-        ]
-        self.params = []
-        if self.p0[2] == 0:
-            self.estimate_width(y.argmax())
-        self.valid = self.do_fit()
+        if len(x) < 4:
+            self.valid = False
+        else:
+            self.x = x
+            self.y = y
+            # sort y and use the boundaries to estimate
+            # the background and amplitude
+            ysorted = sorted(y)
+            # the gaussian could be a peak or a dip
+            midpt = ysorted[len(y) // 2]
+            peak = (ysorted[-1] - midpt) > (midpt - ysorted[0])
+            amplitude = (ysorted[-1] - ysorted[len(y) // 8]
+                         ) * (1 if peak else -1)
+            background = ysorted[len(
+                y) // 8] if peak else ysorted[(7 * len(y)) // 8]
+            if background == 0:
+                background = 0.01 * amplitude
+            center = x[y.argmax()]
+            self.p0 = [
+                kwargs.get('amplitude', amplitude),
+                kwargs.get('center', center),
+                kwargs.get('width', 0),
+                kwargs.get('background', background)
+            ]
+            self.params = []
+            if self.p0[2] == 0:
+                self.estimate_width(y.argmax())
+            self.valid = self.do_fit()
 
     @property
     def center(self):
@@ -90,6 +95,8 @@ class Gaussian:
             np.exp(-0.5 * ((x - mu) / sigma)**2)
 
     def do_fit(self):
+        if len(self.x) < len(self.p0):
+            return False
         try:
             self.params, covar = curve_fit(
                 self._gauss, self.x, self.y, p0=self.p0
@@ -116,12 +123,18 @@ class Gaussian:
         avg = sm.mean()
         amp = sm[n] - avg
         target = avg + 0.3 * amp
-        for j in range(10):
-            if sm[n + j] < target:
-                break
-        for k in range(10):
-            if sm[n - k] < target:
-                break
+        try:
+            for j in range(10):
+                if sm[n + j] < target:
+                    break
+        except:
+            j -= 1
+        try:
+            for k in range(10):
+                if sm[n - k] < target:
+                    break
+        except:
+            k -= 1
         width = (self.x[n + j] - self.x[n - k]) * 0.6
         self.p0[2] = width
 
