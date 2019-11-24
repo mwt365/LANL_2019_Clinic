@@ -41,7 +41,7 @@ def extractSignal(intensityMatrix, velocities, lowerVelocityThreshold, upperVelo
     return dataPoints
 
     
-def seamExtraction(intensityMatrix, startTime:int, stopTime:int, width:int, signalJump:int=50, bottomIndex:int=0, topIndex:int=None, order:int = 2):
+def seamExtraction(intensityMatrix, startTime:int, stopTime:int, width:int, signalJump:int=50, bottomIndex:int=0, topIndex:int=None, order:int = None):
     """
         Input:
             intensityMatrix: a 2d array [velocity][time] and each cell 
@@ -80,7 +80,7 @@ def seamExtraction(intensityMatrix, startTime:int, stopTime:int, width:int, sign
         tableHeight = stopTime - startTime + 1
 
         velocities = np.zeros(tableHeight, dtype = np.int64)
-        # This will hold the answers that we are looking for to return.
+        # This will hold the answers that we are looking for to return. It is a list of indices.
         print(len(velocities))
 
 
@@ -97,19 +97,18 @@ def seamExtraction(intensityMatrix, startTime:int, stopTime:int, width:int, sign
 
         startIndex = np.argmax(transposedIntensities[startTime][bottomIndex+signalJump:topIndex+1])+bottomIndex+signalJump
 
-        top = min(startIndex + (stopTime - startTime)*halfFan, topIndex)
-            # to get it to round up to 1 if it is 0.5
+        #top = min(startIndex + (stopTime - startTime)*halfFan, topIndex)
+        top = transposedIntensities.shape[0]
+
         bottomDP = max(startIndex - (stopTime - startTime)*halfFan, bottomIndex + 1) 
-            # to get it to round up to 1 if it is 0.5
 
         # transposedTimeAndVelSlice = sliceTimeAndVelocity(transposedIntensities, startTime, bottomDP, stopTime, top) 
         # normalized = normalize(transposedTimeAndVelSlice)
 
-        normalized = sliceTimeAndVelocity(normalize(transposedIntensities), startTime, bottomDP, stopTime, top)
+        # normalized = sliceTimeAndVelocity(normalize(transposedIntensities), startTime, bottomDP, stopTime, top)
+        raw = sliceTimeAndVelocity(transposedIntensities, startTime, bottomDP, stopTime, top)
 
-        print(normalized.shape)
-
-        tableHeight, tableWidth = normalized.shape
+        tableHeight, tableWidth = raw.shape
         
         print("Top", top)
         print("bottomDP", bottomDP)
@@ -143,21 +142,25 @@ def seamExtraction(intensityMatrix, startTime:int, stopTime:int, width:int, sign
                 for testIndex in range(-halfFan, halfFan+1): # The + 1 is so that you get a balanced window.
                     if velocityIndex + testIndex >= 0 and velocityIndex + testIndex < tableWidth:
                         # then we have a valid index to test from.                
-                        current = distance.minkowski(normalized[dpTime+1][testIndex+velocityIndex], normalized[dpTime][velocityIndex], order) + DPTable[dpTime+1][velocityIndex+testIndex]
+                        current = np.power(np.abs(raw[dpTime+1][testIndex+velocityIndex]-raw[dpTime][velocityIndex]), order) \
+                         + DPTable[dpTime+1][velocityIndex+testIndex]
                         if current < bestSoFar:
                             bestSoFar = current
                             bestPointer = velocityIndex + testIndex                            
                 DPTable[dpTime][velocityIndex] = bestSoFar
                 parentTable[dpTime][velocityIndex] = bestPointer
 
-
-                # print("Just finished computing the answer for (v,t): (", velocityIndex,",", dpTime, ")")
-                # print("We are going backwards so there are", dpTime, "more columns to fill in the table")
-
         # Now for the reconstruction.
         currentPointer = np.argmin(DPTable[0])
         
+        # Get the values of the DP table to a more reasonable values by taking the orderth root.
+        # for timeIndex in range(tableHeight+1):
+        #     for velocityIndex in range(tableWidth):
+        #         DPTable[timeIndex][velocityIndex] = np.power(DPTable[timeIndex][velocityIndex], 1/order)
+
         print("The value of the current pointer is", currentPointer)
+
+        print("The minimum cost is", DPTable[0][currentPointer])
 
         velocities = reconstruction(parentTable, currentPointer, bottomDP)
 
@@ -228,15 +231,67 @@ def sliceTimeAndVelocity(timeVelocityIntensity, startTime:int=0, minVel:int=0, s
     TimeAndVelSlice = np.transpose(np.transpose(TimeSlice)[minVel:maxVel+1])
     return TimeAndVelSlice
 
-def mainTest(intensityMatrix, velocities, startTime:int, stopTime:int, signalJump:int=50, bottomIndex:int=0, topIndex:int=None, order = 2):
+def mainTest(intensityMatrix, velocities, time, startTime:int, stopTime:int, signalJump:int=50, bottomIndex:int=0, topIndex:int=None, vStartInd: int=None):
     widths = [1,3,5,11,21]
+    orders = [1,2,10]
+    seam = []
     for width in widths:
-        signal, p_table, dp_table, botVel, topVel = seamExtraction(intensityMatrix, startTime, stopTime, width, signalJump, bottomIndex, topIndex)
+        for order in orders:
+            signal, p_table, dp_table, botVel, topVel = seamExtraction(intensityMatrix, startTime, stopTime, width, signalJump, bottomIndex, topIndex, order)
 
-        plt.plot(velocities[botVel:topVel+1], dp_table[0])
-        plt.title("Total Minkowski" + str(order) +" Order Cost diagram with a window size of " +str(width) +" normalized cut second")
-        plt.xlabel("Starting velocity of the trace (m/s)")
-        plt.ylabel("Minimum value of the sum minkowski distance(p_i, p_{i-1}," + str(order) + ") along the path")
-        plt.show()
+            plt.plot(velocities[botVel:topVel+1], dp_table[0])
+            plt.title("Total Minkowski" + str(order) +" Order Cost diagram with a window size of " +str(width) +" raw")
+            plt.xlabel("Starting velocity of the trace (m/s)")
+            plt.ylabel("Minimum value of the sum (|p_i - p_{i-1}|^" + str(order) + ") along the path")
+            plt.show()
 
-    
+            print("Here is a graph of the signal trace across time")       
+
+            plt.figure(figsize=(10, 6))
+            plt.plot(time[startTime: stopTime+1], velocities[signal], 'b--', label="Minimum Cost")
+            if vStartInd != None:
+                # Compute the signal seam for assuming this is the start point.
+                seam = reconstruction(p_table, vStartInd-botVel, botVel)
+                plt.plot(time[startTime: stopTime+1], velocities[seam], 'r--', label="Expected Start Point")
+            plt.title("Velocity as a function of time for the minimum cost seam with Minkowski" + str(order)+ " and a window size of " + str(width) + " raw")
+            plt.xlabel("Time (microseconds)")
+            plt.ylabel("Velocity (m/s)")
+            plt.legend()
+            plt.show()
+
+
+from spectrogram import Spectrogram
+def documentationMain():
+    # Set up
+
+    intensity, vel, time, sTime, eTime, signalJump, botInd, topVelInd, visSigIndex = setupForDocumentation()
+
+    # Now document.
+    mainTest(intensity, vel, time, sTime, eTime, signalJump, botInd, topVelInd, visSigIndex)
+
+
+def setupForDocumentation():
+    # Set up
+    filename = "../See_if_this_is_enough_to_get_started/GEN3CH_4_009.dig"
+    t1 = 14.2389/1e6
+    t2 = 31.796/1e6
+    MySpect = Spectrogram(filename)
+    sTime = MySpect._time_to_index(t1)
+    eTime = MySpect._time_to_index(t2)
+
+    bottomVel = 1906.38
+    botInd = MySpect._velocity_to_index(bottomVel)
+
+    topVel = 5000
+    topVelInd = MySpect._velocity_to_index(topVel)
+
+    signalJump = 25
+
+    intensity = MySpect.intensity
+    time = MySpect.time
+    vel = MySpect.velocity
+
+    visualSignalStart = 2652.21
+    visSigIndex = MySpect._velocity_to_index(visualSignalStart)
+
+    return intensity, vel, time, sTime, eTime, signalJump, botInd, topVelInd, visSigIndex
