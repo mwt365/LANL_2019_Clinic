@@ -180,7 +180,7 @@ class Spectrogram:
         return ", ".join(
             [str(x) for x in
              [self.data.filename,
-              f"{self.points_per_spectrum} / {self.shift}",
+              f"{self.points_per_spectrum} / {self.overlap*self.points_per_spectrum}",
               self.form,
               self.intensity.shape
               ]
