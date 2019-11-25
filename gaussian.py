@@ -30,6 +30,7 @@ class Gaussian:
         assert len(x) == len(y)
         if len(x) < 4:
             self.valid = False
+            self.error = "Insufficient points"
         else:
             self.x = x
             self.y = y
@@ -53,6 +54,7 @@ class Gaussian:
                 kwargs.get('background', background)
             ]
             self.params = []
+            self.error = None
             if self.p0[2] == 0:
                 self.estimate_width(y.argmax())
             self.valid = self.do_fit()
@@ -101,16 +103,17 @@ class Gaussian:
             self.params, covar = curve_fit(
                 self._gauss, self.x, self.y, p0=self.p0
             )
-        except (RuntimeError, RuntimeWarning, OptimizeWarning):
+        except (RuntimeError, RuntimeWarning, OptimizeWarning) as eeps:
+            self.error = eeps
             return False
 
         if np.inf in covar or np.nan in covar:
+            self.error = 'infinity or nan in cavariance matrix'
             return False
         self.errors = np.sqrt(np.diag(covar))
         # if width is negative, flip it
         self.params[2] = abs(self.params[2])
         # How do we know that it worked?
-
         return True
 
     def estimate_width(self, n: int):
@@ -136,7 +139,7 @@ class Gaussian:
         except:
             k -= 1
         width = (self.x[n + j] - self.x[n - k]) * 0.6
-        self.p0[2] = width
+        self.p0[2] = width if width > 0 else self.x[1] - self.x[0]
 
 
 if __name__ == '__main__':

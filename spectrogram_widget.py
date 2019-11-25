@@ -174,11 +174,11 @@ class SpectrogramWidget:
     - controls:
     """
     _gspec = {
-        'width_ratios': [1.25, 6],
+        'width_ratios': [6, 1.25],
         'height_ratios': [1],
         'wspace': 0.05,
-        'left': 0.05,
-        'right': 1,
+        'left': 0.075,
+        'right': 0.975,
     }
 
     def __init__(self, digfile, **kwargs):
@@ -192,7 +192,7 @@ class SpectrogramWidget:
 
         # If LaTeX is enabled in matplotlib, underscores in the title
         # cause problems in displaying the histogram
-        self.title = self.digfile.filename.split('/')[-1].replace("_", "\\_")
+        self.title = self.digfile.filename.split('/')[-1]
         self.baselines = []
         # handle the keyword arguments here
 
@@ -205,7 +205,7 @@ class SpectrogramWidget:
         self.fig, axes = plt.subplots(
             nrows=1, ncols=2, sharey=True,
             squeeze=True, gridspec_kw=self._gspec)
-        self.axSpectrum, self.axSpectrogram = axes
+        self.axSpectrogram, self.axSpectrum = axes
 
         self.subfig = None
         self.axTrack = None
@@ -233,6 +233,7 @@ class SpectrogramWidget:
         self.controls = None
         self.selecting = False    # we are not currently selecting a ROI
         self.roi = []             # and we have no regions of interest
+        self.threshold = None
         self.make_controls(**kwargs)
 
         # create the call-back functions, and then display the controls
@@ -305,6 +306,17 @@ class SpectrogramWidget:
         slide.observe(lambda x: self.update_color_range(),
                       names="value")
 
+        # Threshold percentage #####################################
+        cd['threshold'] = slide = widgets.FloatSlider(
+            description='Noise floor %',
+            value=0,
+            min=0,
+            max=100.0,
+            continuous_update=False
+        )
+        slide.observe(lambda x: self.update_threshold(
+            x['new']), names="value")
+
         # Color map selector ###########################################
         the_maps = sorted(COLORMAPS.keys())
         the_maps.append('Computed')
@@ -342,6 +354,12 @@ class SpectrogramWidget:
         )
         cd['clear_spectra'].on_click(lambda b: self.clear_spectra())
 
+        # Clear peak_followers ###########################################
+        cd['clear_followers'] = widgets.Button(
+            description="Clear Peak Followers"
+        )
+        cd['clear_followers'].on_click(lambda b: self.clear_followers())
+
         # Computing baselines ###########################################
         cd['baselines'] = widgets.Dropdown(
             options=('_None_', 'Squash', 'FFT'),
@@ -364,6 +382,7 @@ class SpectrogramWidget:
         self.controls = widgets.HBox([
             widgets.VBox([
                 cd['t_range'], cd['velocity_range'],
+                cd['threshold'],
                 cd['intensity_range'], cd['spectrum_size']
             ]),
             widgets.VBox([
@@ -375,6 +394,7 @@ class SpectrogramWidget:
             widgets.VBox([
                 cd['clicker'],
                 cd['clear_spectra'],
+                cd['clear_followers']
             ])
         ])
 
@@ -440,11 +460,6 @@ class SpectrogramWidget:
         Recompute and display everything
         """
         sg = self.spectrogram
-        trange = self.range('t_range')
-        vrange = self.range('velocity_range')
-
-        # extract the requisite portions
-        times, velocities, intensities = sg.slice(trange, vrange)
 
         # Having recomputed the spectrum, we need to set the yrange
 
@@ -452,6 +467,18 @@ class SpectrogramWidget:
         cmin = sg.intensity.min()
         cmax = sg.intensity.max()
         self.individual_controls['intensity_range'].range = (cmin, cmax)
+        self.display_spectrogram()
+
+    def display_spectrogram(self):
+        """
+
+        """
+        trange = self.range('t_range')
+        vrange = self.range('velocity_range')
+
+        # extract the requisite portions
+        times, velocities, intensities = self.spectrogram.slice(
+            trange, vrange)
 
         # if we have already displayed an image, remove it
         if self.colorbar:
@@ -461,19 +488,31 @@ class SpectrogramWidget:
             self.image.remove()
             self.image = None
 
+        if self.threshold:
+            intensities[intensities < self.threshold] = self.threshold
+
         self.image = self.axSpectrogram.pcolormesh(
             times * 1e6, velocities, intensities)
 
         self.colorbar = self.fig.colorbar(self.image, ax=self.axSpectrogram,
                                           fraction=0.08)
 
-        self.axSpectrogram.set_title(self.title)
+        self.axSpectrogram.set_title(self.title, usetex=False)
         self.axSpectrogram.set_xlabel('Time ($\mu$s)')
         self.axSpectrogram.set_xlim(* (np.array(trange) * 1e6))
-        self.axSpectrum.set_ylabel('Velocity (m/s)')
+        self.axSpectrogram.set_ylabel('Velocity (m/s)')
         self.update_velocity_range()
         self.update_color_range()
         self.update_cmap()
+
+    def update_threshold(self, x):
+        n = int(x)
+        if n == 0:
+            self.threshold = None
+        else:
+            threshold = self.spectrogram.histogram_levels[n]
+            self.threshold = self.spectrogram.transform(threshold)
+        self.display_spectrogram()
 
     def update_cmap(self):
         """
@@ -536,7 +575,7 @@ class SpectrogramWidget:
             n = int(char)
             # self.fan_out(int(char))
             self.gauss_out(n)
-        if char in ('a','A') and self.roi:
+        if char in ('a', 'A') and self.roi:
             self.analyze_roi()
 
     def clear_spectra(self):
@@ -547,6 +586,14 @@ class SpectrogramWidget:
             self.axSpectrogram.lines.remove(x['marker'])
             self.axSpectrum.lines.remove(x['line'])
         self.spectra = []
+        self.fig.canvas.draw()
+        self.fig.canvas.flush_events()
+
+    def clear_followers(self):
+        """Remove all followers"""
+        for x in self.peak_followers:
+            self.axSpectrogram.lines.remove(x.line)
+        self.peak_followers = []
         self.fig.canvas.draw()
         self.fig.canvas.flush_events()
 
@@ -563,7 +610,8 @@ class SpectrogramWidget:
             self.peak_followers.append(follower)
             follower.run()
             tsec, v = follower.v_of_t
-            self.axSpectrogram.plot(tsec * 1e6, v, 'r-', alpha=0.4)
+            follower.line = self.axSpectrogram.plot(
+                tsec * 1e6, v, 'r-', alpha=0.4)[0]
         # print("Create a figure and axes, then call self.gauss.show_fit(axes)")
 
     def gauss_out(self, n: int):

@@ -212,7 +212,10 @@ class DigFile:
                             # add the property to ourself
                             self.notes[key] = val
         else:
-            self.header_args = [x.strip() for x in tList[0].split(',')]
+            try:
+                self.header_args = [x.strip() for x in tList[0].split(',')]
+            except:
+                self.header_args = []
 
     def point_number(self, time):
         "Return the point number corresponding to the given time"

@@ -148,19 +148,38 @@ class Spectrogram:
         # Convert to a logarithmic representation and use floor to attempt
         # to suppress some noise.
         spec *= 2.0 / (self.points_per_spectrum * self.data.dt)
-        epsilon = 1e-10  # use this to suppress the divide by zero warnings
-        if self.form == 'db':
-            spec = 20 * np.log10(spec + epsilon)
-        elif self.form == 'log':
-            spec = np.log10(spec + epsilon)
-        self.intensity = spec  # a two-dimensional array
-        # the first index is frequency, the second time
+        self.histogram_levels = self.histo_levels(spec)
+        self.intensity = self.transform(spec)
 
+        # the first index is frequency, the second time
         self.frequency = freqs
         self.time = times
 
         # scale the frequency axis to velocity
         self.velocity = freqs * 0.5 * self.wavelength  # velocities
+
+    def transform(self, vals):
+        """
+        Perform any modification to values dictated by the value of self.form
+        """
+        epsilon = 1e-10
+        if self.form == 'db':
+            return 20 * np.log10(vals + epsilon)
+        if self.form == 'log':
+            return np.log10(vals + epsilon)
+        return vals
+
+    def histo_levels(self, array: np.ndarray):
+        """
+        Sort a one-dimensional version of the array and report a vector of
+        the values at 0%, 1%, ..., 100%
+        """
+        vals = array.flatten()
+        vals.sort()
+        indices = np.asarray(np.linspace(
+            0, len(vals) - 1, 101), dtype=np.uint32)
+        ladder = vals[indices]
+        return ladder
 
     def set(self, **kwargs):
         """
