@@ -239,7 +239,7 @@ class SpectrogramWidget:
         # create the call-back functions, and then display the controls
 
         display(self.controls)
-        display(self.fig)
+        # display(self.fig)
         self.update_spectrogram()
 
     def make_controls(self, **kwargs):
@@ -438,11 +438,12 @@ class SpectrogramWidget:
             yrange = ymax - yvals.min()
             yscale = 0.2 * (ylims[1] - ylims[0]) / yrange
             vvals = ylims[1] - yscale * (ymax - yvals)
-            self.axSpectrogram.plot(tvals, vvals,
-                                    'r-', alpha=0.5)
+            self.raw = self.axSpectrogram.plot(tvals, vvals,
+                                               'r-', alpha=0.5)[0]
         else:
             try:
-                del self.axSpectrogram.lines[0]
+                self.axSpectrogram.lines.remove(self.raw)
+                self.raw = None
                 self.fig.canvas.draw()
                 self.fig.canvas.flush_events()
             except:
