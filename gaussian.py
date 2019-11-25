@@ -14,18 +14,23 @@ from moving_average import moving_average
 
 class Gaussian:
     """
-    Blah
+    Object to perform a gaussian fit.
+    The data y(x) to which we need to look for a gaussian
+    fit. The keyword arguments can specify any or all
+    of the gaussian parameters:
+
+      - background
+      - amplitude
+      - center
+      - width
+
+    If the fit is successful, the field Gaussian.valid is
+    set to True.
     """
 
     def __init__(self, x: np.ndarray, y: np.ndarray, **kwargs):
         """
-        The data y(x) to which we need to look for a gaussian
-        fit. The keyword arguments can specify any or all
-        of the gaussian parameters:
-        - background
-        - amplitude
-        - center
-        - width
+
         """
         assert len(x) == len(y)
         if len(x) < 4:
@@ -61,18 +66,22 @@ class Gaussian:
 
     @property
     def center(self):
+        "The location of the peak of the gaussian"
         return self.params[1]
 
     @property
     def width(self):
+        "The standard deviation of the gaussian"
         return self.params[2]
 
     @property
     def amplitude(self):
+        "The amplitude of the gaussian"
         return self.params[0]
 
     @property
     def background(self):
+        "The (constant) background level surrounding the gaussian"
         return self.params[3]
 
     def __str__(self):

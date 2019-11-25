@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 # coding:utf-8
 """
+::
+
   Author:  LANL Clinic 2019 --<lanl19@cs.hmc.edu>
   Purpose: To identify baselines in a spectrogram
   Created: 10/10/19
@@ -17,12 +19,12 @@ def baselines_by_squash(spectrogram: Spectrogram):
     Return a list of baseline velocities and their uncertainties.
 
     Inputs:
-        spectrogram: an instance of Spectrogram
+      -  spectrogram: an instance of Spectrogram
 
     Outputs:
-        peaks: an array of peaks, in descending order of strength
-        widths: an array of uncertainty values for the peaks
-        heights: corresponding peak heights, normalized to
+      -  peaks: an array of peaks, in descending order of strength
+      -  widths: an array of uncertainty values for the peaks
+      -  heights: corresponding peak heights, normalized to
             the greatest height
 
     Observations:
@@ -70,12 +72,12 @@ def baselines_by_fft(spectrogram):
     Return a list of baseline velocities and their uncertainties.
 
     Inputs:
-        spectrogram: an instance of Spectrogram
+      -  spectrogram: an instance of Spectrogram
 
     Outputs:
-        peaks: an array of peaks, in descending order of strength
-        widths: an array of uncertainty values for the peaks
-        heights: corresponding peak heights, normalized to
+      -  peaks: an array of peaks, in descending order of strength
+      -  widths: an array of uncertainty values for the peaks
+      -  heights: corresponding peak heights, normalized to
             the greatest height
 
     Observations:
@@ -84,6 +86,7 @@ def baselines_by_fft(spectrogram):
         isolated time. It might be better to chop the range into several
         intervals and insist on a significant peak in each.
     """
+
     assert isinstance(spectrogram, Spectrogram)
     # Perform a single Fourier transform of the voltage data in the range
     # corresponding to this spectrogram, rounded down to the nearest power
