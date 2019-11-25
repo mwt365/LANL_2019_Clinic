@@ -20,7 +20,7 @@ def make_spectrogram_color_map(spectrogram, number_of_bands, name):
     If number_of_bands is 0, look for the most successful
     number of bands for kmeans up to 7.
     """
-    assert isinstance(spectrogram, Spectrogram)
+    # assert isinstance(spectrogram, Spectrogram)
     assert isinstance(number_of_bands, int) and number_of_bands > 1
     assert isinstance(name, str)
 
@@ -93,8 +93,13 @@ def make_spectrogram_color_map(spectrogram, number_of_bands, name):
 
 if __name__ == '__main__':
     from digfile import DigFile
-    df = DigFile('../dig/sample.dig')
+    df = DigFile('../dig/GEN3CH_4_009.dig')
     sg = Spectrogram(df)
     roids = make_spectrogram_color_map(sg, 4, "Kitty")
 
 
+    sg.plot(cmap = roids["cmap"])
+    import matplotlib.pyplot as plt
+    plt.xlim((0,50))
+    plt.ylim((1500, 5000))
+    plt.show()
