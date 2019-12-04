@@ -181,26 +181,53 @@ class SpectrogramWidget:
         'right': 0.975,
     }
 
-    def __init__(self, digfile, **kwargs):
-        if isinstance(digfile, str):
-            self.digfile = DigFile(digfile)
-            # sg = self.spectrogram = Spectrogram(spectrogram)
-        else:
-            assert isinstance(
-                digfile, DigFile), "You must pass in a DigFile"
-            self.digfile = digfile
+    def __init__(self, *args, **kwargs):
+        """
+        If one passes in a single unnamed arg, it can either be a digfile,
+        a string pointing to a digfile, or a two-dimensional ndarray. 
+        If we are founded on a dig file, it is possible to recompute
+        things. Only a subset of operations are possible when we're
+        based on a two-dimensional array, but perhaps that is sometimes
+        desirable.
+        """
+        self.digfile = None
+        if len(args) == 1:
+            arg = args[0]
+            if isinstance(arg, str):
+                self.digfile = DigFile(arg)
+            elif isinstance(arg, DigFile):
+                self.digfile = arg
+        if self.digfile == None and len(args):
+            # Let's see if we have enough information to display a spectrogram
+            # That means we have a two-dimensional ndarray, and possibly corresponding
+            # time and velocity arrays. The signature would be (intensity, [times, velocities]).
+            arg = args[0]
+            if isinstance(arg, np.ndarray) and len(arg.shape) == 2:
+                self._static = {'intensity': arg, }
+
+                if len(args) == 3:
+                    self._static['time'] = np.asarray(args[1])
+                    self._static['velocity'] = np.asarray(args[2])
+                else:
+                    self._static['time'] = np.arange(0, -1 + arg.shape[1])
+                    self._static['velocity'] = np.arange(
+                        0, -1 + arg.shape[0])
+
+            assert hasattr(
+                self, '_static'), "Inappropriate arguments passed to the SpectrogramWidget constructor"
 
         # If LaTeX is enabled in matplotlib, underscores in the title
-        # cause problems in displaying the histogram
-        self.title = self.digfile.filename.split('/')[-1]
+        # cause problems in displaying the histogram. However, we can
+        # solve this by not using latex in displaying the title, so there
+        # is no need to alter characters here.
+        self.title = "" if self.static else self.digfile.filename.split(
+            '/')[-1]
         self.baselines = []
-        # handle the keyword arguments here
 
         # Compute the base spectrogram (do we really need this?)
-        self.spectrogram = Spectrogram(self.digfile, None, None, **kwargs)
-
-        # Create the figure to display this spectrogram
-        # It would be nice to make this bigger!
+        if self.dig:
+            self.spectrogram = Spectrogram(
+                self.digfile, None, None, **kwargs)
 
         self.fig, axes = plt.subplots(
             nrows=1, ncols=2, sharey=True,
@@ -229,72 +256,118 @@ class SpectrogramWidget:
         self.spectra = []         # will hold spectra displayed at right
         self.spectra_in_db = True  # should spectra be displayed in db?
 
-        self.individual_controls = dict()
-        self.controls = None
+        self.controls = dict()    # widgets stored by name
+        self.layout = None        # how the controls get laid out
         self.selecting = False    # we are not currently selecting a ROI
         self.roi = []             # and we have no regions of interest
         self.threshold = None
         self.make_controls(**kwargs)
 
-        # create the call-back functions, and then display the controls
-
-        display(self.controls)
-#         display(self.fig)
+        display(self.layout)
         self.update_spectrogram()
+
+    @property
+    def static(self):
+        "If we are not associated with a dig file, return True"
+        return hasattr(self, '_static')
+
+    @property
+    def dig(self):
+        "True if we are associated with a dig file and can recompute the spectrogram"
+        return isinstance(self.digfile, DigFile)
+
+    @property
+    def intensity(self):
+        "Return the two-dimensional array of intensities"
+        if self.dig:
+            return self.spectrogram.intensity
+        else:
+            return self._static['intensity']
 
     def make_controls(self, **kwargs):
         """
         Create the controls for this widget and store them in self.controls.
         """
-        cd = self.individual_controls  # the dictionary of controls
-        df = self.digfile
+        cd = self.controls  # the dictionary of controls
+        t_range = kwargs.get('t_range', (0, 100))
 
-        # FFT size  ###########################################
-        # Set the size of each spectrum
-        pps = kwargs.get('points_per_spectrum', 8192)
-        val = int(np.log2(pps))
-        cd['spectrum_size'] = slide = widgets.IntSlider(
-            value=val, min=8, max=18, step=1,
-            description="FFT 2^n"
-        )
-        slide.continuous_update = False
-        slide.observe(lambda x: self.overhaul(
-            points_per_spectrum=2 ** x['new']), names="value")
+        # If we are associated with a dig file, include controls that
+        # allow recomputation of the spectrogram
+        if self.dig:
+            df = self.digfile
 
-        # Set the overlap percentage of successive time intervals
-        cd['overlap'] = slide = widgets.FloatSlider(
-            description='Overlap %',
-            value=100.0 * self.spectrogram.overlap,
-            min=0,
-            max=100)
-        slide.continuous_update = False
-        slide.observe(lambda x: self.overhaul(
-            overlap=x['new'] * 0.01),
-            names="value")
+            # FFT size  ###########################################
+            # Set the size of each spectrum
+            pps = kwargs.get('points_per_spectrum', 8192)
+            val = int(np.log2(pps))
+            cd['spectrum_size'] = slide = widgets.IntSlider(
+                value=val, min=8, max=18, step=1,
+                description="FFT 2^n"
+            )
+            slide.continuous_update = False
+            slide.observe(lambda x: self.overhaul(
+                points_per_spectrum=2 ** x['new']), names="value")
 
-        # Time range ###########################################
-        t_range = kwargs.get('t_range', (0, 25))
-        cd['t_range'] = slide = ValueSlider(
-            "Time (µs)", t_range, (df.t0, df.t_final), 1e6,
-            readout_format=".1f"
-        )
-        slide.continuous_update = False
-        slide.observe(
+            # Set the overlap percentage of successive time intervals
+            cd['overlap'] = slide = widgets.FloatSlider(
+                description='Overlap %',
+                value=100.0 * self.spectrogram.overlap,
+                min=0,
+                max=100)
+            slide.continuous_update = False
+            slide.observe(lambda x: self.overhaul(
+                overlap=x['new'] * 0.01),
+                names="value")
+
+            # Thumbnail  ###########################################
+            # Display a thumbnail of the raw signal
+            cd['raw_signal'] = widgets.ToggleButton(
+                value=False,
+                description="Show V(t)",
+                button_style='',
+                icon='check'
+            )
+            cd['raw_signal'].observe(
+                lambda b: self.show_raw_signal(b), names="value")
+
+            # Time range ###########################################
+
+            cd['t_range'] = slide = ValueSlider(
+                "Time (µs)", t_range, (df.t0, df.t_final), 1e6,
+                readout_format=".1f"
+            )
+            slide.continuous_update = False
+
+            # Velocity range ###########################################
+            cd['velocity_range'] = slide = ValueSlider(
+                "Velocity (km/s)",
+                (0, 50),
+                (0.0, self.spectrogram.v_max), 1e-3,
+                readout_format=".1f",
+                continuous_update=False
+            )
+        else:
+            d = self._static
+            cd['t_range'] = ValueSlider(
+                "Time", t_range, (d['time'][0], d['time'][-1]), 1e-3,
+                readout_format=".1f",
+                continuous_update=False
+            )
+            cd['velocity_range'] = ValueSlider(
+                "Velocity (km/s)",
+                (0, 100),
+                (0.0, d['velocity'][-1]), 1e-3,
+                readout_format=".1f",
+                continuous_update=False
+            )
+
+        cd['t_range'].observe(
             lambda x: self.do_update(x), names="value")
-
-        # Velocity range ###########################################
-        cd['velocity_range'] = slide = ValueSlider(
-            "Velocity (km/s)",
-            (0, 50),
-            (0.0, self.spectrogram.v_max), 1e-3,
-            readout_format=".1f",
-            continuous_update=False
-        )
-        slide.observe(lambda x: self.update_velocity_range(),
-                      names="value")
+        cd['velocity_range'].observe(lambda x: self.update_velocity_range(x),
+                                     names="value")
 
         # Color range ###########################################
-        imax = self.spectrogram.intensity.max()
+        imax = self.intensity.max()
         imin = imax - 200  # ??
         cd['intensity_range'] = slide = ValueSlider(
             "Color",
@@ -332,10 +405,10 @@ class SpectrogramWidget:
 
         # Click selector  ###########################################
         # What to do when registering a click in the spectrogram
-        cd['clicker'] = widgets.Dropdown(
+        cd['clicker'] = widgets.Select(
             options=("Spectrum (dB)", "Spectrum", "Peak", "Gauss", ),
             value='Spectrum (dB)',
-            description="Click",
+            description="Click:",
             disabled=False
         )
 
@@ -346,8 +419,9 @@ class SpectrogramWidget:
             useblit=True,
             rectprops=dict(facecolor='yellow', edgecolor='red',
                            alpha=0.2, fill=True),
-            drawtype='box',
+            drawtype='box'
         )
+        cd['marquee'].set_active(False)
 
         # Clear spectra ###########################################
         cd['clear_spectra'] = widgets.Button(
@@ -372,48 +446,36 @@ class SpectrogramWidget:
             lambda x: self.update_baselines(x["new"]),
             names="value")
 
-        # Thumbnail  ###########################################
-        # Display a thumbnail of the raw signal
-        cd['raw_signal'] = widgets.Checkbox(
-            value=False,
-            description="Show V(t)")
-        cd['raw_signal'].observe(
-            lambda b: self.show_raw_signal(b), names="value")
+        columns = [
+            'color_map;t_range;velocity_range;intensity_range;threshold',
+            'clicker;clear_spectra;clear_followers',
+        ]
+        if self.dig:
+            columns.append(
+                'spectrum_size;overlap;raw_signal;baselines')
 
-        self.controls = widgets.HBox([
-            widgets.VBox([
-                cd['t_range'], cd['velocity_range'],
-                cd['threshold'],
-                cd['intensity_range'], cd['spectrum_size']
-            ]),
-            widgets.VBox([
-                cd['color_map'],
-                cd['raw_signal'],
-                cd['overlap'],
-                cd['baselines']
-            ]),
-            widgets.VBox([
-                cd['clicker'],
-                cd['clear_spectra'],
-                cd['clear_followers']
-            ])
-        ])
+        vboxes = []
+        for col in columns:
+            vboxes.append(widgets.VBox([cd[x] for x in col.split(';')]))
+        self.layout = widgets.HBox(vboxes)
 
     def range(self, var):
         "Return the range of the named control, or None if not found."
-        if var in self.individual_controls:
-            return self.individual_controls[var].range
+        if var in self.controls:
+            return self.controls[var].range
         return None
 
     def RSelect(self, eclick, erelease):
-        t0, t1 = eclick.xdata, erelease.xdata
-        v0, v1 = eclick.ydata, erelease.ydata
-        # make sure they are in the right order
-        if t1 < t0:
-            t0, t1 = t1, t0
-        if v1 < v0:
-            v0, v1 = v1, v0
-        self.roi.append(dict(time=(t0, t1), velocity=(v0, v1)))
+        "Called when self.selecting is True and the marquee is active"
+        if self.selecting:
+            t0, t1 = eclick.xdata, erelease.xdata
+            v0, v1 = eclick.ydata, erelease.ydata
+            # make sure they are in the right order
+            if t1 < t0:
+                t0, t1 = t1, t0
+            if v1 < v0:
+                v0, v1 = v1, v0
+            self.roi.append(dict(time=(t0, t1), velocity=(v0, v1)))
 
     def do_update(self, what):
         self.update_spectrogram()
@@ -438,11 +500,12 @@ class SpectrogramWidget:
             yrange = ymax - yvals.min()
             yscale = 0.2 * (ylims[1] - ylims[0]) / yrange
             vvals = ylims[1] - yscale * (ymax - yvals)
-            self.axSpectrogram.plot(tvals, vvals,
-                                    'r-', alpha=0.5)
+            self.raw = self.axSpectrogram.plot(tvals, vvals,
+                                               'r-', alpha=0.5)[0]
         else:
             try:
-                del self.axSpectrogram.lines[0]
+                self.axSpectrogram.lines.remove(self.raw)
+                self.raw = None
                 self.fig.canvas.draw()
                 self.fig.canvas.flush_events()
             except:
@@ -453,21 +516,23 @@ class SpectrogramWidget:
         A parameter affecting the base spectrogram has been changed, so
         we need to recompute everything.
         """
-        self.spectrogram.set(**kwargs)
+        if self.dig:
+            self.spectrogram.set(**kwargs)
         self.update_spectrogram()
 
     def update_spectrogram(self):
         """
         Recompute and display everything
         """
-        sg = self.spectrogram
+
+        intense = self.spectrogram.intensity if self.dig else self._static['intensity']
 
         # Having recomputed the spectrum, we need to set the yrange
 
         # of the color map slider
-        cmin = sg.intensity.min()
-        cmax = sg.intensity.max()
-        self.individual_controls['intensity_range'].range = (cmin, cmax)
+        cmin = intense.min()
+        cmax = intense.max()
+        self.controls['intensity_range'].range = (cmin, cmax)
         self.display_spectrogram()
 
     def display_spectrogram(self):
@@ -477,9 +542,13 @@ class SpectrogramWidget:
         trange = self.range('t_range')
         vrange = self.range('velocity_range')
 
-        # extract the requisite portions
-        times, velocities, intensities = self.spectrogram.slice(
-            trange, vrange)
+        if self.dig:
+            # extract the requisite portions
+            times, velocities, intensities = self.spectrogram.slice(
+                trange, vrange)
+        else:
+            d = self._static
+            times, velocities, intensities = d['time'], d['velocity'], d['intensity']
 
         # if we have already displayed an image, remove it
         if self.colorbar:
@@ -487,7 +556,7 @@ class SpectrogramWidget:
             self.colorbar = None
         if self.image:
             self.image.remove()
-            self.image = None
+        self.image = None
 
         if self.threshold:
             intensities[intensities < self.threshold] = self.threshold
@@ -519,20 +588,25 @@ class SpectrogramWidget:
         """
         Update the color map used to display the spectrogram
         """
-        mapname = self.individual_controls['color_map'].value
+        mapname = self.controls['color_map'].value
         if mapname == 'Computed':
             from generate_color_map import make_spectrogram_color_map
             mapinfo = make_spectrogram_color_map(
                 self.spectrogram, 4, mapname)
             maprange = (mapinfo['centroids'][1], mapinfo['centroids'][-2])
-            self.individual_controls['intensity_range'].value = maprange
+            self.controls['intensity_range'].value = maprange
         self.image.set_cmap(COLORMAPS[mapname])
 
-    def update_velocity_range(self):
+    def update_velocity_range(self, info=None):
         """
         Update the displayed velocity range using values obtained
         from the 'velocity_range' slider.
         """
+        if info:
+            old_vmin, old_vmax = info['old']
+            vmin, vmax = info['new']
+            if vmax > old_vmax or vmin < old_vmin:
+                return self.update_spectrogram()
         vmin, vmax = self.range('velocity_range')
         self.axSpectrogram.set_ylim(vmin, vmax)
         self.axSpectrum.set_ylim(vmin, vmax)
@@ -549,7 +623,7 @@ class SpectrogramWidget:
         if self.selecting:
             return 0
         # Look up what we should do with the click
-        action = self.individual_controls['clicker'].value
+        action = self.controls['clicker'].value
         try:
             if 'Spectrum' in action:
                 self.spectrum(t, action)
@@ -571,7 +645,7 @@ class SpectrogramWidget:
             self.clear_spectra()
         if char in ('m', 'M'):
             self.selecting = not self.selecting
-            self.individual_controls['marquee'].set_active(self.selecting)
+            self.controls['marquee'].set_active(self.selecting)
         if char in "0123456789":
             n = int(char)
             # self.fan_out(int(char))
@@ -785,7 +859,8 @@ class SpectrogramWidget:
             else:
                 n = -1
             spec['max'] = vals[ordering[n]]
-            spec['90'] = vals[ordering[n - 20]]
+            noise_floor = int(n - 0.1 * len(vals))
+            spec['90'] = vals[ordering[noise_floor]]
 
             # We need to worry about the format of the spectrum
             db = ('dB' in form)
@@ -811,7 +886,9 @@ class SpectrogramWidget:
             if db != self.spectra_in_db:
                 self.spectra_in_db = db  # switch our mode
                 # and replot all the spectra
-                for sp, li in self.spectra:
+                for spec in self.spectra:
+                    li = spec['line']
+                    sp = spec['spectrum']
                     li.set(xdata=getattr(sp, field), ydata=sp.velocities)
 
             self.axSpectrum.set_xlabel("Power (dB)" if db else "Power")
