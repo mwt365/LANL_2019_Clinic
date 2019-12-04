@@ -239,7 +239,6 @@ class SpectrogramWidget:
         # create the call-back functions, and then display the controls
 
         display(self.layout)
-        # display(self.fig)
         self.update_spectrogram()
 
     def make_controls(self, **kwargs):
