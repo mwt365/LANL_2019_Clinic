@@ -47,7 +47,7 @@ class Spectrogram:
         .dig file to voltage before computing the spectrogram. If False,
         the raw integral values are used.
     detrend: ("linear") the background subtraction method.
-
+    complex_value: (False) do you want to maintain the phase information as well. 
     **Computed fields**
 
     time:      array of times at which the spectra are computed
@@ -76,6 +76,7 @@ class Spectrogram:
                  form: str = 'db',
                  convert_to_voltage: bool = True,
                  detrend: str = "linear",
+                 complex_value: bool = False,
                  **kwargs
                  ):
         """
@@ -100,13 +101,19 @@ class Spectrogram:
         self.use_voltage = convert_to_voltage
         self.detrend = detrend
 
+        # Do you want to keep the phase terms as well as the intensities.
+        self.complex_value = complex_value
+
         # the following will be set by _calculate
         self.time = None
         self.frequency = None
         self.velocity = None
         self.intensity = None
+        
+        # This will only get set if self.complex_value is True
+        self.complex_spec = None
 
-        # deal with kwargs
+        # deal with kwargs        
 
         try:
             if False:
@@ -131,7 +138,7 @@ class Spectrogram:
         # if normalize:
         #    vals = self.normalize(
         #        vals, chunksize=fftSize, remove_dc=remove_dc)
-        freqs, times, spec = signal.spectrogram(
+        freqs, times, complex_spec = signal.spectrogram(
             vals,
             1.0 / self.data.dt,  # the sample frequency
             window=self.window_function if self.window_function else (
@@ -139,11 +146,23 @@ class Spectrogram:
             nperseg=self.points_per_spectrum,
             noverlap=int(self.overlap * self.points_per_spectrum),
             detrend=self.detrend,  # could be constant,
-            scaling="spectrum"
+            scaling="spectrum",
+            mode = 'complex'
         )
         times += self.t_start
-        # Attempt to deduce baselines
-        # baselines = np.sum(spec, axis=1)
+
+        # complex_spec is in the form of a matrix of complex numbers
+        if self.complex_value:
+            self.complex_spec = complex_spec 
+
+
+        # Spec is supposed to be in the form of a PSD as that is what was returned originally.
+        # the default mode in signal.spectrogram is PSD.
+        # According to Prof Saeta,
+        # If Sxx is the complex valued spectrogram and Pxx is the power spectrum density,
+        # Pxx = 1/2 (magnitude(Sxx))^2. That does not work for the test cases.
+        # Pxx = Sxx.real^2 + Sxx.imag^2 is close one some of them but not all.
+        spec = 1/2 * np.square(np.absolute(complex_spec))
 
         # Convert to a logarithmic representation and use floor to attempt
         # to suppress some noise.
