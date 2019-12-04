@@ -8,6 +8,9 @@ import matplotlib.pyplot as plt
 from scipy import signal
 
 
+import BasisPursuit as bp
+
+
 class Spectrogram:
     """
     Representation of a photon Doppler velocimetry file stored in 
@@ -390,18 +393,35 @@ class Spectrogram:
 
 
 if __name__ == '__main__':
-    sp = Spectrogram('GEN3CH_4_009.dig')
+    # sp = Spectrogram('GEN3CH_4_009.dig')
+    sp2 = Spectrogram('GEN3CH_4_009.dig')
 
-    axes = plt.axes()
+    # axes = plt.axes()
+    axes2 = plt.axes()
 
-    sgram = sp.spectrogram_no_log(0, 50e-6)
+    # sgram = sp.spectrogram(0, 50e-6)
+    sgram2 = sp2.spectrogram(0, 50e-6)
 
-    intensities, interesting_velocites, baseline_velocity = sp.extract_velocities(sgram)
-    velocities = sgram['v']
+    matrix = sgram2['spectrogram']
+    newSignal = bp.optimize(matrix, 1, 50)
 
-    plt.plot(velocities, intensities, "r")
+    sgram2['spectrogram'] = newSignal
+
+    # sp.plot(axes, sgram)
+    sp2.plot(axes2, sgram2)
+
+    # print(newSignal)
+
+    # intensities, interesting_velocites, baseline_velocity = sp.extract_velocities(sgram)
+    # velocities = sgram['v']
+
+
+
+    # plt.plot(velocities, intensities, "r")
+    # plt.plot(velocities, newSignal, "r")
 
     plt.xlim(1800, 2050)
+    
 
     plt.show()
 

@@ -56,11 +56,12 @@ def compute_l2(matrix):
 #     return matrix
 
 
-def update_dictionary(dictionary):
+def update_dictionary(dictionary, atoms):
 
-    index = random.randint(0, len(dictionary)-1 )
-    element = dictionary[index]
-    dictionary[index] = random.randint(0, int(element*2))
+    for i in range(atoms):
+        index = random.randint(0, len(dictionary)-1 )
+        element = dictionary[index]
+        dictionary[index] = random.randint(0, int(element*2))
 
     return dictionary
 
@@ -77,7 +78,7 @@ def update_sparse(sparse):
 
 
 
-def minimize_l2(matrix, epochs, verbose=False):
+def minimize_l2(matrix, epochs, atoms, verbose=False):
 
     min_value, min_dictionary, min_sparse = compute_l2(matrix)
     dictionary = min_dictionary
@@ -85,7 +86,7 @@ def minimize_l2(matrix, epochs, verbose=False):
 
     for i in range(epochs):
 
-        dictionary = update_dictionary(dictionary)
+        dictionary = update_dictionary(dictionary, atoms)
         sparse = update_sparse(sparse)
         dx = np.matmul(dictionary, sparse)
 
@@ -107,9 +108,9 @@ def minimize_l2(matrix, epochs, verbose=False):
 
 
 
-def optimize(matrix, epochs, verbose=False):
+def optimize(matrix, epochs, atoms, verbose=False):
 
-    value, dictionary, sparse = minimize_l2(matrix, epochs, verbose)
+    value, dictionary, sparse = minimize_l2(matrix, epochs, atoms, verbose)
 
     matrix2 = np.matmul(dictionary, sparse)
 
@@ -124,9 +125,8 @@ def optimize(matrix, epochs, verbose=False):
 
 if __name__ == "__main__":
 
-    rows, cols = (5, 5) 
+    rows, cols = (5, 10) 
     A = [[random.randint(0,5) for i in range(cols)] for j in range(rows)] 
-
 
     newMatrix = optimize(A, 10)
     A = np.array(A)
