@@ -229,8 +229,8 @@ class SpectrogramWidget:
         self.spectra = []         # will hold spectra displayed at right
         self.spectra_in_db = True  # should spectra be displayed in db?
 
-        self.individual_controls = dict()
-        self.controls = None
+        self.controls = dict()
+        self.layout = None
         self.selecting = False    # we are not currently selecting a ROI
         self.roi = []             # and we have no regions of interest
         self.threshold = None
@@ -238,7 +238,7 @@ class SpectrogramWidget:
 
         # create the call-back functions, and then display the controls
 
-        display(self.controls)
+        display(self.layout)
         # display(self.fig)
         self.update_spectrogram()
 
@@ -246,7 +246,7 @@ class SpectrogramWidget:
         """
         Create the controls for this widget and store them in self.controls.
         """
-        cd = self.individual_controls  # the dictionary of controls
+        cd = self.controls  # the dictionary of controls
         df = self.digfile
 
         # FFT size  ###########################################
@@ -290,7 +290,7 @@ class SpectrogramWidget:
             readout_format=".1f",
             continuous_update=False
         )
-        slide.observe(lambda x: self.update_velocity_range(),
+        slide.observe(lambda x: self.update_velocity_range(x),
                       names="value")
 
         # Color range ###########################################
@@ -380,7 +380,7 @@ class SpectrogramWidget:
         cd['raw_signal'].observe(
             lambda b: self.show_raw_signal(b), names="value")
 
-        self.controls = widgets.HBox([
+        self.layout = widgets.HBox([
             widgets.VBox([
                 cd['t_range'], cd['velocity_range'],
                 cd['threshold'],
@@ -401,8 +401,8 @@ class SpectrogramWidget:
 
     def range(self, var):
         "Return the range of the named control, or None if not found."
-        if var in self.individual_controls:
-            return self.individual_controls[var].range
+        if var in self.controls:
+            return self.controls[var].range
         return None
 
     def RSelect(self, eclick, erelease):
@@ -468,7 +468,7 @@ class SpectrogramWidget:
         # of the color map slider
         cmin = sg.intensity.min()
         cmax = sg.intensity.max()
-        self.individual_controls['intensity_range'].range = (cmin, cmax)
+        self.controls['intensity_range'].range = (cmin, cmax)
         self.display_spectrogram()
 
     def display_spectrogram(self):
@@ -520,20 +520,25 @@ class SpectrogramWidget:
         """
         Update the color map used to display the spectrogram
         """
-        mapname = self.individual_controls['color_map'].value
+        mapname = self.controls['color_map'].value
         if mapname == 'Computed':
             from generate_color_map import make_spectrogram_color_map
             mapinfo = make_spectrogram_color_map(
                 self.spectrogram, 4, mapname)
             maprange = (mapinfo['centroids'][1], mapinfo['centroids'][-2])
-            self.individual_controls['intensity_range'].value = maprange
+            self.controls['intensity_range'].value = maprange
         self.image.set_cmap(COLORMAPS[mapname])
 
-    def update_velocity_range(self):
+    def update_velocity_range(self, info=None):
         """
         Update the displayed velocity range using values obtained
         from the 'velocity_range' slider.
         """
+        if info:
+            old_vmin, old_vmax = info['old']
+            vmin, vmax = info['new']
+            if vmax > old_vmax or vmin < old_vmin:
+                return self.update_spectrogram()
         vmin, vmax = self.range('velocity_range')
         self.axSpectrogram.set_ylim(vmin, vmax)
         self.axSpectrum.set_ylim(vmin, vmax)
@@ -550,7 +555,7 @@ class SpectrogramWidget:
         if self.selecting:
             return 0
         # Look up what we should do with the click
-        action = self.individual_controls['clicker'].value
+        action = self.controls['clicker'].value
         try:
             if 'Spectrum' in action:
                 self.spectrum(t, action)
@@ -572,7 +577,7 @@ class SpectrogramWidget:
             self.clear_spectra()
         if char in ('m', 'M'):
             self.selecting = not self.selecting
-            self.individual_controls['marquee'].set_active(self.selecting)
+            self.controls['marquee'].set_active(self.selecting)
         if char in "0123456789":
             n = int(char)
             # self.fan_out(int(char))
@@ -786,7 +791,8 @@ class SpectrogramWidget:
             else:
                 n = -1
             spec['max'] = vals[ordering[n]]
-            spec['90'] = vals[ordering[n - 20]]
+            noise_floor = int(n - 0.1 * len(vals))
+            spec['90'] = vals[ordering[noise_floor]]
 
             # We need to worry about the format of the spectrum
             db = ('dB' in form)
@@ -812,7 +818,9 @@ class SpectrogramWidget:
             if db != self.spectra_in_db:
                 self.spectra_in_db = db  # switch our mode
                 # and replot all the spectra
-                for sp, li in self.spectra:
+                for spec in self.spectra:
+                    li = spec['line']
+                    sp = spec['spectrum']
                     li.set(xdata=getattr(sp, field), ydata=sp.velocities)
 
             self.axSpectrum.set_xlabel("Power (dB)" if db else "Power")
