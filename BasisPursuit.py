@@ -25,7 +25,7 @@ def init_dict(matrix):
 
 def init_sparse(matrix):
     cols = len(matrix[0])
-    x = np.random.randint(5, size=(1, cols))
+    x = np.random.randint(1, size=(1, cols))
 
     return x
 
@@ -44,42 +44,94 @@ def compute_l2(matrix):
     return (l2, dictionary, sparse)
 
 
-def minimize_l2(matrix, epochs):
+# def update_element(matrix):
 
-    min_l2 = (float('inf'), [], [])
+#     row = random.randint(0, len(matrix)-1 )
+#     col = random.randint(0, len(matrix[row])-1 )
+
+#     element = matrix[row][col]
+
+#     matrix[row][col] = random.randint(0, element*2)
+
+#     return matrix
+
+
+def update_dictionary(dictionary):
+
+    index = random.randint(0, len(dictionary)-1 )
+    element = dictionary[index]
+    dictionary[index] = random.randint(0, int(element*2))
+
+    return dictionary
+
+
+def update_sparse(sparse):
+
+    # print(sparse[0])
+
+    index = random.randint(0, len(sparse[0])-1 )
+    element = sparse[0][index]
+    sparse[0][index] = random.randint(0, 1)
+
+    return sparse
+
+
+
+def minimize_l2(matrix, epochs, verbose=False):
+
+    min_value, min_dictionary, min_sparse = compute_l2(matrix)
+    dictionary = min_dictionary
+    sparse = min_sparse
 
     for i in range(epochs):
 
-        l2 = compute_l2(matrix)
+        dictionary = update_dictionary(dictionary)
+        sparse = update_sparse(sparse)
+        dx = np.matmul(dictionary, sparse)
 
-        if min_l2[0] > l2[0]:
-            min_l2 = l2
+        diff = np.subtract(matrix, dx)
+        l2 = calc_l2(diff)
 
-    value = l2[0]
-    dictionary = l2[1]
-    sparse = l2[2]
+        if min_value > l2:
+            min_value = l2
+            min_dictionary = dictionary
+            min_sparse = sparse
 
-    return value, dictionary, sparse
+        if verbose:
+            print("iteration: ",i)
+            print("L2 Norm: ", min_value)
+            print("D: ", min_dictionary)
+            print("x: ", min_sparse, "\n\n")
+
+    return min_value, min_dictionary, min_sparse
 
 
-rows, cols = (30, 30) 
-A = [[random.randint(0,20) for i in range(cols)] for j in range(rows)] 
+
+def optimize(matrix, epochs, verbose=False):
+
+    value, dictionary, sparse = minimize_l2(matrix, epochs, verbose)
+
+    matrix2 = np.matmul(dictionary, sparse)
+
+    newMatrix = np.subtract(matrix, matrix2)
+
+    newMatrix[newMatrix < 0] = 0
+
+    return newMatrix
 
 
 
 
+if __name__ == "__main__":
 
-value, dictionary, sparse = minimize_l2(A, 100)
+    rows, cols = (5, 5) 
+    A = [[random.randint(0,5) for i in range(cols)] for j in range(rows)] 
 
-# print(dictionary)
-# print(sparse)
-# print()
 
-matrix2 = np.matmul(dictionary, sparse)
-diff = np.subtract(A, matrix2)
-print(np.absolute(diff))
+    newMatrix = optimize(A, 10)
+    A = np.array(A)
 
-A = np.array(A)
-print(A)
+    newA = np.array(newMatrix)
+    print(A, "\n")
+    print(newA)
 
-print(value)
