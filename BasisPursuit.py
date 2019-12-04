@@ -19,7 +19,7 @@ def calc_l2(matrix):
 
 def init_dict(matrix):
     rows = len(matrix)
-    D = np.random.randint(5, size=(rows, 1))
+    D = np.random.randint(rows, size=(rows, 1))
 
     return D
 
