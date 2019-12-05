@@ -76,7 +76,6 @@ class Spectrogram:
                  form: str = 'db',
                  convert_to_voltage: bool = True,
                  detrend: str = "linear",
-                 complex_value: bool = False,
                  **kwargs
                  ):
         """
@@ -101,19 +100,30 @@ class Spectrogram:
         self.use_voltage = convert_to_voltage
         self.detrend = detrend
 
-        # Do you want to keep the phase terms as well as the intensities.
-        self.complex_value = complex_value
-
         # the following will be set by _calculate
         self.time = None
         self.frequency = None
         self.velocity = None
-        self.intensity = None
+        self.intensity = None 
+        # This will contain the intensity values if possible.
+        # Otherwise it will contain the phase or angle information. 
+        # Containment determined by the value of computeMode.
         
         # This will only get set if self.complex_value is True
-        self.complex_spec = None
+        self.orig_spec_output = None
 
-        # deal with kwargs        
+        # deal with kwargs
+
+        self.computeMode = "psd" # This stands for power spectrum density.
+        if "mode" in kwargs:
+            available = ["psd", "complex", "magnitude", "angle", "phase"]
+            desired = kwargs["mode"]
+            if desired in available:
+                self.computeMode = desired
+            else:
+                # Default to "psd", but display error to the user.
+                print("You wanted the return value of the spectrogram to be", desired, "the supported values are:", available)
+            del kwargs["mode"]
 
         try:
             if False:
@@ -138,7 +148,7 @@ class Spectrogram:
         # if normalize:
         #    vals = self.normalize(
         #        vals, chunksize=fftSize, remove_dc=remove_dc)
-        freqs, times, complex_spec = signal.spectrogram(
+        freqs, times, orig_spec = signal.spectrogram(
             vals,
             1.0 / self.data.dt,  # the sample frequency
             window=self.window_function if self.window_function else (
@@ -147,22 +157,35 @@ class Spectrogram:
             noverlap=int(self.overlap * self.points_per_spectrum),
             detrend=self.detrend,  # could be constant,
             scaling="spectrum",
-            mode = 'complex'
+            mode = self.computeMode
         )
         times += self.t_start
+        spec = None
 
-        # complex_spec is in the form of a matrix of complex numbers
-        if self.complex_value:
-            self.complex_spec = complex_spec 
+        self.orig_spec_output = orig_spec
 
+        if self.computeMode == "complex":
 
-        # Spec is supposed to be in the form of a PSD as that is what was returned originally.
-        # the default mode in signal.spectrogram is PSD.
-        # According to Prof Saeta,
-        # If Sxx is the complex valued spectrogram and Pxx is the power spectrum density,
-        # Pxx = 1/2 (magnitude(Sxx))^2. That does not work for the test cases.
-        # Pxx = Sxx.real^2 + Sxx.imag^2 is close one some of them but not all.
-        spec = 1/2 * np.square(np.absolute(complex_spec))
+            # Spec is supposed to be in the form of a PSD as that is what was returned originally.
+            # the default mode in signal.spectrogram is PSD.
+            # According to Prof Saeta,
+            # If Sxx is the complex valued spectrogram and Pxx is the power spectrum density,
+            # Pxx = 1/2 (magnitude(Sxx))^2. That does not work for the test cases.
+            # Pxx = Sxx.real^2 + Sxx.imag^2 is close one some of them but not all.
+            spec = 1/2 * np.square(np.absolute(orig_spec))
+
+        elif self.computeMode == "psd":
+            spec = orig_spec
+
+        elif self.computeMode == "magnitude":
+            spec = 1/2*np.square(orig_spec)
+
+        elif self.computeMode == "phase":
+            spec = orig_spec
+
+        else:
+            # self.computeMode == "angle"
+            spec = orig_spec
 
         # Convert to a logarithmic representation and use floor to attempt
         # to suppress some noise.
@@ -355,6 +378,9 @@ class Spectrogram:
         if 'max_vel' in kwargs:
             axes.set_ylim(top=kwargs['max_vel'])
             del kwargs['max_vel']
+        if 'min_vel' in kwargs:
+            axes.set_ylim(bot=kwargs['min_vel'])
+            del kwargs['min_vel']
 
         pcm = axes.pcolormesh(
             self.time * 1e6,
