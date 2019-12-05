@@ -186,9 +186,12 @@ def mainTest(SpectrogramObject:Spectrogram, startTime:int, stopTime:int, bottomI
 
     velocities = SpectrogramObject.velocity
     time = SpectrogramObject.time
+
+    basefilePath = "../DocumentationImages/DP/ComplexSpectra/"
     for width in widths:
         for order in orders:
             for theta in thetas:
+                hyperParamNames =  "w " + str(width) + " ord " + str(order) + " Minkowski dist theta " + str(theta).replace(".", "_")
                 signal, p_table, dp_table, botVel, topVel = seamExtraction(SpectrogramObject, startTime, stopTime, width, bottomIndex, topIndex, order, theta=theta)
 
                 plt.plot(velocities[botVel:topVel+1], dp_table[0])
@@ -198,6 +201,11 @@ def mainTest(SpectrogramObject:Spectrogram, startTime:int, stopTime:int, bottomI
                 if verbose:
                     plt.show()
                     print("Here is a graph of the signal trace across time")       
+                
+                extension = "svg"
+                fname = "DP_Start_Cost " + hyperParamNames + extension
+                filename = basefilePath + fname
+                plt.savefig(filename)
 
                 plt.figure(figsize=(10, 6))
                 myplot = SpectrogramObject.plot()
@@ -212,7 +220,8 @@ def mainTest(SpectrogramObject:Spectrogram, startTime:int, stopTime:int, bottomI
                 myplot.legend()
                 if verbose:
                     myplot.show()
-
+                fname = "Overlay Spectra " + hyperParamNames + extension
+                filename = basefilePath + fname
 
 
 def documentationMain():
