@@ -275,10 +275,12 @@ class Spectrogram:
             velocity_range: Array/Tuple/List of velocities (v0, v1)
                 v1 should be greater than v0 but we will handle the other case
         Output:
-            3 arrays time, velocity, intensity
+            4 arrays time, velocity, intensity, original_spec
             time: the time values used in the measurement from t0 to t1 inclusive.
             velocity: the velocity values measured from v0 to v1 inclusive.
             intensity: the corresponding intensity values that we measured.
+            original_spec: the output of the rolling FFT that we used. Depends on
+                the value of self.computeMode
         """
         if time_range == None:
             time0, time1 = 0, len(self.time) - 1
@@ -296,7 +298,8 @@ class Spectrogram:
         tvals = self.time[time0:time1 + 1]
         vvals = self.velocity[vel0:vel1 + 1]
         ivals = self.intensity[vel0:vel1+1, time0:time1+1]
-        return tvals, vvals, ivals
+        ovals = self.orig_spec_output[vel0:vel1+1, time0:time1+1]
+        return tvals, vvals, ivals, ovals
 
     # Routines to archive the computed spectrogram and reload from disk
 
