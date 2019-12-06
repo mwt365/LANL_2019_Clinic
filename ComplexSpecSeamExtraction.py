@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import pandas as pd
 # from scipy.spatial import distance
 from spectrogram import Spectrogram
 
@@ -68,8 +69,8 @@ def seamExtraction(SpectrogramObject:Spectrogram, startTime:int, stopTime:int, w
 
         t, vel, real_raw_vals, ovals  = SpectrogramObject.slice((SpectrogramObject.time[startTime], SpectrogramObject.time[stopTime]), (SpectrogramObject.velocity[bottomDP], SpectrogramObject.velocity[topIndex]))
 
-        amplitudeArray = None # This is will be the magnitude of the complex data.
-        phaseArray = None   # This will be the phase of the complex data.
+        amplitudeArray = [] # This is will be the magnitude of the complex data.
+        phaseArray = []   # This will be the phase of the complex data.
 
         if SpectrogramObject.computeMode == "complex":
             # We have the complex data.
@@ -85,7 +86,6 @@ def seamExtraction(SpectrogramObject:Spectrogram, startTime:int, stopTime:int, w
             print("Before the transpose: real_raw_vals.shape", real_raw_vals.shape)      
             print("real_raw_vals.shape = ",real_raw_vals.shape)
             print("bottomDP", bottomDP)
-            print("The starting of index is ", startIndex)
             print()
             print("t2-t1", stopTime-startTime)
             print("(t2-t1)*halfan", (stopTime-startTime)*halfFan)
@@ -93,8 +93,6 @@ def seamExtraction(SpectrogramObject:Spectrogram, startTime:int, stopTime:int, w
             print(topIndex)
             print(bottomIndex+1)
             print()
-            print(tableWidth)
-            print(tableHeight)
         
         amplitudeArray = np.transpose(amplitudeArray)
         phaseArray = np.transpose(phaseArray)
@@ -113,9 +111,9 @@ def seamExtraction(SpectrogramObject:Spectrogram, startTime:int, stopTime:int, w
                         # then we have a valid index to test from.
                         ampAddition = 0
                         phaseAddition = 0
-                        if amplitudeArray != None:
+                        if len(amplitudeArray) != 0: # Then it has been initialized.
                             ampAddition = np.power(np.abs(amplitudeArray[dpTime+1][testIndex+velocityIndex]-amplitudeArray[dpTime][velocityIndex]), order)
-                        if phaseArray != None:
+                        if len(phaseArray) != 0: # Then it has been initialized.
                             phaseAddition = np.power(np.abs(phaseArray[dpTime+1][testIndex+velocityIndex]-phaseArray[dpTime][velocityIndex]), order)
 
                         current = (1-theta)*ampAddition + theta*phaseAddition + DPTable[dpTime+1][velocityIndex+testIndex]
@@ -145,13 +143,14 @@ def seamExtraction(SpectrogramObject:Spectrogram, startTime:int, stopTime:int, w
         return velocities, parentTable, DPTable, bottomDP, topIndex
 
 
-def reconstruction(parentTable, startPoint, bottomDP):
+def reconstruction(parentTable, startPoint, bottomDP, verbose:bool =False):
     tableHeight = int(parentTable.shape[0])
     velocities = np.zeros(tableHeight, dtype = np.int64)
     for timeIndex in range(tableHeight):
         velocities[timeIndex] = startPoint + bottomDP
-        print(timeIndex)
-        print("myStart", startPoint)
+        if verbose:
+            print(timeIndex)
+            print("myStart", startPoint)
         startPoint = parentTable[timeIndex][startPoint]
 
     return velocities
@@ -187,42 +186,81 @@ def mainTest(SpectrogramObject:Spectrogram, startTime:int, stopTime:int, bottomI
     velocities = SpectrogramObject.velocity
     time = SpectrogramObject.time
 
+    signalData = time*1e6
+
+    headers = ["Time ($\mu$s)"]
+
     basefilePath = "../DocumentationImages/DP/ComplexSpectra/"
+    digfileUsed = SpectrogramObject.data.filename
     for width in widths:
         for order in orders:
             for theta in thetas:
                 hyperParamNames =  "w " + str(width) + " ord " + str(order) + " Minkowski dist theta " + str(theta).replace(".", "_")
                 signal, p_table, dp_table, botVel, topVel = seamExtraction(SpectrogramObject, startTime, stopTime, width, bottomIndex, topIndex, order, theta=theta)
 
-                plt.plot(velocities[botVel:topVel+1], dp_table[0])
-                plt.title("Total Minkowski" + str(order) +" Order Cost diagram with a window size of " +str(width) +" PercPhase:" + str(theta))
-                plt.xlabel("Starting velocity of the trace (m/s)")
-                plt.ylabel("Minimum value of the sum ($\theta$|$\phi_i$ - $\phi_{i-1}$|^" + str(order) + "(1-$\theta$)|$Amp_i$ - $Amp_{i-1}$|^" + str(order) +") along the path")
+                fname = "DP_Cost_Table time by vel " +hyperParamNames + ".csv"
+                filename = basefilePath + fname
+                np.savetxt(filename,dp_table,delimiter=",")
+
+                fname = "Parent_Table time by vel " + hyperParamNames + ".csv"
+                filename = basefilePath + fname
+                np.savetxt(filename,p_table,delimiter=",")
+
+                fig = plt.figure()
+                fig.plot(velocities[botVel:topVel+1], dp_table[0])
+                fig.title("Total Minkowski" + str(order) +" Order Cost diagram with a window size of " +str(width) +" PercPhase:" + str(theta))
+                fig.xlabel("Starting velocity of the trace (m/s)")
+                fig.ylabel("Minimum value of the sum ($\theta$|$\phi_i$ - $\phi_{i-1}$|^" + str(order) + "(1-$\theta$)|$Amp_i$ - $Amp_{i-1}$|^" + str(order) +") along the path")
+                # manager = plt.get_current_fig_manager()
+                # manager.window.Maximized()
                 if verbose:
-                    plt.show()
+                    fig.show()
                     print("Here is a graph of the signal trace across time")       
-                
+                fig.show()
+                    
                 extension = "svg"
                 fname = "DP_Start_Cost " + hyperParamNames + extension
                 filename = basefilePath + fname
-                plt.savefig(filename)
+                fig.savefig(filename)
 
-                plt.figure(figsize=(10, 6))
-                myplot = SpectrogramObject.plot()
+                fig2 = plt.figure(figsize=(10, 6))
+                fig2Axes = fig2.axes
+                SpectrogramObject.plot(axes=fig2Axes)
                 plt.xlim((SpectrogramObject.time[startTime], SpectrogramObject.time[stopTime]))
 
-                myplot.plot(time[startTime: stopTime+1], velocities[signal], 'b-', alpha = 0.4, label="Minimum Cost")
+                fig2Axes.plot(time[startTime: stopTime+1], velocities[signal], 'b-', alpha = 0.4, label="Minimum Cost")
                 if vStartInd != None:
-                    # Compute the signal seam for assuming this is the start point.
+                       # Compute the signal seam for assuming this is the start point.
                     seam = reconstruction(p_table, vStartInd-botVel, botVel)
-                    myplot.plot(time[startTime: stopTime+1], velocities[seam], 'r--', alpha = 0.4, label="Expected Start Point")
-                myplot.title("Velocity as a function of time for the minimum cost seam with Minkowski" + str(order)+ " and a window size of " + str(width) + " raw")
-                myplot.legend()
+                    fig2Axes.plot(time[startTime: stopTime+1], velocities[seam], 'r--', alpha = 0.4, label="Expected Start Point")
+                fig2Axes.set_title("Velocity as a function of time for the minimum cost seam with Minkowski" + str(order)+ " and a window size of " + str(width) + " raw")
+                fig2Axes.legend()
+
+                # manager = plt.get_current_fig_manager()
+                # manager.window.showMaximized()
                 if verbose:
-                    myplot.show()
+                    fig2.show()
                 fname = "Overlay Spectra " + hyperParamNames + extension
                 filename = basefilePath + fname
+                plt.savefig(filename)
 
+                # Build the reconstruction of every possible starting velocity. Then, save them in a csv file.
+                extension = "csv"
+                fname = "Velocity Traces " + hyperParamNames + extension
+                filename = basefilePath + fname
+
+                for velInd in range(0, topVel-botVel+1):
+                    trace = reconstruction(p_table, velInd, botVel)
+                    header = "Starting Velocity " + velocities[velInd+botVel] + "(m/s)"
+                    headers.append(header) 
+                    meaured = velocities[trace]
+                    signalData = np.hstack((signalData, meaured))
+                signalData = signalData.reshape((topVel-botVel + 2, len(time))).transpose() # I want each column to be a velocity trace.
+                # np.savetxt(filename, signalData, delimiter=",")
+                df = pd.DataFrame(data=signalData, index=time*1e6, columns=headers)
+                df.to_csv(filename)
+
+                print("Completed the documentation for ", + hyperParamNames)
 
 def documentationMain():
     # Set up
