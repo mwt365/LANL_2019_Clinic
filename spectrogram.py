@@ -380,12 +380,14 @@ class Spectrogram:
             axes.set_ylim(top=kwargs['max_vel'])
             del kwargs['max_vel']
         pcm = axes.pcolormesh(sgram['t'] * 1e6, sgram['v'],
-                              sgram['spectrogram'], **kwargs)
+                              sgram['spectrogram'],cmap='gist_yarg', **kwargs)
+        pcm.set_clim(-90,0)
         plt.gcf().colorbar(pcm, ax=axes)
         axes.set_ylabel('Velocity (m/s)')
         axes.set_xlabel('Time ($\mu$s)')
         title = self.filename.split('/')[-1]
         axes.set_title(title.replace("_", "\\_"))
+        
         plt.show()
 
 

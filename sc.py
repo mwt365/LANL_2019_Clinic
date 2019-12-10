@@ -383,42 +383,63 @@ def within_range(test, percent, base):
 
 
 if __name__ == "__main__":
-    filename = 'GEN3CH_4_009.dig'
-    sp = spctgrm.Spectrogram('GEN3CH_4_009.dig')
-    sp_nl = spctgrm.Spectrogram('GEN3CH_4_009.dig')
+    filename = '../For_Candace/newdigs/WHITE_CH3_SHOT.dig'
+
+    # sp = spctgrm.Spectrogram('GEN3CH_4_009.dig')
+    # sp_nl = spctgrm.Spectrogram('GEN3CH_4_009.dig')
+
+    sp = spctgrm.Spectrogram(filename)
+    sp_nl = spctgrm.Spectrogram(filename)
+
 
     sgram_nl = sp_nl.spectrogram_no_log(0, 50e-6)
 
     sp_nl = sgram_nl['spectrogram']
     time_length = len(sgram_nl['t'])
 
-    potential_baselines = find_seams(sp_nl, 20, time_length-200)
+    potential_baselines = find_seams(sp_nl, 10, time_length-100)
 
-    print(potential_baselines[0])
+    # print(potential_baselines[0])
 
     baseline_velocity_index = potential_baselines[0][0][0]
+    # print(len(potential_baselines))
+    # baseline1_velocity_index = potential_baselines[1][0][0]
+    baseline2_velocity_index = potential_baselines[2][0][0]
+    baseline4_velocity_index = potential_baselines[7][0][0]
+
+
     baseline_intensity = potential_baselines[0][0][2]
+
     baseline_velocity = sgram_nl['v'][baseline_velocity_index]
+    baseline_velocity4 = sgram_nl['v'][baseline4_velocity_index]
+    baseline_velocity2 = sgram_nl['v'][baseline2_velocity_index]
 
     print("baseline velocity: ", baseline_velocity)
     print("baseline intensity: ", baseline_intensity)
     
-    axes = plt.axes()
+    # axes = plt.axes()
 
     sgram = sp.spectrogram(0, 50e-6)
 
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
 
-    cmsh = axes.pcolormesh(sgram['t'] * 1e6, sgram['v'], sgram['spectrogram'])
-    plt.gcf().colorbar(cmsh, ax=axes)
-    axes.set_ylabel('Velocity (m/s)')
-    axes.set_xlabel('Time ($\mu$s)')
+    # cmsh = axes.pcolormesh(sgram['t'] * 1e6, sgram['v'], sgram['spectrogram'], cmap='bwr')
+    # cmsh2 = ax.pcolormesh(sgram['t'] * 1e6, sgram['v'], sgram['spectrogram'], cmap='Spectral')
+
+    # plt.gcf().colorbar(cmsh, ax=axes)
+    # axes.set_ylabel('Velocity (m/s)')
+    # axes.set_xlabel('Time ($\mu$s)')
 
 
-    # cmsh.set_clim((0,80))
+    # cmsh.set_clim((0,120))
     ax.plot([0,5,10,15,20,25,30,35,40],[baseline_velocity for i in range(9)],'r-')
+    ax.plot([0,5,10,15,20,25,30,35,40],[baseline_velocity2 for i in range(9)],'r-')
+    ax.plot([0,5,10,15,20,25,30,35,40],[baseline_velocity4 for i in range(9)],'r-')
+
     ax.set_ylim(0,10000)
+
+    # plt.show()
 
     sp.plot(ax, sgram)
     
