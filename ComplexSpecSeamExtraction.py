@@ -130,10 +130,6 @@ def seamExtraction(SpectrogramObject:Spectrogram, startTime:int, stopTime:int, w
         # Now for the reconstruction.
         currentPointer = np.argmin(DPTable[0])
         
-        # Get the values of the DP table to a more reasonable values by taking the orderth root.
-        # for timeIndex in range(tableHeight+1):
-        #     for velocityIndex in range(tableWidth):
-        #         DPTable[timeIndex][velocityIndex] = np.power(DPTable[timeIndex][velocityIndex], 1/order)
         if verbose:
             print("The value of the current pointer is", currentPointer)
             print("The minimum cost is", DPTable[0][currentPointer])
@@ -206,25 +202,29 @@ def mainTest(SpectrogramObject:Spectrogram, startTime:int, stopTime:int, bottomI
                 filename = basefilePath + fname
                 np.savetxt(filename,p_table,delimiter=",")
 
-                fig = plt.figure()
-                fig.plot(velocities[botVel:topVel+1], dp_table[0])
-                fig.title("Total Minkowski" + str(order) +" Order Cost diagram with a window size of " +str(width) +" PercPhase:" + str(theta))
-                fig.xlabel("Starting velocity of the trace (m/s)")
-                fig.ylabel("Minimum value of the sum ($\theta$|$\phi_i$ - $\phi_{i-1}$|^" + str(order) + "(1-$\theta$)|$Amp_i$ - $Amp_{i-1}$|^" + str(order) +") along the path")
+                fig = plt.figure(num=1)
+                plt.plot(velocities[botVel:topVel+1], dp_table[0])
+                plt.title("Total Minkowski" + str(order) +" Order Cost diagram with a window size of " +str(width) +" PercPhase:" + str(theta))
+                plt.xlabel("Starting velocity of the trace (m/s)")
+                plt.ylabel("Minimum value of the sum ($\theta$|$\phi_i$ - $\phi_{i-1}$|^" + str(order) + "(1-$\theta$)|$Amp_i$ - $Amp_{i-1}$|^" + str(order) +") along the path")
                 # manager = plt.get_current_fig_manager()
                 # manager.window.Maximized()
                 if verbose:
                     fig.show()
                     print("Here is a graph of the signal trace across time")       
-                fig.show()
+                # fig.show()
                     
                 extension = "svg"
                 fname = "DP_Start_Cost " + hyperParamNames + extension
                 filename = basefilePath + fname
                 fig.savefig(filename)
 
-                fig2 = plt.figure(figsize=(10, 6))
-                fig2Axes = fig2.axes
+                fig2 = plt.figure(num = 2, figsize=(10, 6))
+                ax = fig2.add_subplot(1,1,1)
+                fig2Axes = fig2.axes[0]
+
+                print(type(fig2Axes))
+                print(fig2Axes)
                 SpectrogramObject.plot(axes=fig2Axes)
                 plt.xlim((SpectrogramObject.time[startTime], SpectrogramObject.time[stopTime]))
 
@@ -251,7 +251,7 @@ def mainTest(SpectrogramObject:Spectrogram, startTime:int, stopTime:int, bottomI
 
                 for velInd in range(0, topVel-botVel+1):
                     trace = reconstruction(p_table, velInd, botVel)
-                    header = "Starting Velocity " + velocities[velInd+botVel] + "(m/s)"
+                    header = "Starting Velocity " + str(velocities[velInd+botVel]) + "(m/s)"
                     headers.append(header) 
                     meaured = velocities[trace]
                     signalData = np.hstack((signalData, meaured))
