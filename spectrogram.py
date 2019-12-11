@@ -379,6 +379,16 @@ class Spectrogram:
             return np.power(10.0, values)
         return values
 
+    def signal_to_noise(self):
+        """
+        Give an approximate signal to noise ratio for each time slice.
+        Max/Mean
+        """
+        timeVelInten = np.transpose(self.intensity)
+        answer = np.zeros(len(self.time))
+        for ind in range(len(self.time)):
+            answer[ind] = np.max(timeVelInten[ind])/np.mean(timeVelInten[ind])
+        return answer
     def plot(self, axes=None, **kwargs):
         # max_vel=6000, vmin=-200, vmax=100):
         if axes == None:
