@@ -359,6 +359,11 @@ class Spectrogram:
         return self.intensity.max()
 
     @property
+    def min(self):
+        """The minimum intensity value"""
+        return self.intensity.min()
+
+    @property
     def v_max(self):
         return self.wavelength * 0.25 / self.data.dt
 
