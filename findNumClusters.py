@@ -1,7 +1,7 @@
 from sklearn.decomposition import PCA
 from sklearn.cluster import KMeans
 import numpy as np
-
+import EnlargeLabels
 import matplotlib.pyplot as plt
 
 def findNumClusters(intensities, minClusters, maxClusters):
@@ -22,10 +22,8 @@ def findNumClusters(intensities, minClusters, maxClusters):
         clusteredData[k_indx] = kmeans.cluster_centers_[outputClusterIndices]
 
     plt.plot(num_clusters, inertia_array)
-    plt.title("Inertia_ vs num clusters whole dataset")
-    plt.ylabel("Sum of the distance to the closest cluster center")
-    plt.xlabel("k")
-    plt.show()
+    
+    EnlargeLabels.increaseReadability("Inertia_ vs num clusters whole dataset","Sum of the distance to the closest cluster center","Num clusters (k)", 25, 20, 20, 16)
 
     return clusteredData, width, height
 
@@ -55,13 +53,19 @@ def testPlotting(SpectrogramObject:Spectrogram, dataToTest, originalWidth:int, o
     SpectrogramObject.time = time
     SpectrogramObject.velocity = vel
 
+    titleSize = 25
+    xlabelSize = 20
+    tickMarkSize = 16
+    ylab = "Velocity (m/s)"
+    xlab = "Time ($\mu$s)"
+
     for k_indx in range(dataToTest.shape[0]):
         newData = dataToTest[k_indx].reshape(originalWidth, originalHeight)
         print(newData.shape, "shape of new data")
         SpectrogramObject.intensity = newData
-        SpectrogramObject.plot(cmap = COLORMAPS["3w_gby"])
-        plt.title("GEN3CH4_009 Dataset from 0 to 50 $\mu$s and "+str(k_indx+minClusters)+" clusters")
-        plt.show()
+        SpectrogramObject.plot()#cmap = COLORMAPS["3w_gby"])
+        title = "GEN3CH4_009 Dataset from 0 to 50 $\mu$s and "+str(k_indx+minClusters)+" clusters"
+        EnlargeLabels.increaseReadability(title, ylab, xlab, titleSize, xlabelSize, xlabelSize, tickMarkSize)
 
     # Clean up after the mess.
 
