@@ -33,6 +33,22 @@ def moving_average(x: np.ndarray, n=3, shape='triangle'):
     return sm
 
 
+def compress(num_pnts: int, *args):
+    """
+    Produce a compressed representation of the np.ndarrays in args
+    by averaging num_pnts consecutive values. 
+    """
+    res = []
+    for arg in args:
+        assert isinstance(arg, np.ndarray)
+        chunks = len(arg) // num_pnts  # how many points we'll get
+        pts = chunks * num_pnts
+        resh = np.reshape(arg[0:pts], (chunks, num_pnts))
+        x = np.mean(resh, axis=1)
+        res.append(x)
+    return res
+
+
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
     from numpy.random import Generator, PCG64
