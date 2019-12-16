@@ -367,11 +367,24 @@ class SpectrogramWidget:
                                      names="value")
 
         # Color range ###########################################
+
         imax = self.intensity.max()
-        imin = imax - 200  # ??
+        if self.dig:
+            hl = self.spectrogram.histogram_levels
+            imin = hl['tens'][3]
+            # Let's figure out the range likely to produce a clear
+            # image. Put the 50% point at the bottom end and the 95%
+            # at the top?
+
+            def scale(x): return int(100.0 * (x - imin) / (imax - imin))
+            start_range = (scale(hl['tens'][8]), scale(hl['tenths'][9]))
+        else:
+            imin = imax - 150  # ?? this is bad and assumes db
+            start_range = (40, 70)
+
         cd['intensity_range'] = slide = ValueSlider(
             "Color",
-            (40, 70),
+            start_range,
             (imin, imax),
             multiplier=1,
             readout_format=".0f",
@@ -576,11 +589,17 @@ class SpectrogramWidget:
         self.update_cmap()
 
     def update_threshold(self, x):
-        n = int(x)
-        if n == 0:
+        n = x
+        sg = self.spectrogram
+        if int(x) == 0:
             self.threshold = None
         else:
-            threshold = self.spectrogram.histogram_levels[n]
+            if x < 90:
+                threshold = sg.histogram_levels['tens'][x // 10]
+            elif x < 99:
+                threshold = sg.histogram_levels['ones'][int(x - 90)]
+            else:
+                threshold = sg.histogram_levels['tenths'][int(10 * (x - 99))]
             self.threshold = self.spectrogram.transform(threshold)
         self.display_spectrogram()
 
@@ -827,6 +846,18 @@ class SpectrogramWidget:
                     alpha=0.4
                 )
                 self.baselines.append(dict(v=v, line=bline))
+
+    def baseline_intensity(self):
+        self.update_baselines("Squash")
+        figgy = plt.figure()
+        ax = figgy.add_subplot(1, 1, 1)
+        sg = self.spectrogram
+        for bline in self.baselines:
+            index = sg._velocity_to_index(bline['v'])
+            if index > 2:
+                ax.semilogy(sg.time * 1e6, sg.power(sg.intensity[index, :]))
+        ax.set_xlabel(r"$t$ ($\mu$ s)")
+        ax.set_ylabel(r"Power")
 
     def spectrum(self, the_time: float, form: str):
         """
