@@ -58,6 +58,8 @@ class Spectrogram:
                frequency/velocity, the second to time.
     """
 
+    # The following fields may be set with the spectrogram.set call using
+    # kwargs
     _fields = ("points_per_spectrum",
                "overlap",
                "window_function",
@@ -79,7 +81,11 @@ class Spectrogram:
                  **kwargs
                  ):
         """
-        TODO: We are currently not handling kwargs
+        Keyword arguments we handle:
+
+        mode: if 'complex', compute the complex spectrogram, which gets
+              stored in self.complex
+        scaling: 'spectrum' or 'density'
         """
         if isinstance(digfile, str):
             digfile = DigFile(digfile)
@@ -114,10 +120,10 @@ class Spectrogram:
             else:
                 raise Exception()
         except:
-            self._compute(ending)
+            self._compute(ending, **kwargs)
             # self._save()
 
-    def _compute(self, ending):
+    def _compute(self, ending, **kwargs):
         """
         Compute a spectrogram. This needs work! There need to be
         lots more options that we either want to supply with
@@ -128,28 +134,48 @@ class Spectrogram:
         else:
             vals = self.data.raw_values(self.t_start, ending)
 
-        # if normalize:
-        #    vals = self.normalize(
-        #        vals, chunksize=fftSize, remove_dc=remove_dc)
-        freqs, times, spec = signal.spectrogram(
-            vals,
-            1.0 / self.data.dt,  # the sample frequency
-            window=self.window_function if self.window_function else (
-                'tukey', 0.25),
-            nperseg=self.points_per_spectrum,
-            noverlap=int(self.overlap * self.points_per_spectrum),
-            detrend=self.detrend,  # could be constant,
-            scaling="spectrum"
-        )
+        # possible modes are 'psd', 'complex', 'magnitude',
+        # 'angle', and 'phase'
+        mode = kwargs.get('mode', 'psd')
+        scaling = kwargs.get('scaling', 'spectrum')
+        if mode in ('angle', 'phase'):
+            modes = [mode, 'psd']
+        else:
+            modes = [mode]
+
+        for mode in modes:
+            freqs, times, spec = signal.spectrogram(
+                vals,
+                1.0 / self.data.dt,  # the sample frequency
+                window=self.window_function if self.window_function else (
+                    'tukey', 0.25),
+                nperseg=self.points_per_spectrum,
+                noverlap=int(self.overlap * self.points_per_spectrum),
+                detrend=self.detrend,  # could be constant,
+                scaling=scaling,
+                mode=mode
+            )
+            if mode in ('angle', 'phase'):
+                setattr(self, mode, spec)
         times += self.t_start
+
         # Attempt to deduce baselines
         # baselines = np.sum(spec, axis=1)
 
         # Convert to a logarithmic representation and use floor to attempt
         # to suppress some noise.
-        spec *= 2.0 / (self.points_per_spectrum * self.data.dt)
-        self.histogram_levels = self.histo_levels(spec)
-        self.intensity = self.transform(spec)
+        # I think the following is an attempt to normalize across
+        # different numbers of points per spectrum.
+        if True:
+            spec *= 2.0 / (self.points_per_spectrum * self.data.dt)
+
+        if mode == 'complex':
+            self.complex = spec
+            self.intensity = np.abs(spec)
+            self.intensity *= self.intensity
+        else:
+            self.intensity = self.transform(spec)
+        self.histogram_levels = self.histo_levels(self.intensity)
 
         # the first index is frequency, the second time
         self.frequency = freqs
@@ -177,8 +203,12 @@ class Spectrogram:
         vals = array.flatten()
         vals.sort()
         indices = np.asarray(np.linspace(
-            0, len(vals) - 1, 101), dtype=np.uint32)
-        ladder = vals[indices]
+            0, len(vals) - 1, 11), dtype=np.uint32)
+        ladder = {'tens': vals[indices], }
+        indices = np.linspace(indices[-2], indices[-1], 11, dtype=np.uint32)
+        ladder['ones'] = vals[indices]
+        indices = np.linspace(indices[-2], indices[-1], 11, dtype=np.uint32)
+        ladder['tenths'] = vals[indices]
         return ladder
 
     def set(self, **kwargs):
