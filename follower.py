@@ -86,7 +86,7 @@ class Follower:
         start_index, end_index = self.data_range(n)
         velocities = self.velocity[start_index:end_index]
         intensities = self.intensity[start_index:end_index, self.time_index]
-        return velocities, intensities, start_index, end_index
+        return velocities, self.spectrogram.power(intensities), start_index, end_index
 
     @property
     def frame(self):
@@ -127,7 +127,7 @@ class Follower:
         time_index = res['time_index'][n]
         v_peak = res['velocities'][n]
         v_peak_index = self.spectrogram._velocity_to_index(v_peak)
-        
+
         hoods, means, stdevs = [], [], []
         hood = neighborhood
         while hood > 1:
@@ -148,10 +148,10 @@ class Follower:
             stdevs.append(stdev)
             hood = hood // 2
         print(stdevs)
-        # 
-        
+        #
+
         return res
-    
+
     def moments(self, x, y):
         """
         Give an array x with equally spaced points and an
