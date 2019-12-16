@@ -81,6 +81,15 @@ class DigFile:
         50 ps).
         """
 
+    @property
+    def date(self):
+        import re
+        dateline = re.search(
+            r"^(.*)(201\d)$", self.header_text, re.MULTILINE)
+        if dateline:
+            return dateline.group(0)
+        return ""
+
     def load_dig_file(self):
         """
         A .dig file has a 1024-byte ascii header, typically followed by binary
@@ -295,6 +304,13 @@ class DigFile:
         t_final = t_start + n_samples * self.dt
         return np.linspace(t_start, t_final, n_samples)
 
+    def microseconds(self, t_start=None, ending=None):
+        """
+        Return the time values for the range specified by t_start (in seconds!!)
+        and ending (either as an int or a time (also in seconds)).
+        """
+        return self.time_values(t_start, ending) * 1e6
+
     def _points(self, t_start, ending):
         """
         Given a start time and either a number of points or an ending time,
@@ -346,9 +362,56 @@ class DigFile:
         ])
         return d
 
+    @staticmethod
+    def dig_dir():
+        """
+        Return the path to the directory of dig files
+        """
+        par = os.path.split(__file__)[0]
+        diggers = os.path.join(os.path.split(par)[0], 'dig')
+        return diggers
+
+    @staticmethod
+    def all_dig_files():
+        """
+        Walk the tree from ../dig down and harvest all .dig files.
+        Return a list of filenames.
+        """
+        curdir = os.getcwd()
+        os.chdir(DigFile.dig_dir())
+        digfiles = []
+        for base, dirs, files in os.walk('.'):
+            for file in files:
+                if file.endswith('.dig'):
+                    digfiles.append(os.path.join(base[2:], file))
+        os.chdir(curdir)
+        return sorted(digfiles)
+
+    @staticmethod
+    def inventory():
+        curdir = os.getcwd()
+        home = DigFile.dig_dir()
+        os.chdir(home)
+        rows = []
+
+        for filename in DigFile.all_dig_files():
+            df = DigFile(filename)
+            rows.append(dict(
+                file=filename,
+                date=df.date,
+                bits=df.bits,
+                dt=df.dt * 1e12,
+                duration=df.dt * df.num_samples * 1e6
+            ))
+        os.chdir(curdir)
+        return pd.DataFrame(rows)
+
 
 if __name__ == '__main__':
     import matplotlib.pyplot as plt
+
+    df = DigFile.inventory()
+    print(df)
 
     df = DigFile('../dig/GEN3_CHANNEL1KEY001')
     print(df)
