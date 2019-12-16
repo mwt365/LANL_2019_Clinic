@@ -11,11 +11,12 @@
 import numpy as np
 from follower import Follower
 from baselines import baselines_by_squash as bline
+from moving_average import moving_average
 
 
 class PeakFollower(Follower):
     """
-    A naive follower implementation that implements a local-region
+    A naive follower implementation that uses a local-region
     smoothing and then follows the local maximum.
 
     **Inputs to the constructor**
@@ -62,11 +63,7 @@ class PeakFollower(Follower):
         velocities, intensities, p_start, p_end = self.data()
 
         if self.smoothing:
-            smooth = np.zeros(len(intensities))
-            for roll in range(-self.smoothing, self.smoothing + 1):
-                smooth += np.roll(intensities, roll)
-            smooth /= 2 * self.smoothing + 1
-            intensities = smooth
+            intensities = moving_average(intensities, n=self.smoothing)
 
         # generate an index array to sort the intensities (low to high)
         low_to_high = np.argsort(intensities)
@@ -89,7 +86,10 @@ class PeakFollower(Follower):
         self.results['times'].append(
             self.spectrogram._point_to_time(self.time_index))
         self.results['velocities'].append(velocities[top])
-        self.results['intensities'].append(intensities[top])
+        # we need to call transform to return to whatever format is being used
+        # for the plot (?)
+        self.results['intensities'].append(
+            self.spectrogram.transform(intensities[top]))
         # on success we increment to the next time index
         self.time_index += 1
 
