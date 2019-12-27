@@ -12,6 +12,7 @@ from scipy.optimize import curve_fit
 import pandas as pd
 from digfile import DigFile
 from save_as_dig_file import save_as_dig
+from moving_average import compress
 import os
 
 
@@ -304,10 +305,136 @@ class Fiducials:
             # df.extract(os.path.join(folder, name), t_start, t_stop)
 
 
+def split_digfile(digfile: DigFile, times: np.ndarray, basename="", **kwargs):
+    """
+    Prepare a subdirectory filled with the segments that
+    go from one timing fiducial to the next. If no basename
+    is supplied, use the name of the source file before the
+    .dig extension.
+    """
+    if not basename:
+        basename = "seg"
+    # Make the directory
+    home, filename = os.path.split(digfile.path)
+    folder = os.path.join(home, basename)
+    if not os.path.exists(folder):
+        os.makedirs(folder)
+
+    # Prepare the top 512-byte header
+    text = digfile.header_text
+    if len(text) > 512:
+        text = text[:512]
+    header = text
+    kwargs = dict(
+        dt=digfile.dt,
+        initialTime=0,
+        voltageMultiplier=digfile.dV,
+        voltageOffset=digfile.V0
+    )
+    for n in range(len(times)):
+        head = header.format(n)
+        t_start = times[n]
+        try:
+            t_stop = times[n + 1]
+        except:
+            t_stop = digfile.t_final
+        vals = digfile.raw_values(t_start, t_stop)
+        name = f"{basename}_{n:02d}.dig"
+        save_as_dig(os.path.join(folder, name),
+                    vals, digfile.data_format,
+                    top_header=head, **kwargs)
+
+
+def downspike(digfile: DigFile, **kwargs):
+    """Look for a downward spike followed by a roughly exponential relaxation
+        towards the zero level with a time constant of roughly 0.5 µs in the range of
+        times specified by t_range.
+    """
+    import matplotlib.pyplot as plt
+
+    # Average consecutive samples over what time?
+    average_over_time = kwargs.get('avg_time', 5.0e-8)
+    average_over = int(average_over_time / digfile.dt)
+    threshold = kwargs.get('threshold', 50)
+    t_range = kwargs.get(
+        't_range', (digfile.t0, min(digfile.t_final, 100e-6)))
+    rawt, rawv = digfile.microseconds(*t_range), digfile.values(*t_range)
+    tvals, vvals = compress(average_over, rawt, rawv)
+    plot = kwargs.get('plot', False)
+
+    try:
+        lead_points = kwargs.get('lead_points', 100)
+        amin = np.argmin(vvals)
+        assert amin > lead_points, "The spike appears too close to the start of the time range"
+        noise = np.std(vvals[0:lead_points])
+
+        # How far below the noise level do we need to go
+        # to detect a downward spike?
+        threshold *= -noise
+        # Look for the first point below threshold
+        spike = lead_points + np.argmax(vvals[lead_points:] < threshold)
+
+        if plot:
+            axes = plt.gca()
+            axes.clear()
+            axes.plot(rawt, rawv, 'y-', alpha=0.25)  # plot raw data
+            axes.plot(tvals, vvals, 'g-')  # plot smoothed version
+            # plot the threshold for a downspike
+            axes.plot([tvals[0], tvals[-1]],
+                      [threshold, threshold], 'k--', alpha=0.5)
+            axes.plot([tvals[spike]], [vvals[spike]], 'bo', alpha=0.5)
+
+        def myline(t, *params):
+            "params = t0, m"
+            return params[1] * (params[0] - t)
+
+        def myexpo(t, *params):
+            "params = y0, tau"
+            t0 = t[0]
+            return params[0] * np.exp((t0 - t) / params[1])
+
+        params, covars = curve_fit(
+            myline, tvals[spike - 5:spike + 5], vvals[spike - 5:spike + 5], p0=(tvals[spike - 5], 1000.))
+        t0 = params[0]
+
+        # Identify the next minimum
+        onemicro = int(1e-6 / average_over_time)
+
+        minpos = spike + np.argmin(vvals[spike:spike + 2 * onemicro])
+
+        # error check?
+        exparams, expcovars = curve_fit(
+            myexpo, tvals[minpos:minpos +
+                          onemicro], vvals[minpos:minpos + onemicro],
+            p0=(vvals[minpos], 0.5)
+        )
+        tau = exparams[1]
+
+        if plot:
+            axes.plot([t0], [0.0], 'r*')  # where we think the spike starts
+            axes.plot(tvals[minpos:minpos + onemicro],
+                      myexpo(tvals[minpos:minpos + onemicro], *exparams), 'r--')
+            axes.set_xlim(tvals[spike - 100], tvals[minpos + 2 * onemicro])
+            plt.show()
+        assert tau < 2
+
+        return t0
+    except Exception as eeps:
+        print(eeps)
+
+
 if __name__ == "__main__":
-    df = DigFile('../dig/GEN3CH_4_009')
+    os.chdir('../dig')
+    candidates = DigFile.all_dig_files()
+    for filename in candidates:
+        df = DigFile(filename)
+        spike = downspike(df, plot=True)
+        ans = f"{spike:.5f} µs" if spike else "-"
+        print("{0: >.24s}  {1}".format(filename, ans))
+
     # fid = Fiducials(df)
     # print(fid.values)
     # df = DigFile('../dig/GEN3_CHANNEL1KEY001')
-    fid = Fiducials(df)
-    print(fid.values)
+    if False:
+        fid = Fiducials(df)
+        print(fid.values)
