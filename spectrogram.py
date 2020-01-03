@@ -47,7 +47,7 @@ class Spectrogram:
         .dig file to voltage before computing the spectrogram. If False,
         the raw integral values are used.
     detrend: ("linear") the background subtraction method.
-
+    complex_value: (False) do you want to maintain the phase information as well. 
     **Computed fields**
 
     time:      array of times at which the spectra are computed
@@ -111,8 +111,26 @@ class Spectrogram:
         self.frequency = None
         self.velocity = None
         self.intensity = None
+        # This will contain the intensity values if possible.
+        # Otherwise it will contain the phase or angle information.
+        # Containment determined by the value of computeMode.
+
+        # This will only get set if self.complex_value is True
+        self.orig_spec_output = None
 
         # deal with kwargs
+
+        self.computeMode = "psd"  # This stands for power spectrum density.
+        if "mode" in kwargs:
+            available = ["psd", "complex", "magnitude", "angle", "phase"]
+            desired = kwargs["mode"]
+            if desired in available:
+                self.computeMode = desired
+            else:
+                # Default to "psd", but display error to the user.
+                print("You wanted the return value of the spectrogram to be",
+                      desired, "the supported values are:", available)
+            del kwargs["mode"]
 
         try:
             if False:
@@ -263,10 +281,12 @@ class Spectrogram:
             velocity_range: Array/Tuple/List of velocities (v0, v1)
                 v1 should be greater than v0 but we will handle the other case
         Output:
-            3 arrays time, velocity, intensity
+            4 arrays time, velocity, intensity, original_spec
             time: the time values used in the measurement from t0 to t1 inclusive.
             velocity: the velocity values measured from v0 to v1 inclusive.
             intensity: the corresponding intensity values that we measured.
+            original_spec: the output of the rolling FFT that we used. Depends on
+                the value of self.computeMode
         """
         if time_range == None:
             time0, time1 = 0, len(self.time) - 1
@@ -283,8 +303,9 @@ class Spectrogram:
             vel0, vel1 = vel1, vel0
         tvals = self.time[time0:time1 + 1]
         vvals = self.velocity[vel0:vel1 + 1]
-        ivals = self.intensity[vel0:vel1, time0:time1]
-        return tvals, vvals, ivals
+        ivals = self.intensity[vel0:vel1 + 1, time0:time1 + 1]
+        ovals = self.orig_spec_output[vel0:vel1 + 1, time0:time1 + 1]
+        return tvals, vvals, ivals, ovals
 
     # Routines to archive the computed spectrogram and reload from disk
 
@@ -344,6 +365,11 @@ class Spectrogram:
         return self.intensity.max()
 
     @property
+    def min(self):
+        """The minimum intensity value"""
+        return self.intensity.min()
+
+    @property
     def v_max(self):
         return self.wavelength * 0.25 / self.data.dt
 
@@ -359,6 +385,18 @@ class Spectrogram:
             return np.power(10.0, values)
         return values
 
+    def signal_to_noise(self):
+        """
+        Give an approximate signal to noise ratio for each time slice.
+        Max/Mean
+        """
+        timeVelInten = np.transpose(self.intensity)
+        answer = np.zeros(len(self.time))
+        for ind in range(len(self.time)):
+            answer[ind] = np.max(timeVelInten[ind]) / \
+                np.mean(timeVelInten[ind])
+        return answer
+
     def plot(self, axes=None, **kwargs):
         # max_vel=6000, vmin=-200, vmax=100):
         if axes == None:
@@ -366,6 +404,9 @@ class Spectrogram:
         if 'max_vel' in kwargs:
             axes.set_ylim(top=kwargs['max_vel'])
             del kwargs['max_vel']
+        if 'min_vel' in kwargs:
+            axes.set_ylim(bot=kwargs['min_vel'])
+            del kwargs['min_vel']
 
         pcm = axes.pcolormesh(
             self.time * 1e6,

@@ -184,7 +184,6 @@ def mainTest(SpectrogramObject:Spectrogram, startTime:int, stopTime:int, signalJ
             if vStartInd != None:
                 # Compute the signal seam for assuming this is the start point.
                 seam = reconstruction(p_table, vStartInd-botVel, botVel)
-                
                 myplot.plot(time[startTime: stopTime+1], velocities[seam], 'r--', alpha = 0.4, label="Expected Start Point")
             myplot.title("Velocity as a function of time for the minimum cost seam with Minkowski" + str(order)+ " and a window size of " + str(width) + " raw")
             myplot.legend()
