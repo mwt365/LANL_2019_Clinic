@@ -1,18 +1,26 @@
-#!/usr/bin/env python3
 # coding:utf-8
+
 """
+::
+
   Author:  Peter N. Saeta --<saeta@hmc.edu>
   Purpose: To generate a sample .dig file with known parameters
   Created: 09/19/19
 """
 
-import os
 import numpy as np
 
 
 def make_dig_file(filename, tvals, vvals, dt=20e-12):
-"""Input: 	velocities vval,
-		time tvals, """
+    """
+    Create a dig file with piecewise linear segments
+
+    Inputs:
+        filename: 
+        tvals: array of times in ascending order
+        vvals: array of corresponding velocities
+        dt: time step, in seconds
+    """
     nsamples = 1 + int((tvals[-1] - tvals[0]) / dt)
     dvdt = [(vvals[n + 1] - vvals[n]) / (tvals[n + 1] - tvals[n])
             for n in range(len(tvals) - 1)]
@@ -23,7 +31,6 @@ def make_dig_file(filename, tvals, vvals, dt=20e-12):
     # the phase is a parabolic function of time.
     segments = []
     wavelength = 1550e-9  # m
-    t, nsamp = tvals[0], 0
     phi0 = 0.0
     for nsegment in range(len(tvals) - 1):
         times = np.arange(0.0, tvals[nsegment + 1] - tvals[nsegment], dt)
@@ -60,5 +67,5 @@ if __name__ == '__main__':
     make_dig_file(
         "test.dig",
         [0, 1e-5, 2e-5, 4e-5],
-        [1000, 1000, 5000, 3000]
+        [8000, 8000, 5000, 3000]
     )
