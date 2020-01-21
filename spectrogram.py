@@ -304,8 +304,8 @@ class Spectrogram:
         tvals = self.time[time0:time1 + 1]
         vvals = self.velocity[vel0:vel1 + 1]
         ivals = self.intensity[vel0:vel1 + 1, time0:time1 + 1]
-        ovals = self.orig_spec_output[vel0:vel1 + 1, time0:time1 + 1]
-        return tvals, vvals, ivals, ovals
+        # ovals = self.orig_spec_output[vel0:vel1 + 1, time0:time1 + 1]
+        return tvals, vvals, ivals,  # ovals
 
     # Routines to archive the computed spectrogram and reload from disk
 
