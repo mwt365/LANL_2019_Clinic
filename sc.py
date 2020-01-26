@@ -88,6 +88,19 @@ def find_potential_seams(two_dimensional_array, num_signals: int):
     potential_baseline_tuples = [new_first_array[i] for i in range(num_signals)]
     potential_baseline_intensities = [i[0] for i in potential_baseline_tuples]
     potential_baseline_indicies = [i[1] for i in potential_baseline_tuples]
+
+    velocity = []
+    intensity = []
+
+    for element in new_first_array:
+        velocity.append(element[1])
+        intensity.append(element[0])
+
+
+
+
+
+
     # print()
     # for row in two_dimensional_array:
     #     print(row)
@@ -95,7 +108,7 @@ def find_potential_seams(two_dimensional_array, num_signals: int):
     # print(potential_baseline_intensities)
     # print(potential_baseline_indicies)
 
-    return potential_baseline_indicies
+    return potential_baseline_indicies, velocity, intensity
 
 
 def find_seams(two_dimensional_array: list, num_signals: int, t_end:int):
@@ -207,11 +220,6 @@ def find_seam(velocity:int, time:int, two_dimensional_array:list, seam_trace:lis
         seam_trace.append((velocity,time,current_intensity))
         return seam_trace
 
-
-    # for row in two_dimensional_array:
-    #     print(row)
-    # print("velocity at time %d: %d" %(time, velocity))
-    # print("intensity: ", current_intensity)
 
     velo_above = velocity+1
     velo_below = velocity-1
@@ -392,54 +400,82 @@ if __name__ == "__main__":
     sp_nl = spctgrm.Spectrogram(filename)
 
 
-    sgram_nl = sp_nl.spectrogram_no_log(0, 50e-6)
+    sgram_nl = sp_nl.spectrogram(0, 50e-6)
 
     sp_nl = sgram_nl['spectrogram']
     time_length = len(sgram_nl['t'])
 
-    potential_baselines = find_seams(sp_nl, 10, time_length-100)
 
-    # print(potential_baselines[0])
+    # print(sp_nl)
+    # maxIntensity = sp_nl.max()
+    # print(maxIntensity)
 
-    baseline_velocity_index = potential_baselines[0][0][0]
-    # print(len(potential_baselines))
-    # baseline1_velocity_index = potential_baselines[1][0][0]
-    baseline2_velocity_index = potential_baselines[2][0][0]
-    baseline4_velocity_index = potential_baselines[7][0][0]
+    # potential_baselines = find_seams(sp_nl, 10, time_length-100)
+
+    # # print(potential_baselines[0])
+
+    # baseline_velocity_index = potential_baselines[0][0][0]
+    # # print(len(potential_baselines))
+    # # baseline1_velocity_index = potential_baselines[1][0][0]
+    # baseline2_velocity_index = potential_baselines[2][0][0]
+    # baseline4_velocity_index = potential_baselines[7][0][0]
 
 
-    baseline_intensity = potential_baselines[0][0][2]
+    # baseline_intensity = potential_baselines[0][0][2]
 
-    baseline_velocity = sgram_nl['v'][baseline_velocity_index]
-    baseline_velocity4 = sgram_nl['v'][baseline4_velocity_index]
-    baseline_velocity2 = sgram_nl['v'][baseline2_velocity_index]
+    # baseline_velocity = sgram_nl['v'][baseline_velocity_index]
+    # baseline_velocity4 = sgram_nl['v'][baseline4_velocity_index]
+    # baseline_velocity2 = sgram_nl['v'][baseline2_velocity_index]
 
-    print("baseline velocity: ", baseline_velocity)
-    print("baseline intensity: ", baseline_intensity)
+    # print("baseline velocity: ", baseline_velocity)
+    # print("baseline intensity: ", baseline_intensity)
+
+
+
+
+    potential_baseline_indicies, velocity, intensity = find_potential_seams(np.transpose(sgram_nl['spectrogram']), 10)
+
+    velocities = sgram_nl['v'][velocity]
     
-    # axes = plt.axes()
+    plt.semilogy(velocities, intensity, 'ro', markersize=2)
 
-    sgram = sp.spectrogram(0, 50e-6)
+    # plt.title('Integration of baselines for WHITE_CH3_SHOT.dig' , fontsize=25)
+    plt.xlabel('Velocity (m/s)', fontsize=20)
+    plt.ylabel('Intensity', fontsize=20)
+    plt.xticks(fontsize=16)
+    plt.yticks(fontsize=16)
 
-    fig = plt.figure()
-    ax = fig.add_subplot(1,1,1)
-
-    # cmsh = axes.pcolormesh(sgram['t'] * 1e6, sgram['v'], sgram['spectrogram'], cmap='bwr')
-    # cmsh2 = ax.pcolormesh(sgram['t'] * 1e6, sgram['v'], sgram['spectrogram'], cmap='Spectral')
-
-    # plt.gcf().colorbar(cmsh, ax=axes)
-    # axes.set_ylabel('Velocity (m/s)')
-    # axes.set_xlabel('Time ($\mu$s)')
+    plt.show()
 
 
-    # cmsh.set_clim((0,120))
-    ax.plot([0,5,10,15,20,25,30,35,40],[baseline_velocity for i in range(9)],'r-')
-    ax.plot([0,5,10,15,20,25,30,35,40],[baseline_velocity2 for i in range(9)],'r-')
-    ax.plot([0,5,10,15,20,25,30,35,40],[baseline_velocity4 for i in range(9)],'r-')
 
-    ax.set_ylim(0,10000)
 
-    # plt.show()
 
-    sp.plot(ax, sgram)
+
+    
+    # # axes = plt.axes()
+
+    # sgram = sp.spectrogram(0, 50e-6)
+
+    # fig = plt.figure()
+    # ax = fig.add_subplot(1,1,1)
+
+    # # cmsh = axes.pcolormesh(sgram['t'] * 1e6, sgram['v'], sgram['spectrogram'], cmap='bwr')
+    # # cmsh2 = ax.pcolormesh(sgram['t'] * 1e6, sgram['v'], sgram['spectrogram'], cmap='Spectral')
+
+    # # plt.gcf().colorbar(cmsh, ax=axes)
+    # # axes.set_ylabel('Velocity (m/s)')
+    # # axes.set_xlabel('Time ($\mu$s)')
+
+
+    # # cmsh.set_clim((0,120))
+    # ax.plot([0,5,10,15,20,25,30,35,40],[baseline_velocity for i in range(9)],'r-')
+    # ax.plot([0,5,10,15,20,25,30,35,40],[baseline_velocity2 for i in range(9)],'r-')
+    # ax.plot([0,5,10,15,20,25,30,35,40],[baseline_velocity4 for i in range(9)],'r-')
+
+    # ax.set_ylim(0,10000)
+
+    # # plt.show()
+
+    # sp.plot(ax, sgram)
     
