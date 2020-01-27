@@ -132,28 +132,6 @@ def baselines_by_fft(spectrogram):
         neighborhoods.append([velocities[low:high], powers[low:high]])
     return neighborhoods
 
-# def find_ave_noise(sgram):
-
-#     for i in range(0, 5):
-
-#         velo = random.randint(1, 4097)
-#         time = random.randint(1, 348)
-
-#         intensity = sgram.intensity[velo][time]
-#         print(intensity)
-
-
-def find_signal_score(sgram, time_x, velo, threshold_intensity):
-
-
-    for i in range(baseline_index, 2*baseline_index):
-        
-        score = peak_follower.PeakFollower(sgram, (time_x, i))
-
-
-
-    
-
         
 
 
@@ -188,12 +166,6 @@ if __name__ == '__main__':
         print("\n")
         # print("velocity:", max_v,"\nintensity:", max_i)
         baselines_v.append(max_v)
-
-
-
-
-
-
 
 
     actual_baselines = []

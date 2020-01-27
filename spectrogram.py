@@ -434,13 +434,13 @@ if __name__ == '__main__':
 
     sp = Spectrogram(path, 0.0, 60.0e-6, overlap_shift_factor= 1/8)
 
-    print(sp.intensity[:][14])
+    # print(sp.intensity[:][14])
 
-    tvals, vvals, ivals = sp.slice((14e-5,14e-5), None)
-    plt.plot(vvals, ivals)
-    plt.xlabel("frequency")
-    plt.ylabel("intensity")
-    plt.show()
+    # tvals, vvals, ivals = sp.slice((14e-5,14e-5), None)
+    # plt.plot(vvals, ivals)
+    # plt.xlabel("frequency")
+    # plt.ylabel("intensity")
+    # plt.show()
 
     # print(sp.intensity)
     # print(sp.intensity.shape)
