@@ -22,7 +22,7 @@ if False:
     print("This is the residual graph's adjacency list",list(R.adjacency()))
 
 
-def setUpGraph(SpectrogramObject:Spectrogram):
+def setUpGraph(SpectrogramObject:Spectrogram, foregroundPoints:list, backgroundPoints:list):
     G = nx.DiGraph()
 
     t = SpectrogramObject.time
@@ -30,19 +30,22 @@ def setUpGraph(SpectrogramObject:Spectrogram):
     Intensity = SpectrogramObject.intensity
     sigma = 30
 
+    hyperLambda = 0.5
+
     count = 0
     lent = len(t)
     lenv = len(velocity)
     maxCount = lent*lenv
 
+    foreGroundCost = foregroundLikelihood(SpectrogramObject, foregroundPoints, sigma)
+    backGroundCost = foregroundLikelihood(SpectrogramObject, backgroundPoints, sigma)
+
+
     for velInd in range(lenv):
         for timeInd in range(lent):
             u = velInd*lent + timeInd
             inten1 = Intensity[velInd][timeInd]
-            cap1 = None
-            cap2 = None
-            cap3 = None
-            cap4 = None
+            
             if velInd + 1 < len(velocity):
                 cap1 = penaltyFunction(inten1, Intensity[velInd+1][timeInd], sigma)
                 G.add_edge(u, u+lent, capacity = cap1)
@@ -55,30 +58,80 @@ def setUpGraph(SpectrogramObject:Spectrogram):
             if timeInd - 1 >= 0:
                 cap4 = penaltyFunction(inten1, Intensity[velInd][timeInd-1], sigma)
                 G.add_edge(u, u-1, capacity = cap4)
+            capacityFromS = 0
+            capacityToT = backGroundCost
+            if (timeInd, velInd) not in foregroundPoints and (timeInd, velInd) not in backgroundPoints:
+                capacityFromS = hyperLambda * Rvalue(inten1, backgroundPoints)
+                capacityToT = hyperLambda * Rvalue(inten1, foregroundPoints)
+            elif (timeInd, velInd) in foregroundPoints:
+                capacityFromS = foreGroundCost
+                capacityToT = 0
             
-            incap = np.nanmax(np.array([cap1, cap2, cap3, cap4], dtype=np.float64))
-            G.add_edge("s", u, capacity = incap)
-            G.add_edge(u, "t", capacity = incap)
+            G.add_edge("s", u, capacity = capacityFromS)            
+            G.add_edge(u, "t", capacity = capacityToT)
             count += 1
             if count%1e6 == 0:
                 print("I have completed", count, "out of", maxCount)
+
+    # for (timeInd, velInd) in foregroundPoints:
+    #     u = velInd*lent + timeInd
+    #     G.add_edge("s", u, capacity = foreGroundCost)
+
+    # for (timeInd, velInd) in backgroundPoints:
+    #     u = velInd*lent + timeInd
+    #     G.add_edge(u, "t", capacity = backGroundCost)
+
     return G
 
 def penaltyFunction(Intensity1, Intensity2, sigma):
-    return int(100*np.exp(-(np.square(Intensity1-Intensity2)/(2*np.square(sigma)))))
+    return np.exp(-(np.square(Intensity1-Intensity2)/(2*np.square(sigma))))
 
-def foregroundLikelihood(SpectrogramObject:Spectrogram, pixel:int, tLen:int):
-    velInd = pixel//tLen
-    timeInd = pixel - velInd*tLen
+def foregroundLikelihood(SpectrogramObject:Spectrogram, foregroundPoints:list, sigma:int):
+    
+    tLen = len(SpectrogramObject.time)
+    vLen = len(SpectrogramObject.velocity)
+    Intensity = SpectrogramObject.intensity
+    maxPenalty = 0
+    for (timeInd, velInd) in foregroundPoints:
+        inten1 = Intensity[velInd][timeInd]
+        if velInd + 1 < vLen:
+            cap1 = penaltyFunction(inten1, Intensity[velInd+1][timeInd], sigma)
+            maxPenalty = max(maxPenalty, cap1)
+        if velInd - 1 >= 0:
+            cap2 = penaltyFunction(inten1, Intensity[velInd-1][timeInd], sigma)
+            maxPenalty = max(maxPenalty, cap2)
+        if timeInd + 1 < tLen:
+            cap3 = penaltyFunction(inten1, Intensity[velInd][timeInd+1], sigma)
+            maxPenalty = max(maxPenalty, cap3)
+        if timeInd - 1 >= 0:
+            cap4 = penaltyFunction(inten1, Intensity[velInd][timeInd-1], sigma)
+            maxPenalty = max(maxPenalty, cap4)
+    return 1 + maxPenalty
 
-    maxValue = np.max(SpectrogramObject.intensity[velInd])
-    return SpectrogramObject.intensity[velInd][timeInd]/maxValue
+# def backgroundLikelihood(SpectrogramObject:Spectrogram, pixel:int, tLen:int):
+#     return 1 - foregroundLikelihood(SpectrogramObject, pixel, tLen)
 
-def backgroundLikelihood(SpectrogramObject:Spectrogram, pixel:int, tLen:int):
-    return 1 - foregroundLikelihood(SpectrogramObject, pixel, tLen)
 
-def segmentImage(SpectrogramObject:Spectrogram):
-    G = setUpGraph(SpectrogramObject)
+def Rvalue(pixelIntensity:float, intensityList:list):
+    """
+    Based upon this paper:
+        https://www.google.com/url?sa=t&rct=j&q=&esrc=s&source=web&cd=17&cad=rja&uact=8&ved=2ahUKEwjek92Qk6PnAhXFPn0KHZeaDf44ChAWMAZ6BAgHEAE&url=http%3A%2F%2Fyadda.icm.edu.pl%2Fyadda%2Felement%2Fbwmeta1.element.baztech-article-AGH1-0028-0094%2Fc%2FFabijanska.pdf&usg=AOvVaw0Xm9HxUAa7BUn6dqAPQ7qI
+
+    """
+    mean = np.mean(intensityList)
+
+    return 1 - (pixelIntensity - mean)/mean
+
+
+def segmentImage(SpectrogramObject:Spectrogram, foregroundPoints:list, backgroundPoints:list):
+    """
+        foregroundPoints: list of time, velocity coordinates that correspond to the signal.
+        backgroundPoints: list of time, velocity coordinates that correspond to the noise.
+
+        Output:
+            numpy array of pixels indices that are in the foreground (signal)     
+    """
+    G = setUpGraph(SpectrogramObject, foregroundPoints, backgroundPoints)
 
     cutVal, partition = minimum_cut(G, "s", "t")
 
@@ -87,24 +140,27 @@ def segmentImage(SpectrogramObject:Spectrogram):
     reach_Foreground, nonreach_Background = partition
 
     print("This is the number of Foreground States", len(reach_Foreground))
-    print("These are the states in the Foreground", list(reach_Foreground))
+    # print("These are the states in the Foreground", list(reach_Foreground))
     print("This is the number of Background States", len(nonreach_Background))
 
-    highlighted = np.zeros(SpectrogramObject.intensity.shape, dtype=bool)
-    lent = len(SpectrogramObject.time)
+    # reach_Foreground = reach_Foreground.remove("s") # Do not need the vertex s.
 
-    count = 0
-    for state in reach_Foreground:
-        if state != "s":
-            velInd = state//lent
-            timeInd = state - velInd*lent
+    print("Everyone Has the edges from s and to t, but floating capacities")
 
-            highlighted[velInd][timeInd] = 1
-            count += 1
+    return np.array(reach_Foreground)
+
+    # count = 0
+    # for state in reach_Foreground:
+    #     if state != "s":
+    #         velInd = state//lent
+    #         timeInd = state - velInd*lent
+
+    #         highlighted[velInd][timeInd] = 1
+    #         count += 1
 
     
     
-    SpectrogramObject.intensity = highlighted
-    print("This is the number of pixels that are set to 1", count)
+    # SpectrogramObject.intensity = highlighted
+    # print("This is the number of pixels that are set to 1", count)
 
-    SpectrogramObject.plot()
+    # SpectrogramObject.plot()
