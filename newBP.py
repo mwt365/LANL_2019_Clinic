@@ -42,11 +42,11 @@ if __name__ == "__main__":
     # comps, feats = 348, 512
     # n_nonzero_coefs = 17
 
-    n_components, n_features = 4097, 300
+    n_components, n_features = 4097, 50
 
 
     # samples = 348
-    samples = 1750
+    samples = 2000
 
     D = generate_dictionary(n_features, n_components)
     X = generate_sparse(n_components, samples)
@@ -65,34 +65,34 @@ if __name__ == "__main__":
     spectrogram_matrix = sgram['spectrogram']
     new_mx = spectrogram_matrix
 
-    omp = OrthogonalMatchingPursuit(n_nonzero_coefs=1000)
+    omp = OrthogonalMatchingPursuit(n_nonzero_coefs=300)
 
-    print(X.shape)
-    print(new_mx.shape)
+    # print(X.shape)
+    # print(new_mx.shape)
 
     # print(spectrogram_matrix[0].reshape(348,1))
 
     omp.fit(X, new_mx)
 
-    print(omp.get_params())
+    # print(omp.get_params())
 
     coef = omp.coef_
 
-    print(coef)
+    # print(coef)
 
-    print(type(coef.nonzero()[0]))
+    # print(type(coef.nonzero()[0]))
 
     idx_r, idx_c = coef.nonzero()
 
-    print(len(idx_c) == len(idx_r))
+    # print(len(idx_c) == len(idx_r))
 
     for i in range(len(idx_c)):
         assert(new_mx[idx_c[i]][idx_r[i]] != 0)
 
-    print(np.max(idx_c))
-    print(np.max(idx_r))
+    # print(np.max(idx_c))
+    # print(np.max(idx_r))
 
-    print((idx_c == idx_r).any())
+    # print((idx_c == idx_r).any())
 
     bp_mx = np.zeros(shape=sgram['spectrogram'].shape)
     spec2 = sgram['spectrogram']
