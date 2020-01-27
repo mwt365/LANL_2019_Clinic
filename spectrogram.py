@@ -405,24 +405,40 @@ class Spectrogram:
             axes.set_ylim(top=kwargs['max_vel'])
             del kwargs['max_vel']
         if 'min_vel' in kwargs:
-            axes.set_ylim(bot=kwargs['min_vel'])
+            axes.set_ylim(bottom=kwargs['min_vel'])
             del kwargs['min_vel']
 
         pcm = axes.pcolormesh(
             self.time * 1e6,
             self.velocity,
             self.intensity,
+            cmap='gist_yarg',
             **kwargs)
+
+        pcm.set_clim(-5,100)
 
         plt.gcf().colorbar(pcm, ax=axes)
         axes.set_ylabel('Velocity (m/s)')
         axes.set_xlabel('Time ($\mu$s)')
         title = self.data.filename.split('/')[-1]
         axes.set_title(title.replace("_", "\\_"))
+
+        plt.show()
+
         return pcm
 
 
 if __name__ == '__main__':
-    sp = Spectrogram('../dig/GEN3CH_4_009.dig', None,
-                     None, overlap_shift_factor=1 / 4)
-    print(sp)
+
+    path = "/Users/trevorwalker/Desktop/Clinic/For_Candace/newdigs/CH_2_009.dig"
+
+    sp = Spectrogram(path, 0.0, 60.0e-6, overlap_shift_factor= 1/8)
+
+    # print(sp.intensity)
+    # print(sp.intensity.shape)
+
+    print(sp.max)
+
+    plot = sp.plot(max_vel=10000, min_vel=0)
+
+    
