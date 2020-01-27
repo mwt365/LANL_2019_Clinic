@@ -304,8 +304,8 @@ class Spectrogram:
         tvals = self.time[time0:time1 + 1]
         vvals = self.velocity[vel0:vel1 + 1]
         ivals = self.intensity[vel0:vel1 + 1, time0:time1 + 1]
-        ovals = self.orig_spec_output[vel0:vel1 + 1, time0:time1 + 1]
-        return tvals, vvals, ivals, ovals
+        # ovals = self.orig_spec_output[vel0:vel1 + 1, time0:time1 + 1]
+        return tvals, vvals, ivals#, ovals
 
     # Routines to archive the computed spectrogram and reload from disk
 
@@ -434,10 +434,18 @@ if __name__ == '__main__':
 
     sp = Spectrogram(path, 0.0, 60.0e-6, overlap_shift_factor= 1/8)
 
+    print(sp.intensity[:][14])
+
+    tvals, vvals, ivals = sp.slice((14e-5,14e-5), None)
+    plt.plot(vvals, ivals)
+    plt.xlabel("frequency")
+    plt.ylabel("intensity")
+    plt.show()
+
     # print(sp.intensity)
     # print(sp.intensity.shape)
 
-    print(sp.max)
+    # print(sp.max)
 
     plot = sp.plot(max_vel=10000, min_vel=0)
 

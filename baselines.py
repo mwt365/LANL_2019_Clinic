@@ -13,6 +13,7 @@ from spectrogram import Spectrogram
 from scipy.signal import find_peaks
 from scipy.fftpack import fft
 import random
+import peak_follower
 
 
 def baselines_by_squash(spectrogram: Spectrogram):
@@ -142,15 +143,16 @@ def baselines_by_fft(spectrogram):
 #         print(intensity)
 
 
-def find_start(sgram, time_x, velo, threshold_intensity):
+def find_signal_score(sgram, time_x, velo, threshold_intensity):
 
-    interesting_velos = []
 
-    for i in range(baseline_index, 4097):
-        if sgram.intensity[i][time_x] > threshold_intensity:
-            interesting_velos.append(i)
+    for i in range(baseline_index, 2*baseline_index):
+        
+        score = peak_follower.PeakFollower(sgram, (time_x, i))
+
+
+
     
-    return interesting_velos
 
         
 
@@ -187,6 +189,13 @@ if __name__ == '__main__':
         # print("velocity:", max_v,"\nintensity:", max_i)
         baselines_v.append(max_v)
 
+
+
+
+
+
+
+
     actual_baselines = []
 
     for baseline in baselines_v:
@@ -213,6 +222,8 @@ if __name__ == '__main__':
             threshold_intensity = threshold * intensity_of_baseline
 
             potential_starting_velos = find_start(sgram, ans, baseline_index, threshold_intensity)
+
+
 
             print( potential_starting_velos ) 
             print( len(sgram.signal_to_noise()) )
