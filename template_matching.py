@@ -17,13 +17,13 @@ class Template:
         self.height = height if height != None else 0
         self.values = values if values != None else []
         
+        
 
 
 start_pattern = [
             [-1, -1, -1, -1],
             [-1, -1, 5,  5 ],
             [-1, -1, -1, -1]]
-
 
 start_pattern2 = [
             [-1, -1, -1, 3],
@@ -71,7 +71,7 @@ def find_potential_baselines(sgram):
     new_baselines.append(baselines[1])
 
     # for baseline in baselines:
-    #     print("is there a baseline at: ", baseline, "?", end=" ")
+    #     print("Is there a baseline at: ", baseline, "?", end=" ")
     #     ans = input("(y/n)\n")
     #     if ans == "y":
     #         new_baselines.append(baseline)
@@ -86,19 +86,19 @@ def find_start_time(sgram, baselines):
     time_index = None
 
     for baseline in baselines:
-        ans = input("where does the start begin? (microseconds)")
+        ans = input("Where does the start begin? (in microseconds)\n")
         try:
             start_time = int(ans) * 10**-6
             # baseline_index = sgram._velocity_to_index(baseline)
             time_index = sgram._time_to_index(start_time)
         except:
-            print("input can not be converted to integer")
+            print("Input can not be converted to integer")
             return None
 
     return time_index
-    
 
-def find_regions(sgram, velo_bounds=None, time_bounds=None):
+
+def find_regions(sgram, template, velo_bounds=None, time_bounds=None):
 
     if velo_bounds is not None:
         assert isinstance(velo_bounds, tuple)
@@ -118,16 +118,13 @@ def find_regions(sgram, velo_bounds=None, time_bounds=None):
         lower_time = sgram.time[0]
 
     baselines = find_potential_baselines(sgram)
-
     time_index = find_start_time(sgram, baselines)
 
-    width = 4
-    height = 3
+    if time_index is None:
+        return
 
     upper_velo_index = sgram._velocity_to_index(upper_velo)
     lower_velo_index = sgram._velocity_to_index(lower_velo)
-
-    newTemplate = Template(width, height, start_pattern3)
 
     time_max = sgram.intensity.shape[1]
     velocity_max = sgram.intensity.shape[0]
@@ -139,12 +136,12 @@ def find_regions(sgram, velo_bounds=None, time_bounds=None):
     # print("upper: ",upper_velo_index)
     # print("lower: ",lower_velo_index)
     # print(sgram.intensity)
-    # print(newTemplate.values)
+    # print(template.values)
     # print(time_index)
 
     for velocity_index in range(upper_velo_index, lower_velo_index, -1):
 
-        score = calculate_score(velocity_index, newTemplate, sgram.intensity, time_index)
+        score = calculate_score(velocity_index, template, sgram.intensity, time_index)
         scores[velocity_index] = score
 
     # print(scores)
@@ -176,14 +173,14 @@ if __name__ == '__main__':
 
     sgram = Spectrogram(df, 0.0, 60.0e-6, form='db')
 
-    # lower_bound_t = input("enter a time to the left of the jumpoff point: \n")
+    # lower_bound_t = input("Enter a time to the left of the jumpoff point: \n")
     # lower_bound_t = int(lower_bound_t) * 10**-6
-    # upper_bound_t = input("enter a time to the right of the jumpoff point: \n")
+    # upper_bound_t = input("Enter a time to the right of the jumpoff point: \n")
     # upper_bound_t = int(upper_bound_t) * 10**-6
 
-    # upper_bound_v = input("enter a velocity above the jumpoff point: \n")
+    # upper_bound_v = input("Enter a velocity above the jumpoff point: \n")
     # upper_bound_v = int(upper_bound_v)
-    # lower_bound_v = input("enter a velocity below the jumpoff point: \n")
+    # lower_bound_v = input("Enter a velocity below the jumpoff point: \n")
     # lower_bound_v = int(lower_bound_v)
 
 
@@ -196,8 +193,12 @@ if __name__ == '__main__':
     time_bounds = (lower_bound_t, upper_bound_t)
     velo_bounds = (lower_bound_v, upper_bound_v)
 
+    width = 4
+    height = 3
+    template = Template(width, height, start_pattern3)
 
-    indicies = find_regions(sgram, velo_bounds, time_bounds)
+
+    indicies = find_regions(sgram, template, velo_bounds, time_bounds)
 
     find_potenital_start_points(sgram, indicies)
 
