@@ -9,10 +9,12 @@
   Created: 09/26/19
 """
 
+import os
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 import ipywidgets as widgets
+
 from matplotlib import widgets as mwidgets
 from IPython.display import display
 
@@ -711,6 +713,7 @@ class SpectrogramWidget:
     def gauss_out(self, n: int):
         if n >= len(self.peak_followers):
             return 0
+        WRITEOUT, fnum = False, 0
         pf = self.peak_followers[n]
         times, centers, widths, amps = [], [], [], []
         vind = pf.frame['velocity_index_spans'].to_numpy()
@@ -728,6 +731,16 @@ class SpectrogramWidget:
                 centers.append(gus.center)
                 widths.append(gus.width)
                 amps.append(gus.amplitude)
+                if WRITEOUT:
+                    fname = f"{os.path.splitext(self.digfile.filename)[0]}_{fnum:04d}.csv"
+                    gus.write_csv(fname)
+                    fnum += 1
+        if WRITEOUT:
+            # write out the times, too
+            fname = f"{os.path.splitext(self.digfile.filename)[0]}_t.csv"
+            v = np.asarray(times)
+            np.savetxt(v, fname)
+
         fig, axes = plt.subplots(nrows=1, ncols=3, squeeze=True)
         ax1, ax2, ax3 = axes
         ax1.errorbar(times, centers, fmt='b-', yerr=widths)

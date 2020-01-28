@@ -8,6 +8,7 @@
    Created: 11/17/19
 """
 import numpy as np
+import pandas as pd  # for exporting fit data
 from scipy.optimize import curve_fit, OptimizeWarning
 from moving_average import moving_average
 
@@ -149,6 +150,16 @@ class Gaussian:
             k -= 1
         width = (self.x[n + j] - self.x[n - k]) * 0.6
         self.p0[2] = width if width > 0 else self.x[1] - self.x[0]
+
+    def write_csv(self, filename: str):
+        """Write out a CSV file of the data for this gaussian"""
+        df = pd.DataFrame(
+            dict(
+                x=self.x,
+                y=self.y
+            )
+        )
+        df.to_csv(filename)
 
 
 if __name__ == '__main__':
