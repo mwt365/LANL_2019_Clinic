@@ -16,7 +16,7 @@ class Template:
         self.width = width if width != None else 0
         self.height = height if height != None else 0
         self.values = values if values != None else []
-        
+
         
 
 
@@ -36,9 +36,10 @@ start_pattern3 = [
             [-2, -1, -1,-1]]
 
 
+
 def calculate_score(index, template, intensities, time_index):
 
-    template_sum = 0
+    template_sum = 0        
 
     for values in template.values:
 
@@ -47,6 +48,10 @@ def calculate_score(index, template, intensities, time_index):
             template_sum += value * intensities[index][time_index+i]
 
     return template_sum
+
+
+
+
 
 
 def find_potential_baselines(sgram):
@@ -129,8 +134,6 @@ def find_regions(sgram, template, velo_bounds=None, time_bounds=None):
     time_max = sgram.intensity.shape[1]
     velocity_max = sgram.intensity.shape[0]
 
-    scores = {}
-
     # print(time_max)
     # print(velocity_max)
     # print("upper: ",upper_velo_index)
@@ -139,12 +142,37 @@ def find_regions(sgram, template, velo_bounds=None, time_bounds=None):
     # print(template.values)
     # print(time_index)
 
-    for velocity_index in range(upper_velo_index, lower_velo_index, -1):
+    all_scores = {}
 
-        score = calculate_score(velocity_index, template, sgram.intensity, time_index)
-        scores[velocity_index] = score
+    max_time = sgram.intensities.shape[1]
+
+    width = template.width
+    start_index = index - (2*width)
+    end_index = index + (2*width)
+
+    if start_index < 0:
+        start_index = 0
+        end_index = width*4
+    if end_index+width > max_time
+        end_index = max_time-width-1
+
+    for time_index in range(start_index, end_index, 1):
+
+
+        for velocity_index in range(upper_velo_index, lower_velo_index, -1):
+
+            score = calculate_score(velocity_index, template, sgram.intensity, time_index)
+            scores[velocity_index] = score
+        
+        all_scores[time_index] = {k: v for k, v in sorted(scores.items(), key=lambda item: item[1])}
 
     # print(scores)
+
+    # next steps....
+    # check and see if all scores dictionary stores the sorted scores by time index and velo index.
+    # then try to create a new list of the sorted total dictionary, storing time index, score, and velo as tuple. 
+    # compare coordinates on spectrogram and verify. 
+    # debug the tailing code after the data structures change.
 
     sorted_scores = {k: v for k, v in sorted(scores.items(), key=lambda item: item[1])}
     indicies = list(sorted_scores.keys())
