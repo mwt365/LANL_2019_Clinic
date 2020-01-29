@@ -6,6 +6,26 @@ import baselines as bls
 
 
 class Template:
+    """
+    Constructor for Template Objects.
+
+    Inputs:
+      -  width: the width of a template
+      -  height: the height of a template
+      -  values: the 2-dimensional array of weights for the template
+
+    Outputs:
+      -  template object: This will be used to calculate a score for the
+                            region it is placed on in the spectrogram.
+
+    Observations:
+        Using multiple templates for a combined score has proven to work 
+        marginally better than a singular template. The template values
+        are multiplied by their coresponding intensity values in the spectrogram,
+        and then summed to get a total score for that region. Some templates have
+        been pre-made below.
+        
+    """
 
     def __init__(self,
                  width=None,
@@ -50,7 +70,27 @@ start_pattern5 = [
 
 
 
-def calculate_score(index, template, intensities, time_index):
+def calculate_score(velo_index, template, intensities, time_index):
+    """
+    Returns the score for the template on a certain region in the
+    spectrogram. The score is the sum of all products of the template 
+    values and their corresponding intensity values. 
+
+    Inputs:
+      -  velo_index: the velocity index of the spectrogram that the template
+                    will start at when computing the sum of all products. 
+      -  template: a template object with values, a width, and a height. 
+      -  intensities: a 2 dimensional array of values that are produced by a 
+                    rolling fast fourier transform of voltage data. See
+                    Spectrogram.py for more details. 
+      - time_index: the time offset specified by the user to index into the 
+                    2 dimensional array of intensities. 
+
+    Outputs:
+      -  template_sum: the sum of all inner products between intensities and 
+                    template values. 
+
+    """
 
     template_sum = 0        
 
@@ -58,13 +98,28 @@ def calculate_score(index, template, intensities, time_index):
 
         for i, value in enumerate(values):
 
-            template_sum += value * intensities[index][time_index+i]
+            template_sum += value * intensities[velo_index][time_index+i]
 
     return template_sum
 
 
 
 def find_potential_baselines(sgram):
+    """
+    Returns a list of velocity values that correspond to the start of 
+    a potential baseline in the spectrogram. The user will be asked to 
+    verify that the baseline found is accurate, and indeed a baseline. 
+
+    Inputs:
+      -  sgram: the spectrogram object. It has time values, velocities, and 
+                a 2 dimensional array of intensities. See spectrogram.py for
+                more details.
+
+    Outputs:
+      -  new_baselines: a list of velocity values that correspond to the start of 
+                a potential baseline in the input spectrogram. 
+
+    """
 
     baselines = []
     hoods = bls.baselines_by_fft(sgram)
@@ -97,29 +152,58 @@ def find_potential_baselines(sgram):
 
 
 
-def find_start_time(sgram, baselines):
+def find_start_time(sgram):
+    """
+    Returns a potential jump off time for each baseline after 
+    prompting the user for that input. 
+
+    Inputs:
+      -  sgram: the spectrogram object. It has time values, velocities, and 
+                a 2 dimensional array of intensities. See spectrogram.py for
+                more details.
+
+    Outputs:
+      -  time_index: the start time index that can be used to find actual 
+                times in the spectrogram.time array. 
+
+    """
 
     time_index = None
+    # start_time = 12 * 10**-6
+    # time_index = sgram._time_to_index(start_time)
 
-    for baseline in baselines:
-
-        # start_time = 12 * 10**-6
-        # time_index = sgram._time_to_index(start_time)
-
-        ans = input("Where does the start begin? (in microseconds)\n")
-        try:
-            start_time = int(ans) * 10**-6
-            # baseline_index = sgram._velocity_to_index(baseline)
-            time_index = sgram._time_to_index(start_time)
-        except:
-            print("Input can not be converted to integer")
-            return None
+    ans = input("Where does the start begin? (in microseconds)\n")
+    try:
+        start_time = int(ans) * 10**-6
+        # baseline_index = sgram._velocity_to_index(baseline)
+        time_index = sgram._time_to_index(start_time)
+    except:
+        print("Input can not be converted to integer")
+        return None
 
     return time_index
 
 
 
 def find_regions(sgram, templates, velo_bounds=None, time_bounds=None):
+    """
+    Returns a dictionary of dictionaries. The outermost dictionary keys are 
+    time values. Those time values each have they're own dictionaries, with 
+    velocity keys corresponding to the score calculated with that key's velocity
+    as the starting position for each of the templates.
+
+    Inputs:
+      -  sgram: the spectrogram object. It has time values, velocities, and 
+                a 2 dimensional array of intensities. See spectrogram.py for
+                more details.
+      - templates: a list of template objects.
+      - velo bounds: will keep the algorithm from searching outside of certain velocity ranges
+      - time bounds: will keep the algorithm from searching outside of certain time ranges
+
+    Outputs:
+      -  all_scoures: a dictionary of dictionaries. Which contain the scores from the inputed 
+                    templates and spectrogram.intensity matrix.  
+    """
 
     if velo_bounds is not None:
         assert isinstance(velo_bounds, tuple)
@@ -139,7 +223,7 @@ def find_regions(sgram, templates, velo_bounds=None, time_bounds=None):
         lower_time = sgram.time[0]
 
     baselines = find_potential_baselines(sgram)
-    time_index = find_start_time(sgram, baselines)
+    time_index = find_start_time(sgram)
 
     if time_index is None:
         return
@@ -198,6 +282,21 @@ def find_regions(sgram, templates, velo_bounds=None, time_bounds=None):
 
 
 def find_potenital_start_points(sgram, all_scores):
+    """
+    Returns a list of interesting coordinates in the spectrogram
+    that can correspond to potential jumpoff points. These 
+    points are likely near the actual starting 
+    jumpoff point. 
+
+    Inputs:
+      -  sgram: the spectrogram object. It has time values, velocities, and 
+                a 2 dimensional array of intensities. See spectrogram.py for
+                more details.
+      - all_scores: a dictionary of dictionaries.
+
+    Outputs:
+      -  interesting_points: a list of (time, velocity) tuples.  
+    """
 
     temp = []
 
@@ -237,6 +336,14 @@ def find_potenital_start_points(sgram, all_scores):
 
 
 def get_bounds_from_user():
+    """
+    Prompts that user for bounds on velocity and time to make
+    searching easier for the algorithms (not to mention faster).
+
+    Outputs:
+      -  time_bounds: a tuple of time values.  
+      -  velo_bounds: a tuple of velocity values. 
+    """
 
     lower_bound_t = input("Enter a time to the left of the jumpoff point: \n")
     lower_bound_t = int(lower_bound_t) * 10**-6
