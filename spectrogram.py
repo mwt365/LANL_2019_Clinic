@@ -417,8 +417,8 @@ class Spectrogram:
 
         pcm.set_clim(-5,100)
 
-        plt.ylim(1500, 3500)
-        plt.xlim(8, 16)
+        plt.ylim(1200, 3700)
+        plt.xlim(5, 25)
 
         plt.gcf().colorbar(pcm, ax=axes)
         axes.set_ylabel('Velocity (m/s)')
@@ -435,7 +435,8 @@ if __name__ == '__main__':
 
     path = "/Users/trevorwalker/Desktop/Clinic/For_Candace/newdigs/CH_2_009.dig"
 
-    sp = Spectrogram(path, 0.0, 60.0e-6, overlap_shift_factor= 1/8)
+    sp = Spectrogram(path, 0.0, 60.0e-6, overlap_shift_factor= 1/8, form='power')
+    sgram = Spectrogram(path, 0.0, 60.0e-6, overlap_shift_factor= 1/8, form='db')
 
     # print(sp.intensity[:][14])
 
@@ -470,7 +471,7 @@ if __name__ == '__main__':
 
     print(interesting_points)
 
-    plot = sp.plot(max_vel=10000, min_vel=0)
+    plot = sgram.plot(max_vel=10000, min_vel=0)
 
     for pair in interesting_points:
         time, velo = pair

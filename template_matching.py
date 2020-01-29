@@ -10,6 +10,7 @@
 """
 
 import numpy as np
+import pandas as pd
 from spectrogram import Spectrogram
 import peak_follower
 import baselines as bls
@@ -66,7 +67,7 @@ start_pattern2 = [
 start_pattern3 = [
             [-1, -1, -1, 3],
             [-1, -1, 3,  3],
-            [-1, -1, -1, 3]]
+            [-1, -1, -1, -1]]
 
 start_pattern4 = [
             [-3, -1, 1, 2],
@@ -77,6 +78,8 @@ start_pattern5 = [
             [-1, 1, 1, 2],
             [-1, -1, 1, 1],
             [-3, -1, -1, 1]]
+
+
 
 
 
@@ -130,6 +133,11 @@ def find_potential_baselines(sgram):
                 a potential baseline in the input spectrogram. 
 
     """
+    #TODO replace the current baseline with baselines_by_squash
+    #TODO use it with peak follower
+    #TODO expand templates and normalization
+    #TODO dot product between one dimensional vectors using .flatten
+    #TODO expand to cover crossings and other phenomena
 
     baselines = []
     hoods = bls.baselines_by_fft(sgram)

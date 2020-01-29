@@ -9,6 +9,7 @@
 """
 
 import numpy as np
+import pandas as pd
 from spectrogram import Spectrogram
 from scipy.signal import find_peaks
 from scipy.fftpack import fft
@@ -149,57 +150,67 @@ if __name__ == '__main__':
     baselines_v = []
 
     sgram = Spectrogram(df, 0.0, 60.0e-6, form='db')
-    hoods = baselines_by_fft(sgram)
+    # hoods = baselines_by_fft(sgram)
 
-    print(sgram.v_max)
 
-    for n, h in enumerate(hoods):
-        max_v = 0
-        max_i = 0
-        print(f"Peak {n}\nVelocity{n}\tIntensity{n}")
-        v, i = h
-        for j in range(len(v)):
-            print(f"{v[j]:.4f}\t{i[j]:.4f}")
-            if i[j] > max_i:
-                max_i = i[j]
-                max_v = v[j]
+    peaks, dvs, heights = baselines_by_squash(sgram) 
+
+
+
+    df = pd.DataFrame(dict(peaks=peaks, heights=heights))
+
+    print(df)
+
+
+    # print(sgram.v_max)
+
+    # for n, h in enumerate(hoods):
+    #     max_v = 0
+    #     max_i = 0
+    #     print(f"Peak {n}\nVelocity{n}\tIntensity{n}")
+    #     v, i = h
+    #     for j in range(len(v)):
+    #         print(f"{v[j]:.4f}\t{i[j]:.4f}")
+    #         if i[j] > max_i:
+    #             max_i = i[j]
+    #             max_v = v[j]
                 
-        print("\n")
-        # print("velocity:", max_v,"\nintensity:", max_i)
-        baselines_v.append(max_v)
+    #     print("\n")
+    #     # print("velocity:", max_v,"\nintensity:", max_i)
+    #     baselines_v.append(max_v)
 
 
-    actual_baselines = []
+    # actual_baselines = []
 
-    for baseline in baselines_v:
-        print("is there a baseline at: ", baseline, "?", end=" ")
-        ans = input("(y/n)\n")
-        if ans == "y":
-            actual_baselines.append(baseline)
-        else:
-            continue
+    # for baseline in baselines_v:
+    #     print("is there a baseline at: ", baseline, "?", end=" ")
+    #     ans = input("(y/n)\n")
+    #     if ans == "y":
+    #         actual_baselines.append(baseline)
+    #     else:
+    #         continue
 
-    for baseline in actual_baselines:
-        ans = input("where does the start begin? (microseconds)")
-        try: 
-            ans = int(ans)
-        except:
-            print("input can not be converted to integer")
-            break
+    # for baseline in actual_baselines:
+    #     ans = input("where does the start begin? (microseconds)")
+    #     try: 
+    #         ans = int(ans)
+    #     except:
+    #         print("input can not be converted to integer")
+    #         break
 
-        if (ans > 0) and (ans < sgram.v_max):
-            baseline_index = sgram._velocity_to_index(baseline)
+    #     if (ans > 0) and (ans < sgram.v_max):
+    #         baseline_index = sgram._velocity_to_index(baseline)
 
-            intensity_of_baseline = sgram.intensity[baseline_index][ans]
-            threshold = .90
-            threshold_intensity = threshold * intensity_of_baseline
+    #         intensity_of_baseline = sgram.intensity[baseline_index][ans]
+    #         threshold = .90
+    #         threshold_intensity = threshold * intensity_of_baseline
 
-            potential_starting_velos = find_start(sgram, ans, baseline_index, threshold_intensity)
+    #         potential_starting_velos = find_start(sgram, ans, baseline_index, threshold_intensity)
 
 
 
-            print( potential_starting_velos ) 
-            print( len(sgram.signal_to_noise()) )
+    #         print( potential_starting_velos ) 
+    #         print( len(sgram.signal_to_noise()) )
 
     # print(baselines_v)
 
