@@ -18,23 +18,25 @@ class Template:
         self.values = values if values != None else []
 
 
-        
-
-
 start_pattern = [
             [-1, -1, -1, -1],
             [-1, -1, 5,  5 ],
             [-1, -1, -1, -1]]
 
 start_pattern2 = [
-            [-1, -1, -1, 3],
-            [-1, -1, 3,  3],
+            [-1, -1, -1, 4],
+            [-1, -1, 4,  4],
             [-1, -1, -1,-1]]
 
 start_pattern3 = [
-            [-2, -1, -1, 3],
-            [-2, -1, 3,  3],
-            [-2, -1, -1,-1]]
+            [-1, -1, -1, 3],
+            [-1, -1, 3,  3],
+            [-1, -1, -1, 3]]
+
+start_pattern4 = [
+            [-3, -2, -1, 2],
+            [-3, -1, 2,  3],
+            [-3, -2, -1, 2]]
 
 
 
@@ -71,15 +73,15 @@ def find_potential_baselines(sgram):
 
     new_baselines = []
 
-    new_baselines.append(baselines[1])
+    # new_baselines.append(baselines[1])
 
-    # for baseline in baselines:
-    #     print("Is there a baseline at: ", baseline, "?", end=" ")
-    #     ans = input("(y/n)\n")
-    #     if ans == "y":
-    #         new_baselines.append(baseline)
-    #     else:
-    #         continue
+    for baseline in baselines:
+        print("Is there a baseline at: ", baseline, "?", end=" ")
+        ans = input("(y/n)\n")
+        if ans == "y":
+            new_baselines.append(baseline)
+        else:
+            continue
 
     return new_baselines
 
@@ -90,6 +92,10 @@ def find_start_time(sgram, baselines):
     time_index = None
 
     for baseline in baselines:
+
+        # start_time = 12 * 10**-6
+        # time_index = sgram._time_to_index(start_time)
+
         ans = input("Where does the start begin? (in microseconds)\n")
         try:
             start_time = int(ans) * 10**-6
@@ -103,7 +109,7 @@ def find_start_time(sgram, baselines):
 
 
 
-def find_regions(sgram, template, velo_bounds=None, time_bounds=None):
+def find_regions(sgram, templates, velo_bounds=None, time_bounds=None):
 
     if velo_bounds is not None:
         assert isinstance(velo_bounds, tuple)
@@ -144,9 +150,14 @@ def find_regions(sgram, template, velo_bounds=None, time_bounds=None):
 
     all_scores = {}
 
+
     max_time = sgram.intensity.shape[1]
 
-    width = template.width
+    if len(templates) > 1:
+        width = templates[0].width
+    else:
+        width = templates.width
+
     start_index = time_index - (2*width)
     end_index = time_index + (2*width)
 
@@ -162,7 +173,12 @@ def find_regions(sgram, template, velo_bounds=None, time_bounds=None):
 
         for velocity_index in range(upper_velo_index, lower_velo_index, -1):
 
-            score = calculate_score(velocity_index, template, sgram.intensity, i)
+            score = 0
+
+            for template in templates:
+
+                score += calculate_score(velocity_index, template, sgram.intensity, i)
+            
             scores[velocity_index] = score
         
         all_scores[i] = {k: v for k, v in sorted(scores.items(), key=lambda item: item[1])}
@@ -196,7 +212,7 @@ def find_potenital_start_points(sgram, all_scores):
 
     interesting_points = []
 
-    for i in range(10):
+    for i in range(30):
 
         tup, velo, score = final[i]
         t, v = tup
@@ -223,21 +239,21 @@ if __name__ == '__main__':
 
     sgram = Spectrogram(df, 0.0, 60.0e-6, form='db')
 
-    # lower_bound_t = input("Enter a time to the left of the jumpoff point: \n")
-    # lower_bound_t = int(lower_bound_t) * 10**-6
-    # upper_bound_t = input("Enter a time to the right of the jumpoff point: \n")
-    # upper_bound_t = int(upper_bound_t) * 10**-6
+    lower_bound_t = input("Enter a time to the left of the jumpoff point: \n")
+    lower_bound_t = int(lower_bound_t) * 10**-6
+    upper_bound_t = input("Enter a time to the right of the jumpoff point: \n")
+    upper_bound_t = int(upper_bound_t) * 10**-6
 
-    # upper_bound_v = input("Enter a velocity above the jumpoff point: \n")
-    # upper_bound_v = int(upper_bound_v)
-    # lower_bound_v = input("Enter a velocity below the jumpoff point: \n")
-    # lower_bound_v = int(lower_bound_v)
+    upper_bound_v = input("Enter a velocity above the jumpoff point: \n")
+    upper_bound_v = int(upper_bound_v)
+    lower_bound_v = input("Enter a velocity below the jumpoff point: \n")
+    lower_bound_v = int(lower_bound_v)
 
 
-    lower_bound_t = 10 * 10**-6
-    upper_bound_t = 14 * 10**-6
-    upper_bound_v = 3700
-    lower_bound_v = 2000
+    # lower_bound_t = 10 * 10**-6
+    # upper_bound_t = 14 * 10**-6
+    # upper_bound_v = 3700
+    # lower_bound_v = 2000
 
 
     time_bounds = (lower_bound_t, upper_bound_t)
@@ -245,13 +261,37 @@ if __name__ == '__main__':
 
     width = 4
     height = 3
-    template = Template(width, height, start_pattern3)
+
+    template = Template(width, height, start_pattern)
+    template2 = Template(width, height, start_pattern2)
+    template3 = Template(width, height, start_pattern3)
+    template4 = Template(width, height, start_pattern4)
 
 
-    scores = find_regions(sgram, template, velo_bounds, time_bounds)
+    templates = [template, template2, template3, template4]
+
+
+
+    scores = find_regions(sgram, templates, velo_bounds, time_bounds)
 
     interesting_points = find_potenital_start_points(sgram, scores)
 
-    print(interesting_points)
+    # print(interesting_points, '\n')
 
+
+    total_time = 0
+    total_velo = 0
+
+    for i in interesting_points:
+
+        time, velo = i
+
+        total_time += time
+        total_velo += velo
+
+    average_time = total_time / len(interesting_points)
+    average_velo = total_velo / len(interesting_points)
+
+    print(average_time)
+    # print(average_velo)
 
