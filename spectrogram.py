@@ -417,18 +417,21 @@ class Spectrogram:
 
         pcm.set_clim(-5,100)
 
+        plt.ylim(1500, 3500)
+        plt.xlim(10, 20)
+
         plt.gcf().colorbar(pcm, ax=axes)
         axes.set_ylabel('Velocity (m/s)')
         axes.set_xlabel('Time ($\mu$s)')
         title = self.data.filename.split('/')[-1]
         axes.set_title(title.replace("_", "\\_"))
 
-        plt.show()
-
         return pcm
 
 
 if __name__ == '__main__':
+    import template_matching as tm
+    import baselines
 
     path = "/Users/trevorwalker/Desktop/Clinic/For_Candace/newdigs/CH_2_009.dig"
 
@@ -447,6 +450,37 @@ if __name__ == '__main__':
 
     # print(sp.max)
 
+
+    time_bounds, velo_bounds = tm.get_bounds_from_user()
+
+
+    template = tm.Template(values=tm.start_pattern)
+    template2 = tm.Template(values=tm.start_pattern2)
+    template3 = tm.Template(values=tm.start_pattern3)
+    template4 = tm.Template(values=tm.start_pattern4)
+
+
+    templates = [template, template2, template3, template4]
+
+
+    scores = tm.find_regions(sp, templates, velo_bounds, time_bounds)
+
+    interesting_points = tm.find_potenital_start_points(sp, scores)
+
+    print(interesting_points)
+
     plot = sp.plot(max_vel=10000, min_vel=0)
 
-    
+    for pair in interesting_points:
+        time, velo = pair
+        y = velo
+        x = time * 10**6
+        # y = sp._velocity_to_index(velo)
+        # x = sp._time_to_index(time)
+
+        plt.plot(x, y, 'ro', markersize=1)
+
+    plt.show()
+
+
+

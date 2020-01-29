@@ -69,7 +69,7 @@ def baselines_by_squash(spectrogram: Spectrogram):
     return peaks, np.ones(len(peaks)) * dv, heights
 
 
-def baselines_by_fft(spectrogram):
+def baselines_by_fft(sgram):
     """
     Return a list of baseline velocities and their uncertainties.
 
@@ -88,16 +88,17 @@ def baselines_by_fft(spectrogram):
         isolated time. It might be better to chop the range into several
         intervals and insist on a significant peak in each.
     """
+    # print(type(sgram))
+    # assert isinstance(sgram, Spectrogram)
 
-    assert isinstance(spectrogram, Spectrogram)
     # Perform a single Fourier transform of the voltage data in the range
     # corresponding to this spectrogram, rounded down to the nearest power
     # of 2 (we could also zero pad up to the next higher power of two).
-    first_point, last_point = spectrogram.data._points(None, None)
+    first_point, last_point = sgram.data._points(None, None)
     nPoints = last_point - first_point + 1
     octaves = np.log2(nPoints)  # how many octaves are spanned
     num_points = int(2 ** np.floor(octaves))
-    vals = spectrogram.data.values(None, num_points)
+    vals = sgram.data.values(None, num_points)
     # Now compute the power spectrum of these points
     # At present, we aren't worrying about a window function, assuming that
     # the noise spread across all frequencies from abrupt shifts will not
@@ -105,8 +106,8 @@ def baselines_by_fft(spectrogram):
     cspec = fft(vals)[0:1 + num_points // 2]
     powers = np.power(np.abs(cspec), 2)
 
-    velocities = np.linspace(0.0, 0.25 / spectrogram.data.dt,
-                             len(cspec)) * spectrogram.wavelength
+    velocities = np.linspace(0.0, 0.25 / sgram.data.dt,
+                             len(cspec)) * sgram.wavelength
     # At this point, powers vs velocities should show some very
     # narrow spikes. Let's normalize the array of powers
     peak_power = powers.max()
@@ -132,7 +133,7 @@ def baselines_by_fft(spectrogram):
         neighborhoods.append([velocities[low:high], powers[low:high]])
     return neighborhoods
 
-        
+
 
 
 if __name__ == '__main__':

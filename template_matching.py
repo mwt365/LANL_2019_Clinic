@@ -13,9 +13,14 @@ class Template:
                  values=None
                  ):
 
-        self.width = width if width != None else 0
-        self.height = height if height != None else 0
-        self.values = values if values != None else []
+        if values != None:
+            self.values = values
+            self.width = len(values[0])
+            self.height = len(values)
+        else:
+            self.width = width if width != None else 0
+            self.height = height if height != None else 0
+            self.values = None
 
 
 start_pattern = [
@@ -212,7 +217,7 @@ def find_potenital_start_points(sgram, all_scores):
 
     interesting_points = []
 
-    for i in range(30):
+    for i in range(10):
 
         tup, velo, score = final[i]
         t, v = tup
@@ -226,18 +231,7 @@ def find_potenital_start_points(sgram, all_scores):
     return interesting_points
 
 
-
-if __name__ == '__main__':
-    import os
-    from digfile import DigFile
-
-    path = "/Users/trevorwalker/Desktop/Clinic/For_Candace/newdigs"
-    os.chdir(path)
-    df = DigFile('CH_2_009.dig')
-
-    baselines_v = []
-
-    sgram = Spectrogram(df, 0.0, 60.0e-6, form='db')
+def get_bounds_from_user():
 
     lower_bound_t = input("Enter a time to the left of the jumpoff point: \n")
     lower_bound_t = int(lower_bound_t) * 10**-6
@@ -249,7 +243,6 @@ if __name__ == '__main__':
     lower_bound_v = input("Enter a velocity below the jumpoff point: \n")
     lower_bound_v = int(lower_bound_v)
 
-
     # lower_bound_t = 10 * 10**-6
     # upper_bound_t = 14 * 10**-6
     # upper_bound_v = 3700
@@ -259,17 +252,32 @@ if __name__ == '__main__':
     time_bounds = (lower_bound_t, upper_bound_t)
     velo_bounds = (lower_bound_v, upper_bound_v)
 
-    width = 4
-    height = 3
+    return time_bounds, velo_bounds
 
-    template = Template(width, height, start_pattern)
-    template2 = Template(width, height, start_pattern2)
-    template3 = Template(width, height, start_pattern3)
-    template4 = Template(width, height, start_pattern4)
+
+
+if __name__ == '__main__':
+    import os
+    from digfile import DigFile
+
+    path = "/Users/trevorwalker/Desktop/Clinic/For_Candace/newdigs"
+    os.chdir(path)
+    df = DigFile('CH_2_009.dig')
+
+
+    sgram = Spectrogram(df, 0.0, 60.0e-6, form='db')
+
+
+    time_bounds, velo_bounds = get_bounds_from_user()
+
+
+    template = Template(values=start_pattern)
+    template2 = Template(values=start_pattern2)
+    template3 = Template(values=start_pattern3)
+    template4 = Template(values=start_pattern4)
 
 
     templates = [template, template2, template3, template4]
-
 
 
     scores = find_regions(sgram, templates, velo_bounds, time_bounds)
@@ -277,7 +285,6 @@ if __name__ == '__main__':
     interesting_points = find_potenital_start_points(sgram, scores)
 
     # print(interesting_points, '\n')
-
 
     total_time = 0
     total_velo = 0
