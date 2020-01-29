@@ -418,7 +418,7 @@ class Spectrogram:
         pcm.set_clim(-5,100)
 
         plt.ylim(1500, 3500)
-        plt.xlim(10, 20)
+        plt.xlim(8, 16)
 
         plt.gcf().colorbar(pcm, ax=axes)
         axes.set_ylabel('Velocity (m/s)')
@@ -458,9 +458,10 @@ if __name__ == '__main__':
     template2 = tm.Template(values=tm.start_pattern2)
     template3 = tm.Template(values=tm.start_pattern3)
     template4 = tm.Template(values=tm.start_pattern4)
+    template5 = tm.Template(values=tm.start_pattern5)
 
 
-    templates = [template, template2, template3, template4]
+    templates = [template, template2, template3, template4, template5]
 
 
     scores = tm.find_regions(sp, templates, velo_bounds, time_bounds)
