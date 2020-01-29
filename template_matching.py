@@ -17,6 +17,7 @@ class Template:
         self.height = height if height != None else 0
         self.values = values if values != None else []
 
+
         
 
 
@@ -48,9 +49,6 @@ def calculate_score(index, template, intensities, time_index):
             template_sum += value * intensities[index][time_index+i]
 
     return template_sum
-
-
-
 
 
 
@@ -86,6 +84,7 @@ def find_potential_baselines(sgram):
     return new_baselines
 
 
+
 def find_start_time(sgram, baselines):
 
     time_index = None
@@ -101,6 +100,7 @@ def find_start_time(sgram, baselines):
             return None
 
     return time_index
+
 
 
 def find_regions(sgram, template, velo_bounds=None, time_bounds=None):
@@ -144,48 +144,70 @@ def find_regions(sgram, template, velo_bounds=None, time_bounds=None):
 
     all_scores = {}
 
-    max_time = sgram.intensities.shape[1]
+    max_time = sgram.intensity.shape[1]
 
     width = template.width
-    start_index = index - (2*width)
-    end_index = index + (2*width)
+    start_index = time_index - (2*width)
+    end_index = time_index + (2*width)
 
     if start_index < 0:
         start_index = 0
         end_index = width*4
-    if end_index+width > max_time
+    if end_index+width > max_time:
         end_index = max_time-width-1
 
-    for time_index in range(start_index, end_index, 1):
+    for i in range(start_index, end_index, 1):
 
+        scores = {}
 
         for velocity_index in range(upper_velo_index, lower_velo_index, -1):
 
-            score = calculate_score(velocity_index, template, sgram.intensity, time_index)
+            score = calculate_score(velocity_index, template, sgram.intensity, i)
             scores[velocity_index] = score
         
-        all_scores[time_index] = {k: v for k, v in sorted(scores.items(), key=lambda item: item[1])}
-
-    # print(scores)
-
-    # next steps....
-    # check and see if all scores dictionary stores the sorted scores by time index and velo index.
-    # then try to create a new list of the sorted total dictionary, storing time index, score, and velo as tuple. 
-    # compare coordinates on spectrogram and verify. 
-    # debug the tailing code after the data structures change.
-
-    sorted_scores = {k: v for k, v in sorted(scores.items(), key=lambda item: item[1])}
-    indicies = list(sorted_scores.keys())
-
-    return indicies
+        all_scores[i] = {k: v for k, v in sorted(scores.items(), key=lambda item: item[1])}
+        
+    return all_scores
 
 
-def find_potenital_start_points(sgram, indicies):
 
-    for i in range(len(indicies)-1, len(indicies)-10, -1):
-        velocity = sgram.velocity[indicies[i]]
-        print("velocity: ",velocity, "\n")
-        # print("score: ", sorted_scores[indicies[i]],"\n")
+def find_potenital_start_points(sgram, all_scores):
+
+    temp = []
+
+    for time in all_scores.keys():
+
+        keys = list(all_scores[time].keys())
+        indicies = []
+
+        for i in range(len(keys)-1, len(keys)-5, -1):
+            tup = (time, keys[i])
+            indicies.append(tup)
+
+        # print(time,'\n')
+        # print(all_scores[time][i])
+        # print(indicies,'\n')
+
+        for i in indicies:
+            tup = (i, sgram.velocity[i[1]], all_scores[i[0]][i[1]])
+            temp.append(tup)
+    
+    final = sorted(temp, key = lambda x: x[2], reverse=True)
+
+    interesting_points = []
+
+    for i in range(10):
+
+        tup, velo, score = final[i]
+        t, v = tup
+
+        # print("velocity: ", velo)
+        # print("time: ", sgram.time[t])
+        # print("score: ", score, '\n')
+        
+        interesting_points.append((sgram.time[t], velo))
+
+    return interesting_points
 
 
 
@@ -226,8 +248,10 @@ if __name__ == '__main__':
     template = Template(width, height, start_pattern3)
 
 
-    indicies = find_regions(sgram, template, velo_bounds, time_bounds)
+    scores = find_regions(sgram, template, velo_bounds, time_bounds)
 
-    find_potenital_start_points(sgram, indicies)
+    interesting_points = find_potenital_start_points(sgram, scores)
+
+    print(interesting_points)
 
 
