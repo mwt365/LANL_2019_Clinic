@@ -1,3 +1,13 @@
+#!/usr/bin/env python3
+# coding:utf-8
+"""
+::
+
+  Author:  LANL Clinic 2019 --<lanl19@cs.hmc.edu>
+  Purpose: To automatically find desired regions in 
+            an intensity matrix that match specified templates.
+  Created: 1/28/2020
+"""
 
 import numpy as np
 from spectrogram import Spectrogram
