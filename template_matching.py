@@ -9,37 +9,16 @@
   Created: 1/28/2020
 """
 
-start_pattern = [
-            [-1, -1, -1, -1],
-            [-1, -1, 5,  5 ],
-            [-1, -1, -1, -1]]
-
-start_pattern2 = [
-            [-1, -1, -1, 4],
-            [-1, -1, 4,  4],
-            [-1, -1, -1,-1]]
-
-start_pattern3 = [
-            [-1, -1, -1, 3],
-            [-1, -1, 3,  3],
-            [-1, -1, -1, -1]]
-
-start_pattern4 = [
-            [-3, -1, 1, 2],
-            [-3, -1, 1, 2],
-            [-3, -1, 1, 2]]
-
-start_pattern5 = [
-            [-1, 1, 1, 2],
-            [-1, -1, 1, 1],
-            [-3, -1, -1, 1]]
-
 import numpy as np
 import pandas as pd
 from spectrogram import Spectrogram
 import peak_follower
 import baselines as bls
 
+
+from ImageProcessing.Templates.templates import *
+# These are the templates that are in the folder ImageProcessing\Templates\templates.py
+# How it is currently written will import everything from that file.
 
 class Template:
 
@@ -64,9 +43,10 @@ class Template:
             Using multiple templates for a combined score has proven to work 
             marginally better than a singular template. The template values
             are multiplied by their coresponding intensity values in the spectrogram,
-            and then summed to get a total score for that region. Some templates have
-            been pre-made below.
-            
+            and then summed to get a total score for that region.
+
+            You can make more templates as shown in the ImageProcessing\Templates\templates.py
+            file.
         """
         self.values = np.array(values) if values != None else np.empty((0,0))
 
