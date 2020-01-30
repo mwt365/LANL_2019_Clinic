@@ -9,51 +9,6 @@
   Created: 1/28/2020
 """
 
-import numpy as np
-import pandas as pd
-from spectrogram import Spectrogram
-import peak_follower
-import baselines as bls
-
-
-class Template:
-    """
-    Constructor for Template Objects.
-
-    Inputs:
-      -  width: the width of a template
-      -  height: the height of a template
-      -  values: the 2-dimensional array of weights for the template
-
-    Outputs:
-      -  template object: This will be used to calculate a score for the
-                            region it is placed on in the spectrogram.
-
-    Observations:
-        Using multiple templates for a combined score has proven to work 
-        marginally better than a singular template. The template values
-        are multiplied by their coresponding intensity values in the spectrogram,
-        and then summed to get a total score for that region. Some templates have
-        been pre-made below.
-        
-    """
-
-    def __init__(self,
-                 width=None,
-                 height=None,
-                 values=None
-                 ):
-
-        if values != None:
-            self.values = values
-            self.width = len(values[0])
-            self.height = len(values)
-        else:
-            self.width = width if width != None else 0
-            self.height = height if height != None else 0
-            self.values = None
-
-
 start_pattern = [
             [-1, -1, -1, -1],
             [-1, -1, 5,  5 ],
@@ -79,7 +34,87 @@ start_pattern5 = [
             [-1, -1, 1, 1],
             [-3, -1, -1, 1]]
 
+import numpy as np
+import pandas as pd
+from spectrogram import Spectrogram
+import peak_follower
+import baselines as bls
 
+
+class Template:
+
+    def __init__(self,
+                 values:list = None,
+                 vertical:bool = True
+                 ):
+
+        """
+        Constructor for Template Objects.
+
+        Inputs:
+        -  values: the 1D or 2-dimensional array of weights for the template
+        -  vertical: a boolean that specifies if the template is 1-d whether
+                it is to be used vertically or horizontally. Defaults to vertical.
+
+        Outputs:
+        -  template object: This will be used to calculate a score for the
+                                region it is placed on in the spectrogram.
+
+        Observations:
+            Using multiple templates for a combined score has proven to work 
+            marginally better than a singular template. The template values
+            are multiplied by their coresponding intensity values in the spectrogram,
+            and then summed to get a total score for that region. Some templates have
+            been pre-made below.
+            
+        """
+        self.values = np.array(values) if values != None else np.empty((0,0))
+
+        self.width = None  # How wide.
+        self.height = None # How tall.
+        if len(self.values.shape) == 2:
+            self.height, self.width = self.values.shape
+
+        elif len(self.values.shape) == 1:
+            if vertical:
+                self.height = self.values.shape[0]
+            else:
+                self.width = self.values.shape[0]
+        else:
+            raise ValueError(f"It is assumed that the input template will be a 2-dimensional template. " \
+        +"You input an array which has {len(self.values.shape)}-dimensions")
+
+
+
+
+    def calculate_score(self, intensities:list, velInd:int, timeInd:int):
+        """
+            Input:
+                intensities: This is a 2-d matrix that I will assume has the appropriate shape
+                    to match the template in the positive quadrant with
+                    the origin at the index (velInd, timeInd).
+                velInd: integer
+                timeInd: integer
+            Output:
+                Compute the product sum of the intensities and the template
+                starting at velInd and timeInd.
+                returns - float
+        """
+        intensities = np.array(intensities) # convert the system to an numpy array so that you can slice it easily.
+        regionIntensity = None
+        if self.width == None:
+            # This is a vertical template.
+            regionIntensity = intensities[velInd:velInd+self.height+1,timeInd]
+        elif self.height == None:
+            # This is a horizontal template.
+            regionIntensity = intensities[velInd,timeInd:timeInd+self.width+1]
+        else:
+            # This is the standard 2-d template.
+            # I am assuming that the height will align with the
+            # velocity and the width with the time axes.
+            regionIntensity = intensities[velInd:velInd+self.height+1,timeInd:timeInd+self.width+1]
+
+        return np.sum(self.values*regionIntensity)
 
 
 
