@@ -138,6 +138,8 @@ def find_potential_baselines(sgram):
     #TODO expand templates and normalization
     #TODO dot product between one dimensional vectors using .flatten
     #TODO expand to cover crossings and other phenomena
+    #TODO use numpy to speed up calculations
+    #TODO find start point without user interaction
 
     baselines = []
     hoods = bls.baselines_by_fft(sgram)

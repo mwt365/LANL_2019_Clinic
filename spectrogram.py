@@ -417,8 +417,8 @@ class Spectrogram:
 
         pcm.set_clim(-5,100)
 
-        plt.ylim(1200, 3700)
-        plt.xlim(5, 25)
+        plt.ylim(500, 4000)
+        plt.xlim(0, 30)
 
         plt.gcf().colorbar(pcm, ax=axes)
         axes.set_ylabel('Velocity (m/s)')
