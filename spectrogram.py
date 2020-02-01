@@ -417,8 +417,8 @@ class Spectrogram:
 
         pcm.set_clim(-5,100)
 
-        plt.ylim(1200, 3700)
-        plt.xlim(5, 25)
+        plt.ylim(500, 4500)
+        plt.xlim(2, 30)
 
         plt.gcf().colorbar(pcm, ax=axes)
         axes.set_ylabel('Velocity (m/s)')
@@ -472,15 +472,32 @@ if __name__ == '__main__':
     print(interesting_points)
 
     plot = sgram.plot(max_vel=10000, min_vel=0)
+    
+    time1, velo1 = interesting_points[0]
+    y = velo1
+    x = time1 * 10**6
+    plt.plot(x, y, 'ro', markersize=.5)
 
-    for pair in interesting_points:
-        time, velo = pair
-        y = velo
-        x = time * 10**6
-        # y = sp._velocity_to_index(velo)
-        # x = sp._time_to_index(time)
+    time2, velo2 = interesting_points[1]
+    y = velo2
+    x = time2 * 10**6
+    plt.plot(x, y, 'ro', markersize=.5)
 
-        plt.plot(x, y, 'ro', markersize=1)
+    time3, velo3 = interesting_points[2]
+    y = velo3
+    x = time3 * 10**6
+    plt.plot(x, y, 'ro', markersize=.5)
+
+
+
+    # for pair in interesting_points:
+    #     time, velo = pair
+    #     y = velo
+    #     x = time * 10**6
+    #     # y = sp._velocity_to_index(velo)
+    #     # x = sp._time_to_index(time)
+
+    #     plt.plot(x, y, 'ro', markersize=.5)
 
     plt.show()
 

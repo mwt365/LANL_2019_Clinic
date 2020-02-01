@@ -81,7 +81,9 @@ class Template:
                 returns - float
         """
         intensities = np.array(intensities) # convert the system to an numpy array so that you can slice it easily.
+
         regionIntensity = None
+
         if self.width == None:
             # This is a vertical template.
             regionIntensity = intensities[velInd:velInd+self.height+1,timeInd]
@@ -92,43 +94,43 @@ class Template:
             # This is the standard 2-d template.
             # I am assuming that the height will align with the
             # velocity and the width with the time axes.
-            regionIntensity = intensities[velInd:velInd+self.height+1,timeInd:timeInd+self.width+1]
+            regionIntensity = intensities[velInd:velInd+self.height, timeInd:timeInd+self.width]
 
         return np.sum(self.values*regionIntensity)
 
 
 
-def calculate_score(velo_index, template, intensities, time_index):
-    """
-    Returns the score for the template on a certain region in the
-    spectrogram. The score is the sum of all products of the template 
-    values and their corresponding intensity values. 
+# def calculate_score(velo_index, template, intensities, time_index):
+#     """
+#     Returns the score for the template on a certain region in the
+#     spectrogram. The score is the sum of all products of the template 
+#     values and their corresponding intensity values. 
 
-    Inputs:
-      -  velo_index: the velocity index of the spectrogram that the template
-                    will start at when computing the sum of all products. 
-      -  template: a template object with values, a width, and a height. 
-      -  intensities: a 2 dimensional array of values that are produced by a 
-                    rolling fast fourier transform of voltage data. See
-                    Spectrogram.py for more details. 
-      - time_index: the time offset specified by the user to index into the 
-                    2 dimensional array of intensities. 
+#     Inputs:
+#       -  velo_index: the velocity index of the spectrogram that the template
+#                     will start at when computing the sum of all products. 
+#       -  template: a template object with values, a width, and a height. 
+#       -  intensities: a 2 dimensional array of values that are produced by a 
+#                     rolling fast fourier transform of voltage data. See
+#                     Spectrogram.py for more details. 
+#       - time_index: the time offset specified by the user to index into the 
+#                     2 dimensional array of intensities. 
 
-    Outputs:
-      -  template_sum: the sum of all inner products between intensities and 
-                    template values. 
+#     Outputs:
+#       -  template_sum: the sum of all inner products between intensities and 
+#                     template values. 
 
-    """
+#     """
 
-    template_sum = 0        
+#     template_sum = 0        
 
-    for values in template.values:
+#     for values in template.values:
 
-        for i, value in enumerate(values):
+#         for i, value in enumerate(values):
 
-            template_sum += value * intensities[velo_index][time_index+i]
+#             template_sum += value * intensities[velo_index][time_index+i]
 
-    return template_sum
+#     return template_sum
 
 
 
@@ -153,35 +155,22 @@ def find_potential_baselines(sgram):
     #TODO expand templates and normalization
     #TODO dot product between one dimensional vectors using .flatten
     #TODO expand to cover crossings and other phenomena
+    #TODO use without user interaction
 
-    baselines = []
-    hoods = bls.baselines_by_fft(sgram)
+    peaks, dvs, heights = bls.baselines_by_squash(sgram) 
 
-    for n, h in enumerate(hoods):
-        max_v = 0
-        max_i = 0
-        # print(f"Peak {n}\nVelocity{n}\tIntensity{n}")
-        v, i = h
-        for j in range(len(v)):
-            # print(f"{v[j]:.4f}\t{i[j]:.4f}")
-            if i[j] > max_i:
-                max_i = i[j]
-                max_v = v[j]    
-        baselines.append(max_v)
+    df = pd.DataFrame(dict(peaks=peaks, heights=heights))
 
-    new_baselines = []
+    new_df = df[df.heights > .6]
 
-    # new_baselines.append(baselines[1])
+    baselines =[] 
+    
+    for index, rows in new_df.iterrows():         
 
-    for baseline in baselines:
-        print("Is there a baseline at: ", baseline, "?", end=" ")
-        ans = input("(y/n)\n")
-        if ans == "y":
-            new_baselines.append(baseline)
-        else:
-            continue
+        baselines.append(rows.peaks) 
 
-    return new_baselines
+    return baselines
+
 
 
 
@@ -256,6 +245,9 @@ def find_regions(sgram, templates, velo_bounds=None, time_bounds=None):
         lower_time = sgram.time[0]
 
     baselines = find_potential_baselines(sgram)
+
+    print(baselines)
+
     time_index = find_start_time(sgram)
 
     if time_index is None:
@@ -304,7 +296,9 @@ def find_regions(sgram, templates, velo_bounds=None, time_bounds=None):
 
             for template in templates:
 
-                score += calculate_score(velocity_index, template, sgram.intensity, i)
+                score += template.calculate_score(sgram.intensity, velocity_index, i)
+                # print(score)
+                # score += calculate_score(velocity_index, template, sgram.intensity, i)
             
             scores[velocity_index] = score
         
@@ -410,40 +404,41 @@ if __name__ == '__main__':
     df = DigFile('CH_2_009.dig')
 
 
-    sgram = Spectrogram(df, 0.0, 60.0e-6, form='db')
+    sgram = Spectrogram(df, 0.0, 60.0e-6, form='power')
+
+    find_potential_baselines(sgram)
+
+    # time_bounds, velo_bounds = get_bounds_from_user()
 
 
-    time_bounds, velo_bounds = get_bounds_from_user()
+    # template = Template(values=start_pattern)
+    # template2 = Template(values=start_pattern2)
+    # template3 = Template(values=start_pattern3)
+    # template4 = Template(values=start_pattern4)
 
 
-    template = Template(values=start_pattern)
-    template2 = Template(values=start_pattern2)
-    template3 = Template(values=start_pattern3)
-    template4 = Template(values=start_pattern4)
+    # templates = [template, template2, template3, template4]
 
 
-    templates = [template, template2, template3, template4]
+    # scores = find_regions(sgram, templates, velo_bounds, time_bounds)
 
+    # interesting_points = find_potenital_start_points(sgram, scores)
 
-    scores = find_regions(sgram, templates, velo_bounds, time_bounds)
+    # # print(interesting_points, '\n')
 
-    interesting_points = find_potenital_start_points(sgram, scores)
+    # total_time = 0
+    # total_velo = 0
 
-    # print(interesting_points, '\n')
+    # for i in interesting_points:
 
-    total_time = 0
-    total_velo = 0
+    #     time, velo = i
 
-    for i in interesting_points:
+    #     total_time += time
+    #     total_velo += velo
 
-        time, velo = i
+    # average_time = total_time / len(interesting_points)
+    # average_velo = total_velo / len(interesting_points)
 
-        total_time += time
-        total_velo += velo
-
-    average_time = total_time / len(interesting_points)
-    average_velo = total_velo / len(interesting_points)
-
-    print(average_time)
-    # print(average_velo)
+    # print(average_time)
+    # # print(average_velo)
 

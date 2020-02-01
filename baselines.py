@@ -36,7 +36,7 @@ def baselines_by_squash(spectrogram: Spectrogram):
         isolated time. It might be better to chop the range into several
         intervals and insist on a significant peak in each.
     """
-    assert isinstance(spectrogram, Spectrogram)
+    # assert isinstance(spectrogram, Spectrogram)
     # Collapse along the time axis, making sure to use power,
     # not dB
     powers = spectrogram.power(spectrogram.intensity)
