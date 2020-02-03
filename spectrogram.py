@@ -452,52 +452,56 @@ if __name__ == '__main__':
     # print(sp.max)
 
 
-    time_bounds, velo_bounds = tm.get_bounds_from_user()
+    # time_bounds = tm.get_bounds_from_user()
 
 
-    template = tm.Template(values=tm.start_pattern)
-    template2 = tm.Template(values=tm.start_pattern2)
-    template3 = tm.Template(values=tm.start_pattern3)
-    template4 = tm.Template(values=tm.start_pattern4)
-    template5 = tm.Template(values=tm.start_pattern5)
+    template = tm.Template(values=tm.bigger_pattern)
+    template2 = tm.Template(values=tm.bigger_pattern2)
+
+    # template = tm.Template(values=tm.start_pattern)
+    # template2 = tm.Template(values=tm.start_pattern2)
+    # template3 = tm.Template(values=tm.start_pattern3)
+    # template4 = tm.Template(values=tm.start_pattern4)
+    # template5 = tm.Template(values=tm.start_pattern5)
 
 
-    templates = [template, template2, template3, template4, template5]
+    # templates = [template, template2, template3, template4, template5]
+    templates = [template, template2]
 
 
-    scores = tm.find_regions(sp, templates, velo_bounds, time_bounds)
+    scores = tm.find_regions(sp, templates)
 
     interesting_points = tm.find_potenital_start_points(sp, scores)
 
-    print(interesting_points)
+    # print(interesting_points)
 
     plot = sgram.plot(max_vel=10000, min_vel=0)
     
-    time1, velo1 = interesting_points[0]
-    y = velo1
-    x = time1 * 10**6
-    plt.plot(x, y, 'ro', markersize=.5)
+    # time1, velo1 = interesting_points[0]
+    # y = velo1
+    # x = time1 * 10**6
+    # plt.plot(x, y, 'ro', markersize=.5)
 
-    time2, velo2 = interesting_points[1]
-    y = velo2
-    x = time2 * 10**6
-    plt.plot(x, y, 'ro', markersize=.5)
+    # time2, velo2 = interesting_points[-1]
+    # y = velo2
+    # x = time2 * 10**6
+    # plt.plot(x, y, 'ro', markersize=.5)
 
-    time3, velo3 = interesting_points[2]
-    y = velo3
-    x = time3 * 10**6
-    plt.plot(x, y, 'ro', markersize=.5)
+    # time3, velo3 = interesting_points[2]
+    # y = velo3
+    # x = time3 * 10**6
+    # plt.plot(x, y, 'ro', markersize=.5)
 
 
 
-    # for pair in interesting_points:
-    #     time, velo = pair
-    #     y = velo
-    #     x = time * 10**6
-    #     # y = sp._velocity_to_index(velo)
-    #     # x = sp._time_to_index(time)
+    for pair in interesting_points:
+        time, velo = pair
+        y = velo
+        x = time * 10**6
+        # y = sp._velocity_to_index(velo)
+        # x = sp._time_to_index(time)
 
-    #     plt.plot(x, y, 'ro', markersize=.5)
+        plt.plot(x, y, 'ro', markersize=.5)
 
     plt.show()
 

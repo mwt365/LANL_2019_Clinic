@@ -67,70 +67,70 @@ class Template:
 
 
 
-    def calculate_score(self, intensities:list, velInd:int, timeInd:int):
-        """
-            Input:
-                intensities: This is a 2-d matrix that I will assume has the appropriate shape
-                    to match the template in the positive quadrant with
-                    the origin at the index (velInd, timeInd).
-                velInd: integer
-                timeInd: integer
-            Output:
-                Compute the product sum of the intensities and the template
-                starting at velInd and timeInd.
-                returns - float
-        """
-        intensities = np.array(intensities) # convert the system to an numpy array so that you can slice it easily.
+    # def calculate_score(self, intensities:list, velInd:int, timeInd:int):
+    #     """
+    #         Input:
+    #             intensities: This is a 2-d matrix that I will assume has the appropriate shape
+    #                 to match the template in the positive quadrant with
+    #                 the origin at the index (velInd, timeInd).
+    #             velInd: integer
+    #             timeInd: integer
+    #         Output:
+    #             Compute the product sum of the intensities and the template
+    #             starting at velInd and timeInd.
+    #             returns - float
+    #     """
+    #     intensities = np.array(intensities) # convert the system to an numpy array so that you can slice it easily.
 
-        regionIntensity = None
+    #     regionIntensity = None
 
-        if self.width == None:
-            # This is a vertical template.
-            regionIntensity = intensities[velInd:velInd+self.height+1,timeInd]
-        elif self.height == None:
-            # This is a horizontal template.
-            regionIntensity = intensities[velInd,timeInd:timeInd+self.width+1]
-        else:
-            # This is the standard 2-d template.
-            # I am assuming that the height will align with the
-            # velocity and the width with the time axes.
-            regionIntensity = intensities[velInd:velInd+self.height, timeInd:timeInd+self.width]
+    #     if self.width == None:
+    #         # This is a vertical template.
+    #         regionIntensity = intensities[velInd:velInd+self.height+1,timeInd]
+    #     elif self.height == None:
+    #         # This is a horizontal template.
+    #         regionIntensity = intensities[velInd,timeInd:timeInd+self.width+1]
+    #     else:
+    #         # This is the standard 2-d template.
+    #         # I am assuming that the height will align with the
+    #         # velocity and the width with the time axes.
+    #         regionIntensity = intensities[velInd:velInd+self.height, timeInd:timeInd+self.width]
 
-        return np.sum(self.values*regionIntensity)
+    #     return np.sum(self.values*regionIntensity)
 
 
 
-# def calculate_score(velo_index, template, intensities, time_index):
-#     """
-#     Returns the score for the template on a certain region in the
-#     spectrogram. The score is the sum of all products of the template 
-#     values and their corresponding intensity values. 
+def calculate_score(velo_index, template, intensities, time_index):
+    """
+    Returns the score for the template on a certain region in the
+    spectrogram. The score is the sum of all products of the template 
+    values and their corresponding intensity values. 
 
-#     Inputs:
-#       -  velo_index: the velocity index of the spectrogram that the template
-#                     will start at when computing the sum of all products. 
-#       -  template: a template object with values, a width, and a height. 
-#       -  intensities: a 2 dimensional array of values that are produced by a 
-#                     rolling fast fourier transform of voltage data. See
-#                     Spectrogram.py for more details. 
-#       - time_index: the time offset specified by the user to index into the 
-#                     2 dimensional array of intensities. 
+    Inputs:
+      -  velo_index: the velocity index of the spectrogram that the template
+                    will start at when computing the sum of all products. 
+      -  template: a template object with values, a width, and a height. 
+      -  intensities: a 2 dimensional array of values that are produced by a 
+                    rolling fast fourier transform of voltage data. See
+                    Spectrogram.py for more details. 
+      - time_index: the time offset specified by the user to index into the 
+                    2 dimensional array of intensities. 
 
-#     Outputs:
-#       -  template_sum: the sum of all inner products between intensities and 
-#                     template values. 
+    Outputs:
+      -  template_sum: the sum of all inner products between intensities and 
+                    template values. 
 
-#     """
+    """
 
-#     template_sum = 0        
+    template_sum = 0        
 
-#     for values in template.values:
+    for values in template.values:
 
-#         for i, value in enumerate(values):
+        for i, value in enumerate(values):
 
-#             template_sum += value * intensities[velo_index][time_index+i]
+            template_sum += value * intensities[velo_index][time_index+i]
 
-#     return template_sum
+    return template_sum
 
 
 
@@ -207,7 +207,7 @@ def find_start_time(sgram):
 
 
 
-def find_regions(sgram, templates, velo_bounds=None, time_bounds=None):
+def find_regions(sgram, templates):
     """
     Returns a dictionary of dictionaries. The outermost dictionary keys are 
     time values. Those time values each have they're own dictionaries, with 
@@ -227,23 +227,6 @@ def find_regions(sgram, templates, velo_bounds=None, time_bounds=None):
                     templates and spectrogram.intensity matrix.  
     """
 
-    if velo_bounds is not None:
-        assert isinstance(velo_bounds, tuple)
-        lower_velo = velo_bounds[0]
-        upper_velo = velo_bounds[1]
-    elif velo_bounds is None:
-        upper_velo_index = sgram.intensity.shape[0]
-        upper_velo = sgram.velocity[upper_velo_index]
-        lower_velo = sgram.velocity[0]
-    if time_bounds is not None:
-        assert isinstance(time_bounds, tuple)
-        lower_time = time_bounds[0]
-        upper_time = time_bounds[1]
-    elif time_bounds is None:
-        upper_time_index = sgram.intensity.shape[1]
-        upper_time = sgram.time[upper_time_index]
-        lower_time = sgram.time[0]
-
     baselines = find_potential_baselines(sgram)
 
     print(baselines)
@@ -253,10 +236,15 @@ def find_regions(sgram, templates, velo_bounds=None, time_bounds=None):
     if time_index is None:
         return
 
-    upper_velo_index = sgram._velocity_to_index(upper_velo)
+    upper_velo_index = sgram.intensity.shape[0]-1
+
+    lower_velo = baselines[0] + 100.0
     lower_velo_index = sgram._velocity_to_index(lower_velo)
 
-    time_max = sgram.intensity.shape[1]
+
+    time_max = sgram.intensity.shape[1]-1
+    time_min = 0
+
     velocity_max = sgram.intensity.shape[0]
 
     # print(time_max)
@@ -270,7 +258,7 @@ def find_regions(sgram, templates, velo_bounds=None, time_bounds=None):
     all_scores = {}
 
 
-    max_time = sgram.intensity.shape[1]
+    max_time = sgram.intensity.shape[1]-1
 
     if len(templates) > 1:
         width = templates[0].width
@@ -286,7 +274,7 @@ def find_regions(sgram, templates, velo_bounds=None, time_bounds=None):
     if end_index+width > max_time:
         end_index = max_time-width-1
 
-    for i in range(start_index, end_index, 1):
+    for time in range(start_index, end_index, 1):
 
         scores = {}
 
@@ -296,13 +284,13 @@ def find_regions(sgram, templates, velo_bounds=None, time_bounds=None):
 
             for template in templates:
 
-                score += template.calculate_score(sgram.intensity, velocity_index, i)
+                # score += template.calculate_score(sgram.intensity, velocity_index, i)
                 # print(score)
-                # score += calculate_score(velocity_index, template, sgram.intensity, i)
+                score += calculate_score(velocity_index, template, sgram.intensity, time)
             
             scores[velocity_index] = score
         
-        all_scores[i] = {k: v for k, v in sorted(scores.items(), key=lambda item: item[1])}
+        all_scores[time] = {k: v for k, v in sorted(scores.items(), key=lambda item: item[1])}
         
     return all_scores
 
@@ -348,7 +336,7 @@ def find_potenital_start_points(sgram, all_scores):
 
     interesting_points = []
 
-    for i in range(10):
+    for i in range(20):
 
         tup, velo, score = final[i]
         t, v = tup
@@ -361,37 +349,6 @@ def find_potenital_start_points(sgram, all_scores):
 
     return interesting_points
 
-
-def get_bounds_from_user():
-    """
-    Prompts that user for bounds on velocity and time to make
-    searching easier for the algorithms (not to mention faster).
-
-    Outputs:
-      -  time_bounds: a tuple of time values.  
-      -  velo_bounds: a tuple of velocity values. 
-    """
-
-    lower_bound_t = input("Enter a time to the left of the jumpoff point: \n")
-    lower_bound_t = int(lower_bound_t) * 10**-6
-    upper_bound_t = input("Enter a time to the right of the jumpoff point: \n")
-    upper_bound_t = int(upper_bound_t) * 10**-6
-
-    upper_bound_v = input("Enter a velocity above the jumpoff point: \n")
-    upper_bound_v = int(upper_bound_v)
-    lower_bound_v = input("Enter a velocity below the jumpoff point: \n")
-    lower_bound_v = int(lower_bound_v)
-
-    # lower_bound_t = 10 * 10**-6
-    # upper_bound_t = 14 * 10**-6
-    # upper_bound_v = 3700
-    # lower_bound_v = 2000
-
-
-    time_bounds = (lower_bound_t, upper_bound_t)
-    velo_bounds = (lower_bound_v, upper_bound_v)
-
-    return time_bounds, velo_bounds
 
 
 
@@ -408,37 +365,35 @@ if __name__ == '__main__':
 
     find_potential_baselines(sgram)
 
-    # time_bounds, velo_bounds = get_bounds_from_user()
+
+    template = Template(values=start_pattern)
+    template2 = Template(values=start_pattern2)
+    template3 = Template(values=start_pattern3)
+    template4 = Template(values=start_pattern4)
 
 
-    # template = Template(values=start_pattern)
-    # template2 = Template(values=start_pattern2)
-    # template3 = Template(values=start_pattern3)
-    # template4 = Template(values=start_pattern4)
+    templates = [template, template2, template3, template4]
 
 
-    # templates = [template, template2, template3, template4]
+    scores = find_regions(sgram, templates)
 
+    interesting_points = find_potenital_start_points(sgram, scores)
 
-    # scores = find_regions(sgram, templates, velo_bounds, time_bounds)
+    # print(interesting_points, '\n')
 
-    # interesting_points = find_potenital_start_points(sgram, scores)
+    total_time = 0
+    total_velo = 0
 
-    # # print(interesting_points, '\n')
+    for i in interesting_points:
 
-    # total_time = 0
-    # total_velo = 0
+        time, velo = i
 
-    # for i in interesting_points:
+        total_time += time
+        total_velo += velo
 
-    #     time, velo = i
+    average_time = total_time / len(interesting_points)
+    average_velo = total_velo / len(interesting_points)
 
-    #     total_time += time
-    #     total_velo += velo
-
-    # average_time = total_time / len(interesting_points)
-    # average_velo = total_velo / len(interesting_points)
-
-    # print(average_time)
-    # # print(average_velo)
+    print(average_time)
+    # print(average_velo)
 
