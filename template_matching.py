@@ -156,9 +156,9 @@ def find_potential_baselines(sgram):
 
     df = pd.DataFrame(dict(peaks=peaks, heights=heights))
 
-    new_df = df[df.heights > .6]
+    new_df = df[df.heights > .13]
 
-    baselines =[] 
+    baselines = []
     
     for index, rows in new_df.iterrows():         
 
@@ -224,69 +224,94 @@ def find_regions(sgram, templates):
 
     baselines = find_potential_baselines(sgram)
 
+    if len(baselines) > 1:
+
+        baselines = sorted(baselines, reverse=True)
+
     print(baselines)
 
+
+
     time_index = find_start_time(sgram)
+
+    time_max = sgram.intensity.shape[1]-1
+    time_min = 0
+
+    
+    max_time = sgram.intensity.shape[1]-1
 
     if time_index is None:
         return
 
     upper_velo_index = sgram.intensity.shape[0]-1
 
-    lower_velo = baselines[0] + 100.0
-    lower_velo_index = sgram._velocity_to_index(lower_velo)
-
-
-    time_max = sgram.intensity.shape[1]-1
-    time_min = 0
-
-    velocity_max = sgram.intensity.shape[0]
-
     # print(time_max)
-    # print(velocity_max)
     # print("upper: ",upper_velo_index)
     # print("lower: ",lower_velo_index)
     # print(sgram.intensity)
     # print(template.values)
     # print(time_index)
 
-    all_scores = {}
+    baseline_scores = {}
 
+    for i, baseline in enumerate(baselines):
 
-    max_time = sgram.intensity.shape[1]-1
+        if i != 0:
+            upper_velo_index = sgram._velocity_to_index(baselines[i-1]-50.0)
 
-    if len(templates) > 1:
-        width = templates[0].width
-    else:
-        width = templates.width
+        print("for baseline: ",upper_velo_index)
 
-    start_index = time_index - (2*width)
-    end_index = time_index + (2*width)
+        lower_velo = baseline + 50.0
+        lower_velo_index = sgram._velocity_to_index(lower_velo)
 
-    if start_index < 0:
-        start_index = 0
-        end_index = width*4
-    if end_index+width > max_time:
-        end_index = max_time-width-1
+        baseline_scores[baseline] = {}
+        # all_scores = {}
 
-    for time in range(start_index, end_index, 1):
+        if len(templates) > 1:
+            width = templates[0].width
+        else:
+            width = templates.width
 
-        scores = {}
+        start_index = time_index - (2*width)
+        end_index = time_index + (2*width)
 
-        for velocity_index in range(upper_velo_index, lower_velo_index, -1):
+        if start_index < 0:
+            start_index = 0
+            end_index = width*4
+        if end_index+width > max_time:
+            end_index = max_time-width-1
 
-            score = 0
+        for time in range(start_index, end_index, 1):
 
-            for template in templates:
+            scores = {}
 
-                # score += template.calculate_score(sgram.intensity, velocity_index, i)
-                # print(score)
-                score += calculate_score(velocity_index, template, sgram.intensity, time)
+            for velocity_index in range(upper_velo_index, lower_velo_index, -1):
+
+                score = 0
+
+                for template in templates:
+
+                    # score += template.calculate_score(sgram.intensity, velocity_index, i)
+                    # print(score)
+                    score += calculate_score(velocity_index, template, sgram.intensity, time)
+                
+                scores[velocity_index] = score
             
-            scores[velocity_index] = score
-        
-        all_scores[time] = {k: v for k, v in sorted(scores.items(), key=lambda item: item[1])}
-        
+            baseline_scores[baseline][time] = {k: v for k, v in sorted(scores.items(), key=lambda item: item[1])}
+            # all_scores[time] = {k: v for k, v in sorted(scores.items(), key=lambda item: item[1])}
+
+
+            # out = list(baseline_scores[baseline][time].items())[-5: -1]
+            # for k, v in out:
+        #         print("    time: ", sgram.time[time])
+        #         print("velocity: ",sgram.velocity[k])
+        #         print("   value: ", v, "\n")
+        #     print()
+
+        # print("\n\n")
+                
+    
+    return baseline_scores, baselines
     return all_scores
 
 
@@ -331,17 +356,23 @@ def find_potenital_start_points(sgram, all_scores):
 
     interesting_points = []
 
-    for i in range(20):
+    total_score = 0
+    for i in range(10):
+        total_score += final[i][2]
+
+    average_score = total_score/10
+    print(average_score)
+
+    for i in range(60):
 
         tup, velo, score = final[i]
+        
         t, v = tup
 
-        # print("velocity: ", velo)
-        # print("time: ", sgram.time[t])
-        # print("score: ", score, '\n')
-        
-        interesting_points.append((sgram.time[t], velo))
-
+        if score > average_score:
+            interesting_points.append((sgram.time[t], velo))
+            
+    print(len(interesting_points))
     return interesting_points
 
 
@@ -353,7 +384,7 @@ if __name__ == '__main__':
 
     path = "/Users/trevorwalker/Desktop/Clinic/For_Candace/newdigs"
     os.chdir(path)
-    df = DigFile('CH_2_009.dig')
+    df = DigFile('WHITE_CH3_SHOT.dig')
 
 
     sgram = Spectrogram(df, 0.0, 60.0e-6, form='power')
@@ -361,34 +392,33 @@ if __name__ == '__main__':
     find_potential_baselines(sgram)
 
 
-    template = Template(values=start_pattern)
-    template2 = Template(values=start_pattern2)
-    template3 = Template(values=start_pattern3)
-    template4 = Template(values=start_pattern4)
+    # template = Template(values=start_pattern)
+    # template2 = Template(values=start_pattern2)
+    # template3 = Template(values=start_pattern3)
+    # template4 = Template(values=start_pattern4)
+    template = Template(values=bigger_start_pattern)
+    template2 = Template(values=bigger_start_pattern2)
+    template3 = Template(values=bigger_start_pattern3)
 
 
-    templates = [template, template2, template3, template4]
+    templates = [template, template2, template3]
 
 
-    scores = find_regions(sgram, templates)
+    baseline_scores, baselines = find_regions(sgram, templates)
 
-    interesting_points = find_potenital_start_points(sgram, scores)
+    for baseline in baselines:
 
-    # print(interesting_points, '\n')
+        interesting_points = find_potenital_start_points(sgram, baseline_scores[baseline])
 
-    total_time = 0
-    total_velo = 0
+        total_velo = 0
 
-    for i in interesting_points:
+        for i in interesting_points:
 
-        time, velo = i
+            time, velo = i
 
-        total_time += time
-        total_velo += velo
+            total_velo += velo
 
-    average_time = total_time / len(interesting_points)
-    average_velo = total_velo / len(interesting_points)
+        average_velo = total_velo / len(interesting_points)
+        print(average_velo)
 
-    print(average_time)
-    # print(average_velo)
 
