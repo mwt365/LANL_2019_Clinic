@@ -95,7 +95,6 @@ class Template:
     #         # I am assuming that the height will align with the
     #         # velocity and the width with the time axes.
     #         regionIntensity = intensities[velInd:velInd+self.height, timeInd:timeInd+self.width]
-
     #     return np.sum(self.values*regionIntensity)
 
 
@@ -119,7 +118,6 @@ def calculate_score(velo_index, template, intensities, time_index):
     Outputs:
       -  template_sum: the sum of all inner products between intensities and 
                     template values. 
-
     """
 
     template_sum = 0        
@@ -150,12 +148,9 @@ def find_potential_baselines(sgram):
                 a potential baseline in the input spectrogram. 
 
     """
-    #TODO replace the current baseline with baselines_by_squash
     #TODO use it with peak follower
-    #TODO expand templates and normalization
     #TODO dot product between one dimensional vectors using .flatten
     #TODO expand to cover crossings and other phenomena
-    #TODO use without user interaction
 
     peaks, dvs, heights = bls.baselines_by_squash(sgram) 
 
