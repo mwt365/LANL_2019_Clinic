@@ -6,24 +6,6 @@ from networkx.algorithms.flow import *
 
 from ImageProcessing.NetworkFlow.gaussianMixtureModels import GMM_Image_Seg
 
-if False:
-    G = nx.DiGraph()
-    G.add_edge('x',tuple(['v1', 'a']), capacity=3.0)
-    G.add_edge('x',tuple(['v2', 'b']), capacity=1.0)
-    G.add_edge(tuple(['v1', 'a']),tuple(['v3', 'c']), capacity=3.0)
-    G.add_edge(tuple(['v2', 'b']),tuple(['v3', 'c']), capacity=5.0)
-    G.add_edge(tuple(['v2', 'b']),tuple(['v4', 'd']), capacity=4.0)
-    G.add_edge(tuple(['v4', 'd']),tuple(['v5', 'e']), capacity=2.0)
-    G.add_edge(tuple(['v3', 'c']),'y', capacity=2.2)
-    G.add_edge(tuple(['v5', 'e']),'y', capacity=3.0)
-    R = edmonds_karp(G, 'x', 'y')
-    flow_value = nx.maximum_flow_value(G, 'x', 'y')
-    cut, partition = nx.minimum_cut(G, "x", "y")
-    print("This is is the partition", partition)
-
-    print("This is the residual graph's adjacency list",list(R.adjacency()))
-
-
 def setUpGraph(SpectrogramObject:Spectrogram):
     G = nx.DiGraph()
 
@@ -32,7 +14,7 @@ def setUpGraph(SpectrogramObject:Spectrogram):
     Intensity = SpectrogramObject.intensity
     sigma = 30
 
-    GMM = GMM_Image_Seg(Intensity, verbose=True)
+    GMM = GMM_Image_Seg(Intensity)
 
     probabilities = GMM.computeProbabilities(Intensity)
 
@@ -70,15 +52,7 @@ def setUpGraph(SpectrogramObject:Spectrogram):
             G.add_edge(u, "t", capacity = capacityToT)
             count += 1
             if count%1e4 == 0:
-                print("I have completed", count, "out of", maxCount)
-
-    # for (timeInd, velInd) in foregroundPoints:
-    #     u = velInd*lent + timeInd
-    #     G.add_edge("s", u, capacity = foreGroundCost)
-
-    # for (timeInd, velInd) in backgroundPoints:
-    #     u = velInd*lent + timeInd
-    #     G.add_edge(u, "t", capacity = backGroundCost)
+                print("I have setup", count, "nodes out of", maxCount, "nodes.")
 
     return G
 
@@ -112,20 +86,15 @@ def segmentImage(SpectrogramObject:Spectrogram):
 
     print("Everyone Has the edges from s and to t, but floating capacities")
 
-    return np.array(list(reach_Foreground))
-
-    # count = 0
-    # for state in reach_Foreground:
-    #     if state != "s":
-    #         velInd = state//lent
-    #         timeInd = state - velInd*lent
-
-    #         highlighted[velInd][timeInd] = 1
-    #         count += 1
-
+    reach = [x for x in reach_Foreground if x != "s"]
+    highlightT = []
+    highV = []
+    lent = len(SpectrogramObject.time)
+    # Convert back to indices in time and velocity.
+    for state in reach:
+        velInd = state//lent
+        timeInd = state - velInd*lent
+        highlightT.append(timeInd)
+        highV.append(velInd)
     
-    
-    # SpectrogramObject.intensity = highlighted
-    # print("This is the number of pixels that are set to 1", count)
-
-    # SpectrogramObject.plot()
+    return np.array(highlightT), np.array(highV)
