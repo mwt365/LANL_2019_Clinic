@@ -2,7 +2,6 @@
 
 """
 ::
-
    Author:  LANL Clinic 2019 --<lanl19@cs.hmc.edu>
    Purpose: Compute a spectrogram from a DigFile
    Created: 9/20/19

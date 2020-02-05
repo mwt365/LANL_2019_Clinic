@@ -2,6 +2,7 @@ import cv2
 import numpy as np
 from matplotlib import pyplot as plt
 
+# imread(path, 0) signifies reading in the image in grayscale mode
 img = cv2.imread('messi5.jpg',0)
 
 img2 = img.copy()
