@@ -476,7 +476,7 @@ if __name__ == '__main__':
             # y = sp._velocity_to_index(velo)
             # x = sp._time_to_index(time)
 
-            plt.plot(x, y, 'ro', markersize=1)
+            plt.plot(x, y, 'ro', markersize=.7)
 
     plt.show()
 
