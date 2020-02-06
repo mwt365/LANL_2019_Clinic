@@ -432,7 +432,7 @@ if __name__ == '__main__':
     import template_matching as tm
     import baselines
 
-    path = "/Users/trevorwalker/Desktop/Clinic/For_Candace/newdigs/WHITE_CH3_SHOT.dig"
+    path = "/Users/trevorwalker/Desktop/Clinic/For_Candace/newdigs/CH_2_009.dig"
 
     sp = Spectrogram(path, 0.0, 60.0e-6, overlap_shift_factor= 1/8, form='power')
     sgram = Spectrogram(path, 0.0, 60.0e-6, overlap_shift_factor= 1/8, form='db')
