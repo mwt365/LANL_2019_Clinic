@@ -1,17 +1,15 @@
+
+
 import cv2
 import spectrogram as sp
 import numpy as np
 from scipy.misc import imsave
 from matplotlib import pyplot as plt
-
-
 from ImageProcessing.Templates.templates import *
 
 
 
 
-#TODO use scipy to convert numpy array to png
-#TODO make different templates
 #TODO read in original image once, give minMaxLoc for each template
 #TODO Learn something from the yielded locations
 
@@ -79,8 +77,6 @@ def main():
         plt.suptitle(meth)
 
         plt.show()
-
-
 
 
 if __name__ == "__main__":
