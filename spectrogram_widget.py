@@ -16,16 +16,16 @@ import ipywidgets as widgets
 from matplotlib import widgets as mwidgets
 from IPython.display import display
 
-from digfile import DigFile
+from ProcessingAlgorithms.preprocess.digfile import DigFile
 from spectrogram import Spectrogram
-from spectrum import Spectrum
+from ProcessingAlgorithms.spectrum import Spectrum
 from plotter import COLORMAPS
 from gaussian import Gaussian
 from gaussian_follow import GaussianFitter
 from peak_follower import PeakFollower
 
-from WidgetControls.value_sliders import ValueSlider
-from WidgetControls.percent_slider import PercentSlider # Note that this class is not actually used yet. 02/07/20
+from UI_Elements.value_sliders import ValueSlider
+from UI_Elements.percent_slider import PercentSlider # Note that this class is not actually used yet. 02/07/20
 
 DEFMAP = '3w_gby'  # should really be in an .ini file
 

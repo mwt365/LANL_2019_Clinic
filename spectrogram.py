@@ -13,7 +13,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy import signal
 
-from digfile import DigFile
+from ProcessingAlgorithms.preprocess.digfile import DigFile
 
 
 class Spectrogram:
@@ -26,7 +26,7 @@ class Spectrogram:
     Required arguments to the constructor:
         digfile: either an instance of DigFile or the filename of a .dig file
 
-    **Optional arguments and their default values**
+    **Optional arguments and their (default) values**
 
     t_start: (digfile.t0) time of the first point to use in the spectrogram
     ending:  (None) either the time of the last point or a positive integer
