@@ -307,6 +307,17 @@ class Spectrogram:
         # ovals = self.orig_spec_output[vel0:vel1 + 1, time0:time1 + 1]
         return tvals, vvals, ivals,  # ovals
 
+    def squash(self, along = 'time', dB = False):
+        """Sum along either rows or columns (as power) and return an
+        array normalized to unit height.
+        """
+        vals = np.sum(self.power(self.intensity),
+                      axis = 0 if along == 'time' else 1)
+        vals /= np.max(vals)
+        if dB:
+            vals = 20 * np.log10(vals)
+        return vals
+
     # Routines to archive the computed spectrogram and reload from disk
 
     def _location(self, location, create=False):

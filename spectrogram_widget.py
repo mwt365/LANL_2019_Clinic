@@ -461,13 +461,18 @@ class SpectrogramWidget:
             lambda x: self.update_baselines(x["new"]),
             names="value")
 
+        cd['squash'] = widgets.Button(
+            description = "Squash in Vertical"
+        )
+        cd['squash'].on_click(lambda b: self.squash_vertical())
+
         columns = [
             'color_map;t_range;velocity_range;intensity_range;threshold',
             'clicker;clear_spectra;clear_followers',
         ]
         if self.dig:
             columns.append(
-                'spectrum_size;overlap;raw_signal;baselines')
+                'spectrum_size;overlap;raw_signal;baselines;squash')
 
         vboxes = []
         for col in columns:
@@ -707,7 +712,7 @@ class SpectrogramWidget:
             follower.run()
             tsec, v = follower.v_of_t
             follower.line = self.axSpectrogram.plot(
-                tsec * 1e6, v, 'r-', alpha=0.4)[0]
+                tsec * 1e6, v, 'r.', alpha=0.4, markersize = 2)[0]
         # print("Create a figure and axes, then call self.gauss.show_fit(axes)")
 
     def gauss_out(self, n: int):
@@ -825,6 +830,11 @@ class SpectrogramWidget:
                 alpha=0.33
             )
         self.axTrack.set_ylabel('$v$')
+
+    def squash_vertical(self):
+        normy = self.spectrogram.squash(dB=False) * 2000
+        self.axSpectrogram.plot(self.spectrogram.time * 1e6, normy,
+                                'b-', alpha = 0.75)
 
     def update_baselines(self, method):
         """
