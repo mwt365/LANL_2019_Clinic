@@ -1,6 +1,6 @@
 #! /usr/bin/env python3
 
-import cm_xml_to_matplotlib as cm
+import xml_cm_files.cm_xml_to_matplotlib as cm
 import os
 
 DIR = os.path.join(os.path.split(__file__)[0], "xml_cm_files")
