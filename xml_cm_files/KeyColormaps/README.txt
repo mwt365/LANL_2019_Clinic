@@ -1,0 +1,1 @@
+THESE XML files were downloaded from https://sciviscolor.org/home/colormaps/
