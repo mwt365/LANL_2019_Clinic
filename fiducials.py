@@ -12,7 +12,7 @@ from scipy.optimize import curve_fit
 import pandas as pd
 from ProcessingAlgorithms.preprocess.digfile import DigFile
 from ProcessingAlgorithms.SaveFiles.save_as_dig_file import save_as_dig
-from moving_average import compress
+from ProcessingAlgorithms.Fitting.moving_average import compress
 import os
 
 
