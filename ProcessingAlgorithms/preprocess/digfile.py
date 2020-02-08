@@ -437,7 +437,7 @@ if __name__ == '__main__':
     plt.show()
     raise Exception("Done")
 
-    for file in os.listdir('../dig/'):
+    for file in os.listdir(DigFile.dig_dir()):
         filename = os.path.splitext(file)[0]
         if filename != 'GEN3_CHANNEL1KEY001':
             continue
