@@ -20,7 +20,7 @@ from ProcessingAlgorithms.preprocess.digfile import DigFile
 from spectrogram import Spectrogram
 from ProcessingAlgorithms.spectrum import Spectrum
 from plotter import COLORMAPS
-from gaussian import Gaussian
+from ProcessingAlgorithms.Fitting.gaussian import Gaussian
 from gaussian_follow import GaussianFitter
 from peak_follower import PeakFollower
 
