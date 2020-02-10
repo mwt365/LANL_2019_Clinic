@@ -10,7 +10,7 @@
 from spectrogram import Spectrogram
 import numpy as np
 import pandas as pd
-from gaussian import Gaussian
+from ProcessingAlgorithms.Fitting.gaussian import Gaussian
 import matplotlib.pyplot as plt
 
 

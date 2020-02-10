@@ -217,7 +217,7 @@ def mainTest(SpectrogramObject:Spectrogram, startTime:int, stopTime:int, bottomI
                 extension = "svg"
                 fname = "DP_Start_Cost " + hyperParamNames + extension
                 filename = basefilePath + fname
-                fig.savefig(filename)
+                fig.savefig(filename, bbox_inches = "tight")
 
                 fig2 = plt.figure(num = 2, figsize=(10, 6))
                 ax = fig2.add_subplot(1,1,1)
@@ -242,7 +242,7 @@ def mainTest(SpectrogramObject:Spectrogram, startTime:int, stopTime:int, bottomI
                     fig2.show()
                 fname = "Overlay Spectra " + hyperParamNames + extension
                 filename = basefilePath + fname
-                plt.savefig(filename)
+                plt.savefig(filename, bbox_inches = "tight")
 
                 # Build the reconstruction of every possible starting velocity. Then, save them in a csv file.
                 extension = "csv"
@@ -260,7 +260,7 @@ def mainTest(SpectrogramObject:Spectrogram, startTime:int, stopTime:int, bottomI
                 df = pd.DataFrame(data=signalData, index=time*1e6, columns=headers)
                 df.to_csv(filename)
 
-                print("Completed the documentation for ", + hyperParamNames)
+                print("Completed the documentation for ", hyperParamNames)
 
 def documentationMain():
     # Set up
@@ -273,10 +273,10 @@ def documentationMain():
 
 def setupForDocumentation():
     # Set up
-    filename = "../See_if_this_is_enough_to_get_started/GEN3CH_4_009.dig"
+    filename = "../dig/GEN3CH_4_009.dig"
     t1 = 14.2389/1e6
     t2 = 31.796/1e6
-    MySpect = Spectrogram(filename)
+    MySpect = Spectrogram(filename, mode = "complex")
     sTime = MySpect._time_to_index(t1)
     eTime = MySpect._time_to_index(t2)
 
@@ -285,8 +285,6 @@ def setupForDocumentation():
 
     topVel = 5000
     topVelInd = MySpect._velocity_to_index(topVel)
-
-    signalJump = 25
 
     visualSignalStart = 2652.21
     visSigIndex = MySpect._velocity_to_index(visualSignalStart)

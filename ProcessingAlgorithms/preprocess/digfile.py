@@ -367,8 +367,13 @@ class DigFile:
         """
         Return the path to the directory of dig files
         """
-        par = os.path.split(__file__)[0]
-        diggers = os.path.join(os.path.split(par)[0], 'dig')
+        root = "LANL_2019_Clinic" # This is the name of the root folder for the source.
+        # We are operating under the assumption that the data files (dig files) will be
+        # in a folder that is on the same level as this source folder.
+        par, curr = os.path.split(__file__)
+        while curr != root:
+            par, curr = os.path.split(par)
+        diggers = os.path.join(os.path.split(par), 'dig')
         return diggers
 
     @staticmethod
@@ -388,7 +393,11 @@ class DigFile:
         return sorted(digfiles)
 
     @staticmethod
-    def inventory():
+    def inventory(segments=False):
+        """Produce a pandas DataFrame showing all the .dig files in
+        the /dig/ directory. If segments is True, show each segment file
+        that was created by Fiducials.split(). By default, segments is False.
+        """
         curdir = os.getcwd()
         home = DigFile.dig_dir()
         os.chdir(home)
@@ -396,6 +405,8 @@ class DigFile:
 
         for filename in DigFile.all_dig_files():
             df = DigFile(filename)
+            if not segments and df.is_segment:
+                continue
             rows.append(dict(
                 file=filename,
                 date=df.date,
@@ -405,6 +416,10 @@ class DigFile:
             ))
         os.chdir(curdir)
         return pd.DataFrame(rows)
+
+    @property
+    def is_segment(self):
+        return self.header_text.startswith('Segment')
 
 
 if __name__ == '__main__':
@@ -422,7 +437,7 @@ if __name__ == '__main__':
     plt.show()
     raise Exception("Done")
 
-    for file in os.listdir('../dig/'):
+    for file in os.listdir(DigFile.dig_dir()):
         filename = os.path.splitext(file)[0]
         if filename != 'GEN3_CHANNEL1KEY001':
             continue

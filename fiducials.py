@@ -10,9 +10,9 @@
 import numpy as np
 from scipy.optimize import curve_fit
 import pandas as pd
-from digfile import DigFile
-from save_as_dig_file import save_as_dig
-from moving_average import compress
+from ProcessingAlgorithms.preprocess.digfile import DigFile
+from ProcessingAlgorithms.SaveFiles.save_as_dig_file import save_as_dig
+from ProcessingAlgorithms.Fitting.moving_average import compress
 import os
 
 
@@ -270,12 +270,13 @@ class Fiducials:
         is supplied, use the name of the source file before the
         .dig extension.
         """
+        parent, file = os.path.split(self.digfile.path)
+        folder, _ = os.path.splitext(file)
         if not basename:
-            base = os.path.split(self.digfile.path)[1]
-            basename = os.path.splitext(base)[0]
+            basename = "seg"
         # Make the directory
         home, filename = os.path.split(self.digfile.path)
-        folder = os.path.join(home, basename)
+        folder = os.path.join(parent, folder)
         if not os.path.exists(folder):
             os.makedirs(folder)
         times = self.marks['t_start'].to_numpy()
@@ -298,11 +299,12 @@ class Fiducials:
             except:
                 t_stop = df.t_final
             vals = df.raw_values(t_start, t_stop)
-            name = f"{basename}_{n:02d}.dig"
+            name = f"{basename}{n:02d}.dig"
             save_as_dig(os.path.join(folder, name),
                         vals, df.data_format,
                         top_header=head, **kwargs)
             # df.extract(os.path.join(folder, name), t_start, t_stop)
+        return f"{len(times)} files written in {folder}"
 
 
 def split_digfile(digfile: DigFile, times: np.ndarray, basename="", **kwargs):
@@ -415,6 +417,8 @@ def downspike(digfile: DigFile, **kwargs):
             axes.plot(tvals[minpos:minpos + onemicro],
                       myexpo(tvals[minpos:minpos + onemicro], *exparams), 'r--')
             axes.set_xlim(tvals[spike - 100], tvals[minpos + 2 * onemicro])
+            axes.set_title(digfile.filename, usetex=False)
+            axes.set_xlabel("$t$")
             plt.show()
         assert tau < 2
 

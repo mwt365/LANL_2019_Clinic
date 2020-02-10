@@ -13,7 +13,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy import signal
 
-from digfile import DigFile
+from ProcessingAlgorithms.preprocess.digfile import DigFile
 
 
 class Spectrogram:
@@ -26,7 +26,7 @@ class Spectrogram:
     Required arguments to the constructor:
         digfile: either an instance of DigFile or the filename of a .dig file
 
-    **Optional arguments and their default values**
+    **Optional arguments and their (default) values**
 
     t_start: (digfile.t0) time of the first point to use in the spectrogram
     ending:  (None) either the time of the last point or a positive integer
@@ -175,6 +175,7 @@ class Spectrogram:
             )
             if mode in ('angle', 'phase'):
                 setattr(self, mode, spec)
+            self.orig_spec_output = spec
         times += self.t_start
 
         # Attempt to deduce baselines
@@ -304,9 +305,10 @@ class Spectrogram:
         tvals = self.time[time0:time1 + 1]
         vvals = self.velocity[vel0:vel1 + 1]
         ivals = self.intensity[vel0:vel1 + 1, time0:time1 + 1]
-        ovals = self.orig_spec_output[vel0:vel1 + 1, time0:time1 + 1]
-        return tvals, vvals, ivals, ovals
-
+        if self.computeMode != "psd":
+            ovals = self.orig_spec_output[vel0:vel1 + 1, time0:time1 + 1]
+            return tvals, vvals, ivals, ovals
+        return tvals, vvals, ivals
     # Routines to archive the computed spectrogram and reload from disk
 
     def _location(self, location, create=False):

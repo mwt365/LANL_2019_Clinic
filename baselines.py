@@ -133,10 +133,8 @@ def baselines_by_fft(spectrogram):
 
 if __name__ == '__main__':
     import os
-    from digfile import DigFile
     os.chdir('../dig')
-    df = DigFile('GEN3CH_4_009.dig')
-    sgram = Spectrogram(df, 0.0, 50.0e-6)
+    sgram = Spectrogram('GEN3CH_4_009.dig', 0.0, 50.0e-6)
     hoods = baselines_by_fft(sgram)
     for n, h in enumerate(hoods):
         print(f"Peak {n}\nVelocity{n}\tIntensity{n}")
