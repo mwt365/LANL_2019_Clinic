@@ -3,7 +3,7 @@
 import cv2
 import spectrogram as sp
 import numpy as np
-from scipy.misc import imsave
+from imageio import imwrite
 from matplotlib import pyplot as plt
 from ImageProcessing.Templates.templates import *
 
@@ -16,7 +16,7 @@ from ImageProcessing.Templates.templates import *
 
 def main():
 
-    path = "/Users/trevorwalker/Desktop/Clinic/For_Candace/newdigs/CH_2_009.dig"
+    path = "/home/lanl/Documents/max/dig/sample.dig"
     spec = sp.Spectrogram(path, 0.0, 60.0e-6, overlap_shift_factor= 1/8, form='db')
 
     matrix = spec.intensity
@@ -37,8 +37,8 @@ def main():
     template1 = bigger_start_pattern
 
 
-    imsave("./template1.png", template1[:])
-    imsave("./photo.png", spec[:])
+    imwrite("./template1.png", template1[:])
+    imwrite("./photo.png", spec[:])
 
 
     # imread(path, 0) signifies reading in the image in grayscale mode
@@ -49,7 +49,7 @@ def main():
 
     w, h = template.shape[::-1]
 
-    # All the 6 methods for comparison in a list
+    # All the 6 methods for comparison in a lists
     methods = ['cv2.TM_CCOEFF', 'cv2.TM_CCOEFF_NORMED', 'cv2.TM_CCORR',
                 'cv2.TM_CCORR_NORMED', 'cv2.TM_SQDIFF', 'cv2.TM_SQDIFF_NORMED']
 
