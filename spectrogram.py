@@ -2,7 +2,6 @@
 
 """
 ::
-
    Author:  LANL Clinic 2019 --<lanl19@cs.hmc.edu>
    Purpose: Compute a spectrogram from a DigFile
    Created: 9/20/19
@@ -305,10 +304,11 @@ class Spectrogram:
         tvals = self.time[time0:time1 + 1]
         vvals = self.velocity[vel0:vel1 + 1]
         ivals = self.intensity[vel0:vel1 + 1, time0:time1 + 1]
-        if self.computeMode != "psd":
-            ovals = self.orig_spec_output[vel0:vel1 + 1, time0:time1 + 1]
-            return tvals, vvals, ivals, ovals
-        return tvals, vvals, ivals
+
+        # ovals = self.orig_spec_output[vel0:vel1 + 1, time0:time1 + 1]
+        return tvals, vvals, ivals#, ovals
+
+
     # Routines to archive the computed spectrogram and reload from disk
 
     def _location(self, location, create=False):
@@ -407,24 +407,80 @@ class Spectrogram:
             axes.set_ylim(top=kwargs['max_vel'])
             del kwargs['max_vel']
         if 'min_vel' in kwargs:
-            axes.set_ylim(bot=kwargs['min_vel'])
+            axes.set_ylim(bottom=kwargs['min_vel'])
             del kwargs['min_vel']
 
         pcm = axes.pcolormesh(
             self.time * 1e6,
             self.velocity,
             self.intensity,
+            cmap='gist_yarg',
             **kwargs)
+
+        pcm.set_clim(-5,100)
+
+        # plt.ylim(1500, 5500)
+        # plt.xlim(20, 40)
 
         plt.gcf().colorbar(pcm, ax=axes)
         axes.set_ylabel('Velocity (m/s)')
         axes.set_xlabel('Time ($\mu$s)')
         title = self.data.filename.split('/')[-1]
         axes.set_title(title.replace("_", "\\_"))
+
         return pcm
 
 
 if __name__ == '__main__':
-    sp = Spectrogram('../dig/GEN3CH_4_009.dig', None,
-                     None, overlap_shift_factor=1 / 4)
-    print(sp)
+    import template_matching as tm
+    import baselines
+
+    path = "/Users/trevorwalker/Desktop/Clinic/For_Candace/newdigs/CH_2_009.dig"
+
+    sp = Spectrogram(path, 0.0, 60.0e-6, overlap_shift_factor= 1/8, form='power')
+    sgram = Spectrogram(path, 0.0, 60.0e-6, overlap_shift_factor= 1/8, form='db')
+
+
+    # template = tm.Template(values=tm.bigger_end_pattern)
+    # template2 = tm.Template(values=tm.bigger_end_pattern2)
+    # template3 = tm.Template(values=tm.bigger_end_pattern3)
+
+    template = tm.Template(values=tm.bigger_start_pattern)
+    template2 = tm.Template(values=tm.bigger_start_pattern2)
+    template3 = tm.Template(values=tm.bigger_start_pattern3)
+
+    # template = tm.Template(values=tm.start_pattern)
+    # template2 = tm.Template(values=tm.start_pattern2)
+    # template3 = tm.Template(values=tm.start_pattern3)
+    # template4 = tm.Template(values=tm.start_pattern4)
+    # template5 = tm.Template(values=tm.start_pattern5)
+
+
+    # templates = [template, template2, template3, template4, template5]
+
+    # print(interesting_points)
+
+    plot = sgram.plot(max_vel=10000, min_vel=0)
+    
+
+    templates = [template, template2, template3]
+
+    baseline_scores, baselines = tm.find_regions(sgram, templates)
+
+    for baseline in baselines:
+
+        interesting_points = tm.find_potenital_start_points(sgram, baseline_scores[baseline])
+
+        for pair in interesting_points:
+            time, velo = pair
+            y = velo
+            x = time * 10**6
+            # y = sp._velocity_to_index(velo)
+            # x = sp._time_to_index(time)
+
+            plt.plot(x, y, 'ro', markersize=.7)
+
+    plt.show()
+
+
+
