@@ -43,7 +43,8 @@ class PeakFollower(Follower):
         self.smoothing = smoothing
         self.max_hop = max_hop
         peaks, dv, heights = bline(spectrogram)
-        self.baselines = np.array(peaks)
+        # Let's take only the peaks greater than 10% of the strongest peak
+        self.baselines = peaks[heights > 0.1]
 
     def run(self):
         """
@@ -69,10 +70,12 @@ class PeakFollower(Follower):
         low_to_high = np.argsort(intensities)
 
         # remove any peaks that are too close to the baseline
+        # Since argsort only sorts from low to high, we will use negative
+        # indexing to crawl down from the greatest intensity.
         n = -1
         while True:
-            mingap = np.min(
-                np.abs(self.baselines - velocities[low_to_high[n]]))
+            vpeak = velocities[low_to_high[n]]
+            mingap = np.min(np.abs(self.baselines - vpeak))
             if mingap > 100:
                 break
             n -= 1
