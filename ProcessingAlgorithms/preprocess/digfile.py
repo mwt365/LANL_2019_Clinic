@@ -373,7 +373,7 @@ class DigFile:
         par, curr = os.path.split(__file__)
         while curr != root:
             par, curr = os.path.split(par)
-        diggers = os.path.join(os.path.split(par), 'dig')
+        diggers = os.path.join(par, 'dig')
         return diggers
 
     @staticmethod
