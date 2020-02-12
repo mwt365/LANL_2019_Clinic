@@ -6,7 +6,7 @@ from spectrogram import Spectrogram
 # spec = Spectrogram("./dig/GEN3CH_4_009.dig")
 # times, velocities, intensities = spec.slice((spec.time[1500],spec.time[2000]),(1000,5000))
 
-img = cv2.imread('GEN1_CHAN1TEKBAK001.dig.png',0)
+img = cv2.imread('messi_5.jpg',0)
 # img = intensities
 img2 = img.copy()
 template = cv2.imread('messi_face.jpg',0)
