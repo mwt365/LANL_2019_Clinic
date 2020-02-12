@@ -12,11 +12,11 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--file_name',type=str,default=False)
 args = parser.parse_args()
 
-directory = '../dig'
+directory = '/home/lanl/Documents/dig/'
 
 
 if args.file_name:
-    spec = Spectrogram('../dig/'+args.file_name)
+    spec = Spectrogram(directory+args.file_name)
     spec.plot()
     plt.savefig(args.file_name+'.png')
     plt.clf()
