@@ -3,7 +3,11 @@
 import Documentation.cm_xml_to_matplotlib as cm
 import os
 
+import Documentation.cm_xml_to_matplotlib as cm
+import os
+
 DIR = os.path.join(os.path.split(__file__)[0], "xml_cm_files")
+# This should be pulling the folder structure from the current file
 
 # make the Matplotlib compatible colormap
 
@@ -11,10 +15,14 @@ DIR = os.path.join(os.path.split(__file__)[0], "xml_cm_files")
 COLORMAPS = {}
 
 try:
-    for file in os.listdir(DIR):
-        base, ext = os.path.splitext(file)
-        if ext == '.xml':
-            COLORMAPS[base] = cm.make_cmap(os.path.join(DIR, file))
+    for base, dirs, files in os.walk(DIR):
+        for file in files:
+            if file.endswith('.xml'):
+                try:
+                    path = os.path.join(base, file)
+                    COLORMAPS[os.path.splitext(file)[0]] = cm.make_cmap(path)
+                except Exception as eeps:
+                    print(f"No luck with {path}")
 except FileNotFoundError:
     print("No folder named 'xml color map files' in the source directory.")
 

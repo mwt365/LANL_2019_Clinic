@@ -10,9 +10,9 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-from digfile import DigFile
+from ProcessingAlgorithms.preprocess.digfile import DigFile
 from spectrogram import Spectrogram
-from spectrum import Spectrum
+from ProcessingAlgorithms.spectrum import Spectrum
 from plotter import COLORMAPS
 from scipy.cluster.vq import kmeans, kmeans2, whiten
 

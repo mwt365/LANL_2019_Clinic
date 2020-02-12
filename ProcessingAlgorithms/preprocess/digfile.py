@@ -367,8 +367,13 @@ class DigFile:
         """
         Return the path to the directory of dig files
         """
-        par = os.path.split(__file__)[0]
-        diggers = os.path.join(os.path.split(par)[0], 'dig')
+        root = "LANL_2019_Clinic"  # This is the name of the root folder for the source.
+        # We are operating under the assumption that the data files (dig files) will be
+        # in a folder that is on the same level as this source folder.
+        parent, curr = __file__, ""
+        while curr != root:
+            parent, curr = os.path.split(parent)
+        diggers = os.path.join(parent, 'dig')
         return diggers
 
     @staticmethod

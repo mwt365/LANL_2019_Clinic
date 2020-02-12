@@ -10,7 +10,7 @@
 import numpy as np
 import pandas as pd  # for exporting fit data
 from scipy.optimize import curve_fit, OptimizeWarning
-from moving_average import moving_average
+from .moving_average import moving_average
 
 
 class Gaussian:

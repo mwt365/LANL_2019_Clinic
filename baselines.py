@@ -133,7 +133,7 @@ def baselines_by_fft(spectrogram):
 
 if __name__ == '__main__':
     import os
-    from digfile import DigFile
+    from ProcessingAlgorithms.preprocess.digfile import DigFile
     os.chdir('../dig')
     df = DigFile('GEN3CH_4_009.dig')
     sgram = Spectrogram(df, 0.0, 50.0e-6)

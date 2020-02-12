@@ -92,14 +92,13 @@ def make_spectrogram_color_map(spectrogram, number_of_bands, name):
 
 
 if __name__ == '__main__':
-    from digfile import DigFile
+    from ProcessingAlgorithms.preprocess.digfile import DigFile
     df = DigFile('../dig/GEN3CH_4_009.dig')
     sg = Spectrogram(df)
     roids = make_spectrogram_color_map(sg, 4, "Kitty")
 
-
     sg.plot(cmap = roids["cmap"])
     import matplotlib.pyplot as plt
-    plt.xlim((0,50))
+    plt.xlim((0, 50))
     plt.ylim((1500, 5000))
     plt.show()

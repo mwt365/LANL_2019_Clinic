@@ -13,7 +13,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy import signal
 
-from digfile import DigFile
+from ProcessingAlgorithms.preprocess.digfile import DigFile
 
 
 class Spectrogram:

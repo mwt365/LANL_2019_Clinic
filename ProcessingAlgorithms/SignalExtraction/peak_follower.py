@@ -9,9 +9,9 @@
 """
 
 import numpy as np
-from follower import Follower
+from ProcessingAlgorithms.SignalExtraction.follower import Follower
 from baselines import baselines_by_squash as bline
-from moving_average import moving_average
+from ProcessingAlgorithms.Fitting.moving_average import moving_average
 
 
 class PeakFollower(Follower):

@@ -18,13 +18,13 @@ import ipywidgets as widgets
 from matplotlib import widgets as mwidgets
 from IPython.display import display
 
-from digfile import DigFile
+from ProcessingAlgorithms.preprocess.digfile import DigFile
 from spectrogram import Spectrogram
-from spectrum import Spectrum
+from ProcessingAlgorithms.spectrum import Spectrum
 from plotter import COLORMAPS
-from gaussian import Gaussian
-from gaussian_follow import GaussianFitter
-from peak_follower import PeakFollower
+from ProcessingAlgorithms.Fitting.gaussian import Gaussian
+from ProcessingAlgorithms.SignalExtraction.gaussian_follow import GaussianFitter
+from ProcessingAlgorithms.SignalExtraction.peak_follower import PeakFollower
 
 DEFMAP = '3w_gby'  # should really be in an .ini file
 

@@ -10,7 +10,7 @@
 import numpy as np
 import inspect
 from scipy.optimize import curve_fit, OptimizeWarning
-from moving_average import moving_average
+from ProcessingAlgorithms.Fitting.moving_average import moving_average
 
 
 class Fit:
