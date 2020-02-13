@@ -7,7 +7,12 @@ from imageio import imwrite
 from matplotlib import pyplot as plt
 from ImageProcessing.Templates.templates import *
 
-
+# process command line args
+import argparse
+parser = argparse.ArgumentParser()
+parser.add_argument('--file_name',type=str,default=False)
+parser.add_argument('-m',default=False)
+args = parser.parse_args()
 
 
 #TODO read in original image once, give minMaxLoc for each template
@@ -52,6 +57,9 @@ def main():
     # All the 6 methods for comparison in a lists
     methods = ['cv2.TM_CCOEFF', 'cv2.TM_CCOEFF_NORMED', 'cv2.TM_CCORR',
                 'cv2.TM_CCORR_NORMED', 'cv2.TM_SQDIFF', 'cv2.TM_SQDIFF_NORMED']
+    if args.m:
+
+        methods = [methods[int(args.m)]]
 
     for meth in methods:
         img = img2.copy()
