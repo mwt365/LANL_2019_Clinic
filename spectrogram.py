@@ -423,7 +423,7 @@ class Spectrogram:
         axes.set_ylabel('Velocity (m/s)')
         axes.set_xlabel('Time ($\mu$s)')
         title = self.data.filename.split('/')[-1]
-        axes.set_title(title.replace("_", "\\_"))
+        axes.set_title(title.replace("_", "\\"))
 
         return pcm
 

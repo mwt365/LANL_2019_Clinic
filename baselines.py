@@ -14,7 +14,8 @@ from spectrogram import Spectrogram
 from scipy.signal import find_peaks
 from scipy.fftpack import fft
 import random
-import peak_follower
+
+# import peak_follower
 
 
 def baselines_by_squash(spectrogram: Spectrogram):
@@ -159,7 +160,7 @@ if __name__ == '__main__':
 
     df = pd.DataFrame(dict(peaks=peaks, heights=heights))
 
-    print(df)
+    # print(df)
 
 
     # print(sgram.v_max)

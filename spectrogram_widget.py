@@ -8,7 +8,7 @@
   with convenient controls
   Created: 09/26/19
 """
-
+import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
@@ -23,6 +23,9 @@ from plotter import COLORMAPS
 from gaussian import Gaussian
 from gaussian_follow import GaussianFitter
 from peak_follower import PeakFollower
+from template_matcher import TemplateMatcher
+from ImageProcessing.Templates.templates import opencv_start_pattern2
+
 
 DEFMAP = '3w_gby'  # should really be in an .ini file
 
@@ -419,7 +422,7 @@ class SpectrogramWidget:
         # Click selector  ###########################################
         # What to do when registering a click in the spectrogram
         cd['clicker'] = widgets.Select(
-            options=("Spectrum (dB)", "Spectrum", "Peak", "Gauss", ),
+            options=("Spectrum (dB)", "Spectrum", "Peak", "Gauss", "Template_Matching"),
             value='Spectrum (dB)',
             description="Click:",
             disabled=False
@@ -646,6 +649,8 @@ class SpectrogramWidget:
         try:
             if 'Spectrum' in action:
                 self.spectrum(t, action)
+            elif 'Template_Matching' in action:
+                self.match_templates(t, v)
             else:
                 self.follow(t, v, action)
 
@@ -942,3 +947,19 @@ class SpectrogramWidget:
             line = self.axSpectrogram.lines[0]
 
             line.set(xdata=[tval, tval], ydata=[0, self.spectrogram.v_max])
+
+
+    def match_templates(self, time, velocity):
+
+        template = opencv_start_pattern2
+
+        matcher = TemplateMatcher(self.spectrogram, (time, velocity), template)
+
+        top_left, bottom_right = matcher.main()
+
+        print(top_left, bottom_right)
+
+        cv2.rectangle(self.axSpectrogram, top_left, bottom_right, 0, thickness=1)
+
+        
+
