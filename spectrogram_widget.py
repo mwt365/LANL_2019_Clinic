@@ -953,13 +953,10 @@ class SpectrogramWidget:
 
         template = opencv_start_pattern2
 
-        matcher = TemplateMatcher(self.spectrogram, (time, velocity), template)
+        # for i in range(40, 121, 40):
 
-        top_left, bottom_right = matcher.main()
-
-        print(top_left, bottom_right)
-
-        cv2.rectangle(self.axSpectrogram, top_left, bottom_right, 0, thickness=1)
-
+        matcher = TemplateMatcher(self.spectrogram, (time, velocity), template, span=40)
+        times, velos = matcher.main()
+        self.axSpectrogram.plot( times, velos, 'ro', markersize=2, alpha=0.8)
         
 
