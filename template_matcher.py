@@ -38,7 +38,7 @@ class TemplateMatcher():
 
     """
 
-    def __init__(self, spectrogram, start_point, template, span=40):
+    def __init__(self, spectrogram, start_point, template, span=80):
         assert isinstance(spectrogram, Spectrogram)
         assert (start_point is not None)
         assert (len(template) > 0)
@@ -84,7 +84,7 @@ class TemplateMatcher():
     def crop_intensities(self, matrix, time_bounds, velo_bounds):
 
         sortedmatrix = sorted(matrix.flatten(), reverse=True)
-        threshold_percentile = np.percentile(sortedmatrix, 97)
+        threshold_percentile = np.percentile(sortedmatrix, 90)
 
         new_matrix = np.where(matrix > threshold_percentile, matrix+(2*threshold_percentile), threshold_percentile)
         new_matrix = new_matrix[velo_bounds[0]:velo_bounds[1], time_bounds[0]:time_bounds[1]]
