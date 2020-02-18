@@ -95,10 +95,12 @@ def splitIntoDigFiles(SpectrogramObject:Spectrogram, fracOfMedian = 0.1, timeBet
     for n in range(len(timeForSplits)+1):
         head = header.format(n)
         try:
-            t_stop = df.time_values(spec.time[timeForSplits[n]], 1)[0]
+            t_stop = df.time_values(SpectrogramObject.time[timeForSplits[n]], 1)[0]
+            print("spec time", SpectrogramObject.time[timeForSplits[n]], "and its corresponding point number", df.point_number(SpectrogramObject.time[timeForSplits[n]]))
         except:
             t_stop = df.t_final
         print("segmentOffset", segmentOffset, "tEnd", t_stop)
+        print("The final time point is", df.t_final)
         vals = df.raw_values(segmentOffset, t_stop)
         name = f"{basename}{n:02d}.dig"
         kwargs = dict(
