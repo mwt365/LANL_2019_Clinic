@@ -304,8 +304,8 @@ class Spectrogram:
         tvals = self.time[time0:time1 + 1]
         vvals = self.velocity[vel0:vel1 + 1]
         ivals = self.intensity[vel0:vel1 + 1, time0:time1 + 1]
-        ovals = self.orig_spec_output[vel0:vel1 + 1, time0:time1 + 1]
-        return tvals, vvals, ivals, ovals
+        # ovals = self.orig_spec_output[vel0:vel1 + 1, time0:time1 + 1]
+        return tvals, vvals, ivals, #ovals
 
     # Routines to archive the computed spectrogram and reload from disk
 
@@ -420,6 +420,17 @@ class Spectrogram:
         title = self.data.filename.split('/')[-1]
         axes.set_title(title.replace("_", "\\_"))
         return pcm
+
+    def squash(self, along = 'time', dB = False):
+        """Sum along either rows or columns (as power) and return an
+        array normalized to unit height.
+        """
+        vals = np.sum(self.power(self.intensity),
+                      axis = 0 if along == 'time' else 1)
+        vals /= np.max(vals)
+        if dB:
+            vals = 20 * np.log10(vals)
+        return vals
 
 
 if __name__ == '__main__':
