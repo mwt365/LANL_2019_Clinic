@@ -314,7 +314,7 @@ class Fiducials:
             name = f"{basename}{n:02d}.dig"
             save_as_dig(os.path.join(folder, name),
                         vals, df.data_format,
-                        top_header=heading, **kwargs)
+                        top_header=heading, date = the_date, **kwargs)
         return f"{len(times)} files written in {folder}"
 
 

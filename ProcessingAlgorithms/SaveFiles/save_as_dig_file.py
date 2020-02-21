@@ -6,7 +6,7 @@ import numpy as np
 
 def save_as_dig(filename, vvals, datatype, dt=20e-12, initialTime=0,
                 voltageMultiplier=6.103516e-5, voltageOffset=0,
-                top_header=""):
+                top_header="", **kwargs):
     """
         Inputs:
             filename: string/path object pointing to where the file is.
@@ -33,6 +33,7 @@ def save_as_dig(filename, vvals, datatype, dt=20e-12, initialTime=0,
             The rest of the file will be writing the datapoints in binary.
     """
     dataformat = ""
+    date = kwargs.get("date", "")
     if isinstance(datatype, type(str("example"))
                   ) or isinstance(datatype, type('8')):
         if datatype == '8':
@@ -75,7 +76,7 @@ def save_as_dig(filename, vvals, datatype, dt=20e-12, initialTime=0,
         f.write(top_header)  # write 512 bytes of spaces
         stuff = "\r\n".join([
             # today's date Day Mon NumDay HH:MM:SS: YEAR
-            "Fri Sep 20 08:00:00 2019",
+            date,
             # the number of samples used.
             str(nsamples),
             # format for the data to be read as.
