@@ -37,36 +37,44 @@ def save_as_dig(filename, vvals, datatype, dt=20e-12, initialTime=0,
                   ) or isinstance(datatype, type('8')):
         if datatype == '8':
             dataformat = '8'
-            datatype = np.dtype("ubyte")
+            datatype = np.dtype("u1")
         elif datatype == '16':
             dataformat = '16'
-            datatype = np.dtype(">uint16")
+            datatype = np.dtype(">u2")
         elif datatype == '32':
             dataformat = '32'
-            datatype = np.dtype(">uint32")
+            datatype = np.dtype(">u4")
         else:
             raise ValueError(
                 "datatype corresponds to an unsupported data type.")
-    elif datatype == np.dtype("ubyte"):
+    elif datatype == np.dtype("u1"):
         dataformat = '8'
-    elif datatype == np.dtype(">uint16"):
+    elif datatype == np.dtype(">u2"):
         dataformat = '16'
-    elif datatype == np.dtype(">uint32"):
+    elif datatype == np.dtype(">u4"):
         dataformat = '32'
     else:
         raise ValueError("datatype corresponds to an unsupported data type.")
 
     nsamples = len(vvals)
 
+    # If the top_header argument is a dictionary, prepare a string
+    # representation.
+    if isinstance(top_header, dict):
+        keys = top_header.keys()
+        head = "\r\n".join([f"{k} = {top_header[k]}" for k in keys])
+        top_header = head
+
     # Now write the header, the important parts of which are
     # nsamples, bits, dt, t0, dv, v0
     # This will fail if the file is not already created.
+
     with open(filename, 'w') as f:
         if len(top_header) < 512:
             top_header += " " * (512 - len(top_header))
         f.write(top_header)  # write 512 bytes of spaces
         stuff = "\r\n".join([
-            # todays date Day Mon NumDay HH:MM:SS: YEAR
+            # today's date Day Mon NumDay HH:MM:SS: YEAR
             "Fri Sep 20 08:00:00 2019",
             # the number of samples used.
             str(nsamples),
