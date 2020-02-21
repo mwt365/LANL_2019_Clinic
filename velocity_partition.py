@@ -1,6 +1,12 @@
-# Vertical Partitioning.
+#!/usr/bin/env python3
+# coding:utf-8
+"""
+::
 
-
+  Author:  LANL Clinic 2019 --<lanl19@cs.hmc.edu>
+  Purpose: To segment the data in a spectrogram based upon lack of signal.
+  Created: 02/12/20
+"""
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -10,30 +16,33 @@ import os
 from ProcessingAlgorithms.SaveFiles.save_as_dig_file import save_as_dig
 
 
-def make_total_inten_vs_time_plot(Intensity, time, title:str):
-
-    # powered = SpectrogramObject.power(SpectrogramObject.intensity)
+def intensityOverTime(Intensity, time, title:str):
+    """
+        Input: Intensity - 2d array of intensities [v, t]
+                time - array of times
+                title - string corresponding to the title of the graph.
+        Effect:
+            Plot the totalIntensity at each time slice.
+    """
+    
     totalInten = np.sum(Intensity, axis=0)
-    # powerInten = np.sum(powered, axis=0)
-
-
+    
     plt.plot(time*1e6, totalInten)
     plt.title(title.replace("_", "\\_"))
-    plt.xlabel('Time ($\mu$s)')
+    plt.xlabel(r'Time ($\mu$s)')
     plt.ylabel("Total Intensity across all velocities")
+    plt.show()
 
-def threshold(totalInten, fracOfMedian):
+
+def threshold(totalInten, fracOfMax):
     """
         Return the time indices that contain total intensity less than 
-        fracOfMedian of the maximum throughout the whole spectrogram.
+        fracOfMax of the maximum throughout the whole spectrogram.
     """
 
     maxValue = np.max(totalInten)
 
-    inds = np.where(totalInten <= fracOfMedian*maxValue)
-
-    print("The number of locations that I think are separators is", len(inds[0]), "for a threshold of", fracOfMedian)
-
+    inds = np.where(totalInten <= fracOfMax*maxValue)
 
     return sorted(inds[0])
 
@@ -51,7 +60,7 @@ def split(indicies:np.array, timeArray, timeBetweenSlices):
     """
     time = timeArray.copy()
     timeValues = time[indicies].copy()*1e6
-    timeBetweenSlices *= 1e6 # Convert to seconds.
+    timeBetweenSlices *= 1e6 # Convert to microseconds.
     data = []
     ind = 0
     while ind < len(indicies):
@@ -69,7 +78,7 @@ def split(indicies:np.array, timeArray, timeBetweenSlices):
     return np.array([indicies[data[i]] for i in range(len(data))])
 
 
-def splitIntoDigFiles(SpectrogramObject:Spectrogram, fracOfMedian = 0.1, timeBetweenSlices = 1e-5):
+def splitIntoDigFiles(SpectrogramObject:Spectrogram, fracOfMedian = 0.1, timeBetweenSlices = 5e-5):
     intensity = SpectrogramObject.intensity
     totalInten = np.sum(intensity, axis = 0)
     totalInten -= np.min(totalInten)
@@ -116,52 +125,35 @@ def splitIntoDigFiles(SpectrogramObject:Spectrogram, fracOfMedian = 0.1, timeBet
         segmentOffset = t_stop
     return f"{len(timeForSplits)} files written in {folder}"
 
-if False:
-    if __name__ == "__main__":
-        import os
-        from ProcessingAlgorithms.preprocess.digfile import DigFile
-        from spectrogram import Spectrogram
-        # plt.clf()
-        digFolder = DigFile.dig_dir()
-        allDigs = DigFile.inventory()["file"] # Just the files that are not segments.
+if __name__ == "__main__":
+    from ProcessingAlgorithms.preprocess.digfile import DigFile
 
-        saveLoc = os.path.join(os.path.split(digFolder)[0], "TotalIntensityMaps\\Median\\")
-        if not os.path.exists(saveLoc):
-            os.makedirs(saveLoc)
+    digFolder = DigFile.dig_dir()
+    allDigs = DigFile.inventory()["file"] # Just the files that are not segments.
 
-        # for i in range(len(allDigs)):
-        #     filename = allDigs[i]
-        #     path = os.path.join(digFolder, filename)
-        #     spec = Spectrogram(path)
-        #     title = spec.data.filename.split('/')[-1]
-        #     inTen = spec.power(spec.intensity)
-        #     make_total_inten_vs_time_plot(inTen, spec.time, title)
-        #     name, _ = os.path.splitext(filename)
-        #     name += "_Power_intensity_map.png"
-        #     name = os.path.join(saveLoc, name.replace("new\\", ""))
-        #     plt.savefig(name)
-        #     plt.clf()
-        #     del spec
+    saveLoc = os.path.join(os.path.split(digFolder)[0], "TotalIntensityMaps\\Median\\")
+    if not os.path.exists(saveLoc):
+        os.makedirs(saveLoc)
+    
+    fractions = np.arange(10)
+    fractionsL = len(fractions)
+
+    data = np.zeros((fractionsL, len(allDigs)))
+    data[:,0] = fractions
+    for i in range(len(allDigs)):
+        filename = allDigs[i]
+        path = os.path.join(digFolder, filename)
+        spec = Spectrogram(path)
+        inTen = np.sum(spec.intensity, axis = 0)
+            # Offset the values so that everything is non negative.
+        inTen = inTen - np.min(inTen)
+
+        for j in range(fractionsL):
+            frac = np.power(10.0, -1*fractions[j])
+            data[j,i] = len(threshold(inTen, frac))
         
-        fractions = np.arange(10)
-        fractionsL = len(fractions)
+        del spec
 
-        data = np.zeros((fractionsL, len(allDigs)))
-        data[:,0] = fractions
-        for i in range(len(allDigs)):
-            filename = allDigs[i]
-            path = os.path.join(digFolder, filename)
-            spec = Spectrogram(path)
-            inTen = np.sum(spec.intensity, axis = 0)
-                # Offset the values so that everything is non negative.
-            inTen = inTen - np.min(inTen)
+    name = os.path.join(saveLoc, "NumberOfLowValuesVsFracOfMax.txt")
 
-            for j in range(fractionsL):
-                frac = np.power(10.0, -1*fractions[j])
-                data[j,i] = threshold(inTen, frac)
-            
-            del spec
-
-        name = os.path.join(saveLoc, "NumberOfLowValuesVsFracOfMax.txt")
-
-        np.savetxt(name, data)
+    np.savetxt(name, data)
