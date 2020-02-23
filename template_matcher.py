@@ -7,6 +7,7 @@
   Purpose: Attempt to match templates in a user specified area.
   Created: 2/16/20
 """
+
 import cv2
 import numpy as np
 from template_matching import Template
@@ -14,12 +15,11 @@ from spectrogram import Spectrogram
 from ImageProcessing.Templates.templates import *
 from scipy.misc import imsave
 from matplotlib import pyplot as plt
+from matplotlib.patches import Rectangle
 
 
-# return a list of kth strongest potential starting points
-# run the trace extraction on each, calculate a score for the explored path
-# get a score for each starting point for each of those
-# return the highest contrast, or the max score for the easiest implementation
+#TODO 'Genetic' algorithm for finding templates
+#TODO Run peak follower on highest scored points with contrast, or highest signal score
 
 
 class TemplateMatcher():
@@ -46,7 +46,7 @@ class TemplateMatcher():
         self.template = template
         self.raw_click = start_point
         self.spectrogram = spectrogram
-        self.span = span
+        self.span = int(span)
 
         self.setup()
 
@@ -57,15 +57,23 @@ class TemplateMatcher():
         t, velocity = self.raw_click
         time = t * 10**-6
 
-        self.click = (self.spectrogram._time_to_index(time), self.spectrogram._time_to_index(velocity))
+        self.click = (self.spectrogram._time_to_index(time), self.spectrogram._velocity_to_index(velocity))
 
-        start_time = self.spectrogram._time_to_index(time) - int(1.5 * self.span)
-        end_time = self.spectrogram._time_to_index(time) + int(1.5 * self.span)
+        start_time = self.spectrogram._time_to_index(time)
+        end_time = self.spectrogram._time_to_index(time) + self.span
         max_time_index = self.spectrogram.intensity.shape[1]
 
-        start_velo = self.spectrogram._velocity_to_index(velocity) - self.span
-        end_velo = self.spectrogram._velocity_to_index(velocity) + self.span
+        start_velo = self.spectrogram._velocity_to_index(velocity)
+        end_velo = self.spectrogram._velocity_to_index(velocity) + (3*self.span)
         max_velo_index = self.spectrogram.intensity.shape[0]
+
+        # start_time = self.spectrogram._time_to_index(time) - self.span
+        # end_time = self.spectrogram._time_to_index(time) + self.span
+        # max_time_index = self.spectrogram.intensity.shape[1]
+
+        # start_velo = self.spectrogram._velocity_to_index(velocity) - self.span
+        # end_velo = self.spectrogram._velocity_to_index(velocity) + self.span
+        # max_velo_index = self.spectrogram.intensity.shape[0]
 
         if start_time < 0:
             start_time = 0
@@ -86,9 +94,23 @@ class TemplateMatcher():
         sortedmatrix = sorted(matrix.flatten(), reverse=True)
         threshold_percentile = np.percentile(sortedmatrix, 90)
 
-        new_matrix = np.where(matrix > threshold_percentile, matrix+(2*threshold_percentile), threshold_percentile)
-        new_matrix = new_matrix[velo_bounds[0]:velo_bounds[1], time_bounds[0]:time_bounds[1]]
-        spec = np.flip(np.flip(new_matrix), axis=1)
+        new_matrix = np.where(matrix > threshold_percentile, matrix+threshold_percentile, threshold_percentile)
+        new_matrix = np.flip(np.flip(new_matrix), axis=1)
+        
+        # spec = new_matrix[velo_bounds[0]:velo_bounds[1], time_bounds[0]:time_bounds[1]]
+
+        # print((-1 * velo_bounds[1]))
+        # print((-1 * velo_bounds[0]))
+        # print(time_bounds[0])
+        # print(time_bounds[1])
+
+
+        spec = new_matrix[-1500:-100, 50:150]
+
+
+        # imsave("./debug.png", spec[:])
+        imsave("./debug.png", spec[:])
+
 
         return spec
 
@@ -135,20 +157,35 @@ class TemplateMatcher():
             bottom_right = (top_left[0] + w, top_left[1] + h)
 
             velo_offset = self.spectrogram.velocity[self.velo_bounds[0]]
-            time_offset = self.spectrogram.time[self.time_bounds[0]]*10**6
-            template_offset_time = (len(self.template[0]))/2
-            template_offset_velo = (len(self.template))/2
+            time_offset = self.spectrogram.time[self.time_bounds[0]] * 10**6
+
+            # print(time_offset)
+
+            # print( (self.spectrogram.time[top_left[0]]) * 10**5)
+            # print(self.spectrogram.velocity[top_left[1]])
+            # print(top_left,'\n')
+
+            xcoords.append( (self.spectrogram.time[top_left[0]] * 10**6) + time_offset)
+            ycoords.append( self.spectrogram.velocity[top_left[1]] + velo_offset)
+
+            # xcoords.append( (self.spectrogram.time[top_left[1] + self.time_bounds[0]]) * 10**6)
+            # ycoords.append( self.spectrogram.velocity[top_left[0] + self.velo_bounds[0]] + velo_offset)
 
 
-            xcoords.append( (self.spectrogram.time[top_left[1]]*10**6) + time_offset + template_offset_time)
-            ycoords.append( self.spectrogram.velocity[top_left[0]] + velo_offset + template_offset_velo)
+            #top left does not mean anything to spectrogram.time
 
 
-            print(meth)
-            print(xcoords[-1])
-            print(ycoords[-1])
-            print(self.span)
-            print(scores[-1],'\n')
+
+            # print(top_left[1], top_left[0])
+            # print(self.click)
+
+            # print(meth)
+
+            # print(xcoords[-1], '\n')
+            # print(ycoords[-1])
+
+            # print(self.span)
+            # print(scores[-1],'\n')
 
             # cv2.rectangle(img, top_left, bottom_right, 255, thickness=1)
             # plt.subplot(121),plt.imshow(res,cmap = 'gray')
@@ -175,17 +212,17 @@ if __name__ == "__main__":
 
     template = opencv_start_pattern2
 
-    for i in range(40, 121, 40):
+    # for i in range(40, 121, 40):
 
-        time = round(secure_random.uniform(8.5, 13.5), 3)
-        velo = round(secure_random.uniform(2600.5, 2900.5), 3)
+    time = round(secure_random.uniform(8.5, 13.5), 3)
+    velo = round(secure_random.uniform(2600.5, 2900.5), 3)
 
-        print("   time : ",time)
-        print("velocity: ",velo,'\n')
+    print("   time : ",time)
+    print("velocity: ",velo,'\n')
 
-        user_click = (time, velo)
+    user_click = (time, velo)
 
-        template_matcher = TemplateMatcher(spec, user_click, template, span=i)
-        template_matcher.main()
+    template_matcher = TemplateMatcher(spec, user_click, template, span=80)
+    template_matcher.main()
 
 

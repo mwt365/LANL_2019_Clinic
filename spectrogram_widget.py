@@ -25,6 +25,7 @@ from gaussian_follow import GaussianFitter
 from peak_follower import PeakFollower
 from template_matcher import TemplateMatcher
 from ImageProcessing.Templates.templates import opencv_start_pattern2
+from matplotlib.patches import Rectangle
 
 
 DEFMAP = '3w_gby'  # should really be in an .ini file
@@ -955,8 +956,35 @@ class SpectrogramWidget:
 
         # for i in range(40, 121, 40):
 
-        matcher = TemplateMatcher(self.spectrogram, (time, velocity), template, span=40)
-        times, velos = matcher.main()
-        self.axSpectrogram.plot( times, velos, 'ro', markersize=2, alpha=0.8)
-        
+        # print(times)
+        dv = self.spectrogram.velocity[240]
+        dt = self.spectrogram.time[60] * 1e6
 
+
+        t = time * 1e6
+
+        # print(dv)
+        # print(dt, '\n')
+        # print(t)
+        # print(velocity, '\n')
+        # print("time: ", time)
+
+        time_offset = dt / 2
+        velo_offset = dv / 2
+
+        box_coords = (t-time_offset, velocity-velo_offset)
+        print(box_coords)
+        print(dt)
+        print(dv)
+
+
+        matcher = TemplateMatcher(self.spectrogram, (time, velocity), template, span=60)
+
+        times, velos = matcher.main()
+
+        print(times, velos)
+
+
+        patch = Rectangle( (t-time_offset, velocity-velo_offset), dt, dv, fill=False, color='r')
+        self.axSpectrogram.add_patch(patch)
+        self.axSpectrogram.plot( times, velos, 'ro', markersize=1.5, alpha=0.8)
