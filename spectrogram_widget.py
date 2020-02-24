@@ -954,36 +954,22 @@ class SpectrogramWidget:
 
         template = opencv_start_pattern2
 
-        # for i in range(40, 121, 40):
+        span = 80
 
-        # print(times)
-        dv = self.spectrogram.velocity[240]
-        dt = self.spectrogram.time[60] * 1e6
-
+        dv = self.spectrogram.velocity[3*span]
+        dt = self.spectrogram.time[span] * 1e6
 
         t = time * 1e6
-
-        # print(dv)
-        # print(dt, '\n')
-        # print(t)
-        # print(velocity, '\n')
-        # print("time: ", time)
 
         time_offset = dt / 2
         velo_offset = dv / 2
 
         box_coords = (t-time_offset, velocity-velo_offset)
-        print(box_coords)
-        print(dt)
-        print(dv)
+        new_click = (box_coords[0]*1e-6, velocity-velo_offset)
 
-
-        matcher = TemplateMatcher(self.spectrogram, (time, velocity), template, span=60)
+        matcher = TemplateMatcher(self.spectrogram, new_click, template, span=span)
 
         times, velos = matcher.main()
-
-        print(times, velos)
-
 
         patch = Rectangle( (t-time_offset, velocity-velo_offset), dt, dv, fill=False, color='r')
         self.axSpectrogram.add_patch(patch)
