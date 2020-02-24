@@ -75,6 +75,13 @@ class TemplateMatcher():
         if end_velo > max_velo_index:
             end_velo = max_velo_index-1
 
+        zero_index = self.spectrogram._time_to_index(0)
+
+        print(zero_index)
+        print(start_time)
+        print(zero_index+start_time)
+        print(self.spectrogram.time[zero_index+start_time])
+
         self.time_bounds = (start_time, end_time) #indices, not actual time/velo values
         self.velo_bounds = (start_velo, end_velo)
 

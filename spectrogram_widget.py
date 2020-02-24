@@ -952,7 +952,6 @@ class SpectrogramWidget:
 
     def match_templates(self, time, velocity):
 
-
         print("start")
 
         template = opencv_start_pattern2
@@ -970,51 +969,59 @@ class SpectrogramWidget:
         box_coords = (t-time_offset, velocity-velo_offset)
         new_click = (box_coords[0]*1e-6, velocity-velo_offset)
 
+        start_time = self.spectrogram.time[0] * 1e6
+        offset = start_time * -1
+
+
         matcher = TemplateMatcher(self.spectrogram, new_click, template, span=span)
 
         times, velos = matcher.main()
 
+        times[:] = times[:] + offset
+
         print("done with matching")
 
-        patch = Rectangle( (t-time_offset, velocity-velo_offset), dt, dv, fill=False, color='r')
+        patch = Rectangle( (t-time_offset, velocity-velo_offset), dt, dv, fill=False, color='b', alpha=0.15)
         self.axSpectrogram.add_patch(patch)
 
-        self.axSpectrogram.plot( times, velos, 'ro', markersize=1.5, alpha=0.8)
+        self.axSpectrogram.plot( times, velos, 'bo', markersize=1.5, alpha=0.6)
 
-        max_follower = 0
-        max_index = 0
-        max_tsecs = 0
-        max_v = 0
+        print(times, velos)
 
-        for i in range(len(times)):
+        # max_follower = 0
+        # max_index = 0
+        # max_tsecs = 0
+        # max_v = 0
 
-            t = times[i] * 1e-6
-            v = velos[i]
+        # for i in range(len(times)):
 
-            follower = PeakFollower(self.spectrogram, (t, v))
+        #     t = times[i] * 1e-6
+        #     v = velos[i]
 
-            self.peak_followers.append(follower)
-            follow_sum = follower.run()
+        #     follower = PeakFollower(self.spectrogram, (t, v))
 
-            tsec, v = follower.v_of_t
+        #     self.peak_followers.append(follower)
+        #     follow_sum = follower.run()
 
-            if follow_sum > max_follower:
-                max_follower = follow_sum
-                max_index = i
-                max_tsecs = tsec
-                max_v = v
+        #     tsec, v = follower.v_of_t
 
-        follower.line = self.axSpectrogram.plot(
-            max_tsecs * 1e6, max_v, 'r-', alpha=0.4)[0]
+        #     if follow_sum > max_follower:
+        #         max_follower = follow_sum
+        #         max_index = i
+        #         max_tsecs = tsec
+        #         max_v = v
 
-        most_likely_time = times[max_index]
-        most_likely_velo = velos[max_index]
+        # follower.line = self.axSpectrogram.plot(
+        #     max_tsecs * 1e6, max_v, 'r-', alpha=0.3)[0]
 
-        print("done with following")
+        # most_likely_time = times[max_index]
+        # most_likely_velo = velos[max_index]
 
-        print(most_likely_time, most_likely_velo)
+        # print("done with following")
 
-        self.axSpectrogram.plot( most_likely_time, most_likely_velo, 'ro', markersize=1.5, alpha=0.8)
+        # print(most_likely_time, most_likely_velo)
+
+        # self.axSpectrogram.plot( most_likely_time, most_likely_velo, 'ro', markersize=2.5, alpha=1)
 
 
 
