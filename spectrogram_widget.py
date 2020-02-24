@@ -952,6 +952,9 @@ class SpectrogramWidget:
 
     def match_templates(self, time, velocity):
 
+
+        print("start")
+
         template = opencv_start_pattern2
 
         span = 80
@@ -971,10 +974,12 @@ class SpectrogramWidget:
 
         times, velos = matcher.main()
 
-        # patch = Rectangle( (t-time_offset, velocity-velo_offset), dt, dv, fill=False, color='r')
-        # self.axSpectrogram.add_patch(patch)
+        print("done with matching")
 
-        # self.axSpectrogram.plot( times, velos, 'ro', markersize=1.5, alpha=0.8)
+        patch = Rectangle( (t-time_offset, velocity-velo_offset), dt, dv, fill=False, color='r')
+        self.axSpectrogram.add_patch(patch)
+
+        self.axSpectrogram.plot( times, velos, 'ro', markersize=1.5, alpha=0.8)
 
         max_follower = 0
         max_index = 0
@@ -999,11 +1004,13 @@ class SpectrogramWidget:
                 max_tsecs = tsec
                 max_v = v
 
-        # follower.line = self.axSpectrogram.plot(
-        #     max_tsecs * 1e6, max_v, 'r-', alpha=0.4)[0]
+        follower.line = self.axSpectrogram.plot(
+            max_tsecs * 1e6, max_v, 'r-', alpha=0.4)[0]
 
         most_likely_time = times[max_index]
         most_likely_velo = velos[max_index]
+
+        print("done with following")
 
         print(most_likely_time, most_likely_velo)
 
