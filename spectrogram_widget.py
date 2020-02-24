@@ -971,6 +971,43 @@ class SpectrogramWidget:
 
         times, velos = matcher.main()
 
-        patch = Rectangle( (t-time_offset, velocity-velo_offset), dt, dv, fill=False, color='r')
-        self.axSpectrogram.add_patch(patch)
-        self.axSpectrogram.plot( times, velos, 'ro', markersize=1.5, alpha=0.8)
+        # patch = Rectangle( (t-time_offset, velocity-velo_offset), dt, dv, fill=False, color='r')
+        # self.axSpectrogram.add_patch(patch)
+
+        # self.axSpectrogram.plot( times, velos, 'ro', markersize=1.5, alpha=0.8)
+
+        max_follower = 0
+        max_index = 0
+        max_tsecs = 0
+        max_v = 0
+
+        for i in range(len(times)):
+
+            t = times[i] * 1e-6
+            v = velos[i]
+
+            follower = PeakFollower(self.spectrogram, (t, v))
+
+            self.peak_followers.append(follower)
+            follow_sum = follower.run()
+
+            tsec, v = follower.v_of_t
+
+            if follow_sum > max_follower:
+                max_follower = follow_sum
+                max_index = i
+                max_tsecs = tsec
+                max_v = v
+
+        # follower.line = self.axSpectrogram.plot(
+        #     max_tsecs * 1e6, max_v, 'r-', alpha=0.4)[0]
+
+        most_likely_time = times[max_index]
+        most_likely_velo = velos[max_index]
+
+        print(most_likely_time, most_likely_velo)
+
+        self.axSpectrogram.plot( most_likely_time, most_likely_velo, 'ro', markersize=1.5, alpha=0.8)
+
+
+
