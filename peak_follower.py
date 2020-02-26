@@ -50,8 +50,10 @@ class PeakFollower(Follower):
         Repeatedly call step until it fails.
         """
         intensities = []
-
-        while self.step(intensities):
+        counter = 0
+        
+        while self.step(intensities) and counter < 10:
+            counter+=1
             pass
         
         return np.sum(intensities)

@@ -10,6 +10,7 @@
 
 import cv2
 import numpy as np
+from baselines import baselines_by_squash
 from template_matching import Template
 from spectrogram import Spectrogram
 from ImageProcessing.Templates.templates import *
@@ -87,6 +88,10 @@ class TemplateMatcher():
 
     def crop_intensities(self, matrix, time_bounds, velo_bounds):
 
+        # baselines, ws, hs = baselines_by_squash(self.spectrogram)
+
+        # print(baselines)
+
         sortedmatrix = sorted(matrix.flatten(), reverse=True)
         threshold_percentile = np.percentile(sortedmatrix, 90)
 
@@ -118,8 +123,14 @@ class TemplateMatcher():
         w, h = template.shape[::-1]
 
         # All the 6 methods for comparison in a list
-        methods = ['cv2.TM_CCOEFF', 'cv2.TM_CCOEFF_NORMED', 'cv2.TM_CCORR',
-                    'cv2.TM_CCORR_NORMED', 'cv2.TM_SQDIFF', 'cv2.TM_SQDIFF_NORMED']
+        # methods = ['cv2.TM_CCOEFF', 'cv2.TM_CCOEFF_NORMED', 'cv2.TM_CCORR',
+        #             'cv2.TM_CCORR_NORMED', 'cv2.TM_SQDIFF', 'cv2.TM_SQDIFF_NORMED']
+
+        # methods = ['cv2.TM_CCOEFF', 'cv2.TM_CCOEFF_NORMED']
+        # methods = ['cv2.TM_CCORR', 'cv2.TM_CCORR_NORMED']
+        # methods = ['cv2.TM_SQDIFF', 'cv2.TM_SQDIFF_NORMED']
+
+        methods = ['cv2.TM_CCORR'] # the 'best' method for matching
 
         xcoords = []
         ycoords = []
@@ -157,8 +168,9 @@ class TemplateMatcher():
             # plt.suptitle(meth)
             # plt.show()
 
-        return xcoords, ycoords
+        # print(scores)
 
+        return xcoords, ycoords
 
 
 
