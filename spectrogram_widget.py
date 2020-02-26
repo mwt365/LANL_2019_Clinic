@@ -26,6 +26,7 @@ from peak_follower import PeakFollower
 from template_matcher import TemplateMatcher
 from ImageProcessing.Templates.templates import opencv_start_pattern2
 from matplotlib.patches import Rectangle
+import time as Time
 
 
 DEFMAP = '3w_gby'  # should really be in an .ini file
@@ -952,10 +953,11 @@ class SpectrogramWidget:
 
     def match_templates(self, time, velocity):
 
-        print("start")
+        # print("start")
+        start = Time.time()
 
         template = opencv_start_pattern2
-        template_start_index = 5
+        template_start_index = 5 #where should the actual start index be in the template?
 
         span = 80
 
@@ -979,14 +981,14 @@ class SpectrogramWidget:
 
         times[:] = times[:] + start_time_offset
 
-        print("done with matching")
+        # print("done with matching")
 
         # patch = Rectangle( (t-time_offset, velocity-velo_offset), dt, dv, fill=False, color='b', alpha=0.15)
         # self.axSpectrogram.add_patch(patch)
 
         # self.axSpectrogram.plot( times, velos, 'bo', markersize=1.5, alpha=0.6)
 
-        print(times, velos)
+        # print(times, velos)
 
         max_follower = 0
         max_index = 0
@@ -1018,9 +1020,13 @@ class SpectrogramWidget:
 
         most_likely_velo = velos[max_index]
 
-        print("done with following")
+        end = Time.time()
 
-        print(most_likely_time, most_likely_velo)
+        print("finished in: ", round(end-start, 3), " seconds")
+
+        # print("done with following")
+
+        # print(most_likely_time, most_likely_velo)
 
         self.axSpectrogram.plot( most_likely_time, most_likely_velo, 'ro', markersize=2.5, alpha=1)
 
