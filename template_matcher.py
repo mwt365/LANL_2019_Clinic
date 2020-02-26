@@ -142,7 +142,34 @@ class TemplateMatcher():
 
             # Apply template Matching
             res = cv2.matchTemplate(img,template,method)
+
+            # print(res.shape)
+            # print(res)
+
             min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(res)
+
+
+            # RES SEEMS TO BE IMMUTABLE? 
+            # CAN'T REASSIGN VALUES IN RES TO RERUN THE MINMAXLOC FUNCTION
+            # IN ORDER TO FIND A LIST OF THE SORTED 2D ARRAY OF ELEMENTS AND 
+            # THEIR CORRESPONDING LOCATIONS 
+            
+            # values = []
+            # values.append(max_loc)
+            # res[max_loc[0]][max_loc[1]] = 0
+
+            # for i in range(10):
+            #     a, b, c, new_max = cv2.minMaxLoc(res)
+            #     values.append(new_max)
+            #     print(new_max[0])
+            #     print(res[new_max[0]][new_max[1]])
+            #     res[new_max[0]][new_max[1]] = 0
+            #     print(res[new_max[0]][new_max[1]],'\n')
+
+            # # print(values)
+            # # print(max(mylist))
+            # # print(max_val, max_loc)
+            # # print(min_val, min_loc)
 
             
             # If the method is TM_SQDIFF or TM_SQDIFF_NORMED, take minimum
