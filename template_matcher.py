@@ -19,8 +19,6 @@ from matplotlib.patches import Rectangle
 
 
 #TODO 'Genetic' algorithm for finding templates
-#TODO Run peak follower on highest scored points with contrast, or highest signal score
-
 
 class TemplateMatcher():
     """
@@ -77,10 +75,10 @@ class TemplateMatcher():
 
         zero_index = self.spectrogram._time_to_index(0)
 
-        print(zero_index)
-        print(start_time)
-        print(zero_index+start_time)
-        print(self.spectrogram.time[zero_index+start_time])
+        # print(zero_index)
+        # print(start_time)
+        # print(zero_index+start_time)
+        # print(self.spectrogram.time[zero_index+start_time])
 
         self.time_bounds = (start_time, end_time) #indices, not actual time/velo values
         self.velo_bounds = (start_velo, end_velo)
@@ -108,6 +106,7 @@ class TemplateMatcher():
 
         matrix = self.spectrogram.intensity
         cropped_spectrogram = self.crop_intensities(matrix, self.time_bounds, self.velo_bounds)
+
 
         imsave("./im_template.png", self.template[:])
         imsave("./im_cropped_bg.png", cropped_spectrogram[:])
@@ -163,25 +162,34 @@ class TemplateMatcher():
 
 
 
-# if __name__ == "__main__":
+if __name__ == "__main__":
 
-    # path = "/Users/trevorwalker/Desktop/Clinic/For_Candace/newdigs/CH_2_009.dig"
-    # spec = Spectrogram(path, 0.0, 60.0e-6, overlap_shift_factor= 1/8, form='db')
+    path = "/Users/trevorwalker/Desktop/Clinic/For_Candace/newdigs/CH_2_009.dig"
+    spec = Spectrogram(path, 0.0, 60.0e-6, overlap_shift_factor= 1/8, form='db')
 
-    # import random
-    # secure_random = random.SystemRandom()
+    import random
+    secure_random = random.SystemRandom()
 
-    # template = opencv_start_pattern2
+    template = opencv_start_pattern2
 
-    # time = round(secure_random.uniform(8.5, 13.5), 3)
-    # velo = round(secure_random.uniform(2400.5, 2700.5), 3)
+    time = round(secure_random.uniform(8.5, 13.5), 3)
+    velo = round(secure_random.uniform(2400.5, 2700.5), 3)
+
+
+    user_click = (time*1e-6, velo)
 
     # print("   time : ",time)
     # print("velocity: ",velo,'\n')
 
-    # user_click = (time*1e-6, velo)
 
-    # template_matcher = TemplateMatcher(spec, user_click, template, span=80)
-    # times, velos = template_matcher.main()
+    template_matcher = TemplateMatcher(spec, user_click, template, span=80)
+    times, velos = template_matcher.main()
+
+
+    print(times, velos)
+
+    spec.plot()
+    plt.plot(times, velos, 'ro', markersize=1.5)
+    plt.show()
 
 
