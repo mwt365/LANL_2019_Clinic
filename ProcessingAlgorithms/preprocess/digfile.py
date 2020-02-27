@@ -90,6 +90,23 @@ class DigFile:
             return dateline.group(0)
         return ""
 
+    @property
+    def basename(self):
+        "Return the name of this file, without extension"
+        return os.path.splitext(os.path.split(self.path)[1])[0]
+
+    @property
+    def rel_path(self):
+        """
+        Returns the relative path from the dig folder to the file
+        """
+        return os.path.relpath(self.path, self.dig_dir())
+
+    @property
+    def rel_dir(self):
+        "Return the relative path to the directory holding this file"
+        return os.path.split(self.rel_path)[0]
+
     def load_dig_file(self):
         """
         A .dig file has a 1024-byte ascii header, typically followed by binary

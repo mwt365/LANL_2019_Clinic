@@ -845,9 +845,11 @@ class SpectrogramWidget:
         self.baselines = []  # remove any existing baselines
         if method == "Squash":
             peaks, sigs, heights = baselines_by_squash(self.spectrogram)
-            for n in range(len(heights)):
-                if heights[n] > 0.1:
-                    blines.append(peaks[n])
+            blines.extend(peaks)
+
+            # for n in range(len(heights)):
+            # if heights[n] > 0.1:
+            # blines.append(peaks[n])
 
         # Now show the baselines in blines or remove any
         # if blines is empty

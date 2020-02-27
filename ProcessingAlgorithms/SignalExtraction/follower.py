@@ -12,11 +12,13 @@ import numpy as np
 import pandas as pd
 from spectrogram import Spectrogram
 from scipy.optimize import curve_fit
+from scipy.interpolate import InterpolatedUnivariateSpline as ius
 
 
 class Follower:
     """
-    Given a spectrogram and a starting point (t, v), a follower
+    Given a spectrogram and a starting point (t, v) --
+    or a list of such points -- a follower
     looks for a quasicontinuous local maximum through the spectrogram.
     This base class handles storage of the spectrogram reference, the
     starting point, and a span value describing the width of the
@@ -38,14 +40,10 @@ class Follower:
         assert isinstance(spectrogram, Spectrogram)
         assert isinstance(span, int)
         self.spectrogram = spectrogram
-        self.t_start = start_point[0]
-        self.v_start = start_point[1]
-        self.span = span
 
         # Now establish storage for intermediate results and
         # state. time_index is the index into the spectrogram.intensity
         # along the time axis.
-        self.time_index = spectrogram._time_to_index(self.t_start)
 
         self.results = dict(
             velocity_index_spans=[],  # the range of points used for the fit
@@ -59,12 +57,87 @@ class Follower:
         self.time = self.spectrogram.time
         self.intensity = self.spectrogram.intensity
 
+        # convert to a numpy array so we can inspect dimensions
+        stpt = np.asarray(start_point)
+        if stpt.size == 2:
+            # we have a single start point
+            self.t_start = start_point[0]
+            self.v_start = start_point[1]
+        else:
+            self.t_start = stpt[0, 0]
+            self.v_start = stpt[0, 1]
+            for t, v in start_point:
+                t_index = self.spectrogram._time_to_index(t)
+                self.add_point(t_index, v)
+
+        self.time_index = spectrogram._time_to_index(self.t_start)
+        self.span = span
+
+    def add_point(self, t_index, v, span = None):
+        """Add this point to the results, making sure to keep the results
+        array sorted by time.
+        """
+        r = self.results
+        v_index = self.spectrogram._velocity_to_index(v)
+        d = dict(
+            times = self.time[t_index],
+            time_index = t_index,
+            velocities = v,
+            intensities = self.spectrogram.intensity[v_index, t_index],
+            velocity_index_spans = span
+        )
+
+        if len(r['times']) and t_index < r['time_index'][0]:
+            # We need to insert at the beginning
+            for k, v in d.items():
+                r[k].insert(0, v)
+        else:
+            for k, v in d.items():
+                r[k].append(v)
+
     @property
     def v_of_t(self):
         "A convenience function for plotting; returns arrays for time and velocity"
         t = np.array(self.results['times'])
         v = np.array(self.results['velocities'])
         return t, v
+
+    def guess_range(self, t_index):
+        """
+        Attempt to guess where the center of the peak should be for time
+        index t_index, using the best information available. If we have no
+        data yet, use t_start and v_start
+        """
+
+        r = self.results
+        if len(r['times']) == 0:
+            v_guess = self.v_start
+        elif len(r['times']) == 1:
+            v_guess = r['velocities'][0]
+        else:
+            k = min(4, len(r['velocities'])) - 1
+            spline = ius(r['time_index'], r['velocities'], k = k)
+            v_guess = spline(t_index)
+
+        velocity_index = self.spectrogram._velocity_to_index(v_guess)
+        start_index = max(0, velocity_index - self.span)
+        end_index = min(velocity_index + self.span,
+                        len(self.spectrogram.velocity))
+        return (start_index, end_index)
+
+    def guess_intensity(self, t_index):
+        """Attempt to guess the expected intensity based on extrapolation"""
+        r = self.results
+        ti = r['time_index']
+        n = len(ti)
+        if n == 0:
+            return 0
+        if n == 1:
+            return self.results['intensities'][0]
+        else:
+            k = min(4, n) - 1
+            spline = ius(ti, r['intensities'], k = k)
+            return spline(t_index)
 
     def data_range(self, n=-1):
         """
@@ -83,7 +156,8 @@ class Follower:
         return (start_index, end_index)
 
     def data(self, n=-1):
-        start_index, end_index = self.data_range(n)
+        #  old way: start_index, end_index = self.data_range(n)
+        start_index, end_index = self.guess_range(n)
         velocities = self.velocity[start_index:end_index]
         intensities = self.intensity[start_index:end_index, self.time_index]
         return velocities, self.spectrogram.power(intensities), start_index, end_index

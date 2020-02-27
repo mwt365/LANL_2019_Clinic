@@ -71,13 +71,13 @@ class Spectrogram:
                  digfile: DigFile,
                  t_start=None,
                  ending=None,
-                 wavelength: float = 1550.0e-9,
-                 points_per_spectrum: int = 8192,
-                 overlap: float = 0.25,
+                 wavelength: float=1550.0e-9,
+                 points_per_spectrum: int=8192,
+                 overlap: float=0.25,
                  window_function=None,  # 'hanning',
-                 form: str = 'db',
-                 convert_to_voltage: bool = True,
-                 detrend: str = "linear",
+                 form: str='db',
+                 convert_to_voltage: bool=True,
+                 detrend: str="linear",
                  **kwargs
                  ):
         """

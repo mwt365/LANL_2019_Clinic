@@ -9,6 +9,7 @@
 """
 
 import numpy as np
+from spectrogram import Spectrogram
 from ProcessingAlgorithms.SignalExtraction.follower import Follower
 from baselines import baselines_by_squash as bline
 from ProcessingAlgorithms.Fitting.moving_average import moving_average
@@ -23,45 +24,78 @@ class PeakFollower(Follower):
 
     - spectrogram: an instance of Spectrogram
     - start_point: (t, v), the coordinates at which to begin the search
-    - span: (60) the number of pixels on either side of the starting value of v
+    - span: (80) the number of pixels on either side of the starting value of v
       at which to search for a peak at the next time step.
     - smoothing: (4) the number of points on either side of a given velocity
       in a spectrum to average over to produce a smoothed representation of the
       spectrum prior to searching for a peak.
-    - max_hop: (50) the largest change in v from the previous time step to consider
+    - max_hop: (70) the largest change in v from the previous time step to consider
       as a continuation.
-
-
     """
 
-    def __init__(self, spectrogram, start_point, span=80,
+    def __init__(self,
+                 spectrogram: Spectrogram,
+                 start_point,  # either a tuple or a list of tuples
+                 span=80,      # width of neighborhood to search
                  smoothing=4,  # average this many points on each side
-                 max_hop=70   # require peaks at successive time steps
-                 # to be within this many velocity indices
+                 max_hop=500,  # require peaks at successive time steps
+                               # to be within this many m/s
+                 direction=1,  # go forward in time (1), backward (-1)
                  ):
         super().__init__(spectrogram, start_point, span)
         self.smoothing = smoothing
         self.max_hop = max_hop
+        assert direction in (-1, 1), "Direction must be +1 or -1"
+        self.direction = direction
         peaks, dv, heights = bline(spectrogram)
         # Let's take only the peaks greater than 10% of the strongest peak
         self.baselines = peaks[heights > 0.1]
+
+    def reverse(self):
+        """Switch directions"""
+        self.direction = -self.direction
+        # now update the value of time_index
+        tindex = self.results['time_index']
+        if len(tindex) > 0:
+            if self.direction > 0:
+                self.time_index = tindex[-1] + 1
+                self.last_peak = self.results['velocities'][-1]
+            else:
+                self.time_index = tindex[0] - 1
+                self.last_peak = self.results['velocities'][0]
 
     def run(self):
         """
         Repeatedly call step until it fails.
         """
-        while self.step():
-            pass
+        failures = 0
+        consecutive_failures = 0
+        while True:
+            try:
+                self.step()
+                consecutive_failures = 0
+                continue
+            except IndexError:
+                break
+            except Exception as eeps:
+                failures += 1
+                consecutive_failures += 1
+
+            if consecutive_failures > 10:
+                break
 
     def step(self):
         """
-        Attempt to fit a gaussian starting from the coeffients
+        Identify the tallest peak in the range of data supplied
+        by the inherited data() method, after removing peaks that
+        are too close to known baselines.
+
         in the input parameter to intensities vs velocities.
         If coefficients is None or empty, guess reasonable values.
         The order of the parameters in the coefficients array is
         amplitude, center, width, and background.
         """
-        velocities, intensities, p_start, p_end = self.data()
+        velocities, intensities, p_start, p_end = self.data(self.time_index)
 
         if self.smoothing:
             intensities = moving_average(intensities, n=self.smoothing)
@@ -83,30 +117,30 @@ class PeakFollower(Follower):
         top = low_to_high[n]  # index of the tallest intensity peak
         v_high = velocities[top]
 
+        # At this point, we need a criterion for accepting or rejecting
+        # this point.
+        reject = False
+        if len(self.results['times']) > 0:
+            i_guess = self.guess_intensity(self.time_index)
+            reject = 0.02 * i_guess > intensities[top]
+
         # add this to our results
-        self.results['velocity_index_spans'].append((p_start, p_end))
-        self.results['time_index'].append(self.time_index)
-        self.results['times'].append(
-            self.spectrogram._point_to_time(self.time_index))
-        self.results['velocities'].append(velocities[top])
-        # we need to call transform to return to whatever format is being used
-        # for the plot (?)
-        self.results['intensities'].append(
-            self.spectrogram.transform(intensities[top]))
+        if not reject:
+            self.add_point(self.time_index, v_high, span = (p_start, p_end))
+            try:
+                hop = abs(v_high - self.last_peak)
+                if hop > self.max_hop:
+                    print(f"hop at [{self.time_index}] of {hop} from {self.last_peak:0f} to {self.v_high:0f}")
+
+            except:
+                pass
+            self.last_peak = v_high
+
         # on success we increment to the next time index
-        self.time_index += 1
+        self.time_index += self.direction
 
-        if self.time_index >= len(self.time):
-            return False  # we're out of data
+        if self.time_index >= len(self.time) or self.time_index < 0:
+            raise IndexError  # we're out of data
 
-        try:
-            hop = v_high - self.results['velocities'][-2]
-            hop = np.abs(hop / (velocities[1] - velocities[0]))
-            return hop <= self.max_hop
-        except IndexError:
-            return True
-        except Exception as eeps:
-            print(eeps)
-            return False
 
 

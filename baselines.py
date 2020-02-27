@@ -98,7 +98,7 @@ def baselines_by_squash(
                 if sq[pk_pos + delta] < max_side_lobe * sq[pk_pos] > sq[pk_pos - delta]:
                     totes += 1
             strong_peaks.append(totes >= segments * min_percent * 0.01)
-            print(f"[{pk_pos}] -> {spectrogram.velocity[pk_pos]} ({heights[n]})) got {totes}")
+            # print(f"[{pk_pos}] -> {spectrogram.velocity[pk_pos]} ({heights[n]})) got {totes}")
         else:
             strong_peaks.append(False)
     keepers = np.array(strong_peaks)
