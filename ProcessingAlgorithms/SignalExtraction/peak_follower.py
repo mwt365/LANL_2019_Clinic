@@ -102,19 +102,19 @@ class PeakFollower(Follower):
 
         # generate an index array to sort the intensities (low to high)
         low_to_high = np.argsort(intensities)
+        high_to_low = np.flip(low_to_high)
 
         # remove any peaks that are too close to the baseline
         # Since argsort only sorts from low to high, we will use negative
         # indexing to crawl down from the greatest intensity.
-        n = -1
+        n = 0
         while True:
-            vpeak = velocities[low_to_high[n]]
+            vpeak = velocities[high_to_low[n]]
             mingap = np.min(np.abs(self.baselines - vpeak))
             if mingap > 100:
                 break
-            n -= 1
-
-        top = low_to_high[n]  # index of the tallest intensity peak
+            n += 1
+        top = high_to_low[n]
         v_high = velocities[top]
 
         # At this point, we need a criterion for accepting or rejecting
@@ -122,8 +122,12 @@ class PeakFollower(Follower):
         reject = False
         if len(self.results['times']) > 0:
             i_guess = self.guess_intensity(self.time_index)
-            reject = 0.02 * i_guess > intensities[top]
+            reject = 0.05 * i_guess > intensities[top]
 
+        hop = None if not hasattr(self, 'last_peak') else abs(
+            v_high - self.last_peak)
+        if hop and hop > self.max_hop:
+            reject = True
         # add this to our results
         if not reject:
             self.add_point(self.time_index, v_high, span = (p_start, p_end))

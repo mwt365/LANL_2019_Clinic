@@ -11,6 +11,7 @@ import sys
 from time import time
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 
 
 from ProcessingAlgorithms.preprocess.digfile import DigFile
@@ -32,12 +33,14 @@ class Pipeline:
         self.orders = orders
         self.df = DigFile(filename)
         self.rel_dir = os.path.join(self.df.rel_dir, self.df.basename)
+        self.output_dir = os.path.join(self.home, self.rel_dir)
 
         # Make sure that this directory exists
         os.makedirs(self.rel_dir, exist_ok = True)
         # Open a log file
-        self.logfile = open(os.path.join(
-            self.home, self.rel_dir, 'info.txt'), 'w')
+        self.logfile = open(
+            os.path.join(self.output_dir, 'info.txt'),
+            'w', buffering = 1)
         now = datetime.datetime.now()
         self.log(f"{self.filename} log, {now.strftime('%a %d %b %Y at %H:%M:%S')}")
         self.spectrogram = None
@@ -59,7 +62,7 @@ class Pipeline:
 
     def __del__(self):
         try:
-            print("I'm in the destructor")
+            # print("I'm in the destructor")
             self.logfile.flush()
             self.logfile.close()
         except:
@@ -80,11 +83,10 @@ def make_spectrogram(pipeline, **kwargs):
         form = kwargs.get('form', 'power'),
     )
     t0 = time()
+    allargs = {**defaults, **kwargs}
     pipeline.spectrogram = Spectrogram(
         pipeline.df,
-        **defaults,
-        **kwargs
-    )
+        **allargs)
     pipeline.log(f"  took {(time()-t0):.1f} s")
 
 
@@ -132,6 +134,7 @@ def find_signal(pipeline, **kwargs):
 def follow_signal(pipeline, **kwargs):
     """We'll first look left, then right.
     """
+    t0 = time()
     from ProcessingAlgorithms.SignalExtraction.peak_follower import PeakFollower
     follower = PeakFollower(
         pipeline.spectrogram,
@@ -143,9 +146,77 @@ def follow_signal(pipeline, **kwargs):
     follower.run()
 
     signal = pd.DataFrame(follower.results)
+    format_dict = dict(
+        times = lambda x: f"{x*1e6:.3f}",
+        velocities = lambda x: f"{x:.1f}",
+        intensities = lambda x: f"{x:.1f}"
+    )
+    signal.style.format(format_dict)
     pipeline.signals.append(signal)
-    pipeline.log(f"follow_signal generated {len(signal)} points")
-    pipeline.log(str(signal))
+    dt = time() - t0
+    pipeline.log(f"follow_signal generated {len(signal)} points in {dt:.2} s")
+    pipeline.log(signal.to_string(
+        formatters = format_dict, sparsify = False))
+
+    plt.clf()
+    plt.plot(signal['times'] * 1e6, signal['velocities'])
+    plt.xlabel('$t~(\mu \mathrm{s})$')
+    plt.ylabel('$v~(\mathrm{m/s})$')
+    plt.savefig(os.path.join(pipeline.output_dir, 'follower.pdf'))
+
+
+def gaussian_fit(pipeline, **kwargs):
+    """
+    Run through signals (which are pandas DataFrames) and
+    add columns for gaussian centers, widths, and amplitudes.
+    """
+    from ProcessingAlgorithms.Fitting.gaussian import Gaussian
+    t0 = time()
+    for signal in pipeline.signals:
+        # First add the requisite columns
+        blanks = np.zeros(len(signal)) + np.nan
+        signal['center'] = blanks
+        signal['width'] = blanks
+        signal['amplitude'] = blanks
+
+        for n in range(len(signal)):
+            row = signal.iloc[n]
+            t_index = row['time_index']
+            vfrom, vto = row['velocity_index_spans']
+            powers = pipeline.spectrogram.intensity[vfrom:vto, t_index]
+            speeds = pipeline.spectrogram.velocity[vfrom:vto]
+            gus = Gaussian(speeds, powers)
+            if gus.valid:
+                signal.loc[n, 'center'] = gus.center
+                signal.loc[n, 'width'] = gus.width
+                signal.loc[n, 'amplitude'] = gus.amplitude
+
+        signal['dcenter'] = signal.center - signal.velocities
+    dt = time() - t0
+    pipeline.log(f"\ngaussian_fit took {dt:.2f} s\n")
+
+    def oned(x): return f"{x:.1f}"
+
+    format_dict = dict(
+        times = lambda x: f"{x*1e6:.3f}",
+        velocities = oned,
+        intensities = oned,
+        center = oned,
+        width = oned,
+        amplitude = oned,
+        dcenter = lambda x: f"{x:.2f}"
+    )
+    for signal in pipeline.signals:
+        pipeline.log(signal.to_string(
+            formatters = format_dict, sparsify = False))
+        pipeline.log("\n\n")
+        plt.clf()
+        plt.errorbar(signal['times'] * 1e6,
+                     signal.dcenter, yerr = signal.width, fmt = 'b.',
+                     markersize = 1.0, lw = 0.5)
+        plt.xlabel(r'$t~(\mu \mathrm{s})$')
+        plt.ylabel(r'$\delta v~(\mathrm{m/s})$')
+        plt.savefig(os.path.join(pipeline.output_dir, 'gauss.pdf'))
 
     # def find_gaps(pipeline, *args, **kwargs):
     # """
@@ -162,9 +233,13 @@ sample_orders = (
     (find_baselines, {}),
     (find_signal, dict(t_start = 2e-5)),
     (follow_signal, dict()),
+    (gaussian_fit, dict())
 )
 
 if __name__ == '__main__':
     # sys.path.insert(0, '../')
-    pipe = Pipeline('../dig/new/CH_1_009/seg00.dig', sample_orders)
+    for seg in range(16):
+        print(seg)
+        pipe = Pipeline(
+            f'../dig/new/CH_1_009/seg{seg:02d}.dig', sample_orders, overlap = 0.75)
     print("Done!")
