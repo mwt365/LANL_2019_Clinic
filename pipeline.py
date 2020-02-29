@@ -7,7 +7,7 @@
 """
 import datetime
 import os
-import sys
+import inspect
 from time import time
 import numpy as np
 import pandas as pd
@@ -60,6 +60,41 @@ class Pipeline:
     def log(self, x):
         self.logfile.write(x + '\n')
 
+    def entry(self, message = ""):
+        """
+        Call this on entry to get the caller's information
+        added to the log and to start the timer for the
+        routine.
+        """
+        self.t0 = time()  # start timing
+        stack = inspect.stack()
+        caller = stack[1]
+        msg = f"[[{caller.function}]]"
+        kwargs = caller.frame.f_locals['kwargs']
+        if kwargs:
+            msg += f" {kwargs}"
+        self.log(msg)
+        if message:
+            self.log(message)
+
+    def exit(self, message = ""):
+        """
+        Call this on exit
+        """
+        stack = inspect.stack()
+        caller = stack[1]
+        dt = time() - self.t0
+        if dt > 0.1:
+            unit = 's'
+        elif dt > 0.001:
+            dt *= 1000
+            unit = 'ms'
+        elif dt > 1e-6:
+            dt *= 1e6
+            unit = 'µs'
+        msg = f"[[!{caller.function}]] {dt:.2f} {unit}\n"
+        self.log(msg)
+
     def __del__(self):
         try:
             # print("I'm in the destructor")
@@ -71,7 +106,7 @@ class Pipeline:
 
 def make_spectrogram(pipeline, **kwargs):
     from spectrogram import Spectrogram
-    pipeline.log(f"make_spectrogram for {kwargs}")
+    pipeline.entry()
 
     defaults = dict(
         t_start = kwargs.get('t_start'),
@@ -87,18 +122,17 @@ def make_spectrogram(pipeline, **kwargs):
     pipeline.spectrogram = Spectrogram(
         pipeline.df,
         **allargs)
-    pipeline.log(f"  took {(time()-t0):.1f} s")
+    pipeline.exit()
 
 
 def find_baselines(pipeline, **kwargs):
-    t0 = time()
+    pipeline.entry()
     from baselines import baselines_by_squash as bline
     peaks, widths, heights = bline(pipeline.spectrogram)
     baseline_limit = kwargs.get('baseline_limit', 0.1)
     pipeline.baselines = peaks[heights > baseline_limit]
-    dt = time() - t0
     pipeline.log(f"Baselines > {baseline_limit*100}%: {pipeline.baselines}")
-    pipeline.log(f"  in {dt*1000:.2f} ms")
+    pipeline.exit()
 
 
 def find_signal(pipeline, **kwargs):
@@ -106,7 +140,7 @@ def find_signal(pipeline, **kwargs):
     Start at t_start and look for a peak above the baseline
     """
     from scipy.signal import find_peaks
-
+    pipeline.entry()
     ts = kwargs.get('t_start', 2e-5)  # guess 20 µs if no info provided
     sg = pipeline.spectrogram
     t_index = sg._time_to_index(ts)
@@ -129,12 +163,13 @@ def find_signal(pipeline, **kwargs):
 
     pipeline.signal_guess = (ts, peaks[0])
     pipeline.log(f"find_signal guesses signal is at {pipeline.signal_guess}")
+    pipeline.exit()
 
 
 def follow_signal(pipeline, **kwargs):
     """We'll first look left, then right.
     """
-    t0 = time()
+    pipeline.entry()
     from ProcessingAlgorithms.SignalExtraction.peak_follower import PeakFollower
     follower = PeakFollower(
         pipeline.spectrogram,
@@ -153,8 +188,8 @@ def follow_signal(pipeline, **kwargs):
     )
     signal.style.format(format_dict)
     pipeline.signals.append(signal)
-    dt = time() - t0
-    pipeline.log(f"follow_signal generated {len(signal)} points in {dt:.2} s")
+
+    pipeline.log(f"follow_signal generated {len(signal)} points")
     pipeline.log(signal.to_string(
         formatters = format_dict, sparsify = False))
 
@@ -163,6 +198,7 @@ def follow_signal(pipeline, **kwargs):
     plt.xlabel('$t~(\mu \mathrm{s})$')
     plt.ylabel('$v~(\mathrm{m/s})$')
     plt.savefig(os.path.join(pipeline.output_dir, 'follower.pdf'))
+    pipeline.exit()
 
 
 def gaussian_fit(pipeline, **kwargs):
@@ -171,13 +207,14 @@ def gaussian_fit(pipeline, **kwargs):
     add columns for gaussian centers, widths, and amplitudes.
     """
     from ProcessingAlgorithms.Fitting.gaussian import Gaussian
-    t0 = time()
+    pipeline.entry()
     for signal in pipeline.signals:
         # First add the requisite columns
         blanks = np.zeros(len(signal)) + np.nan
         signal['center'] = blanks
         signal['width'] = blanks
         signal['amplitude'] = blanks
+        signal['dcenter'] = blanks
 
         for n in range(len(signal)):
             row = signal.iloc[n]
@@ -190,10 +227,23 @@ def gaussian_fit(pipeline, **kwargs):
                 signal.loc[n, 'center'] = gus.center
                 signal.loc[n, 'width'] = gus.width
                 signal.loc[n, 'amplitude'] = gus.amplitude
-
-        signal['dcenter'] = signal.center - signal.velocities
-    dt = time() - t0
-    pipeline.log(f"\ngaussian_fit took {dt:.2f} s\n")
+                diff = gus.center - signal.loc[n, 'velocities']
+                signal.loc[n, 'dcenter'] = diff
+                discrepancy = abs(diff / gus.width)
+                if discrepancy > 1:
+                    # The difference between the peak follower and the gaussian
+                    # fit was more than 1 value of the width.
+                    # Let's print out a plot to show what's going on
+                    plt.clf()
+                    plt.plot([signal.loc[n, 'velocities'], ],
+                             [signal.loc[n, 'intensities'], ], 'k*')
+                    plt.plot(speeds, powers, 'r.')
+                    vels = np.linspace(speeds[0], speeds[-1], 200)
+                    plt.plot(vels, gus(vels), 'b-', alpha = 0.5)
+                    plt.title(f"Time index = {t_index} $\\to$ {pipeline.spectrogram.time[t_index]*1e6:.2f}")
+                    plt.xlabel(r"$v {\rm(m/s)}$")
+                    plt.ylabel(r"$I$")
+                    plt.savefig(os.path.join(pipeline.output_dir, f'bad{t_index}.pdf'))
 
     def oned(x): return f"{x:.1f}"
 
@@ -217,6 +267,8 @@ def gaussian_fit(pipeline, **kwargs):
         plt.xlabel(r'$t~(\mu \mathrm{s})$')
         plt.ylabel(r'$\delta v~(\mathrm{m/s})$')
         plt.savefig(os.path.join(pipeline.output_dir, 'gauss.pdf'))
+
+    pipeline.exit()
 
     # def find_gaps(pipeline, *args, **kwargs):
     # """
