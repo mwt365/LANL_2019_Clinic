@@ -90,6 +90,20 @@ class DigFile:
             return dateline.group(0)
         return ""
 
+    @staticmethod
+    def dig_dir():
+        """
+        Return the path to the directory of dig files
+        """
+        root = "LANL_2019_Clinic"  # This is the name of the root folder for the source.
+        # We are operating under the assumption that the data files (dig files) will be
+        # in a folder that is on the same level as this source folder.
+        parent, curr = __file__, ""
+        while curr != root:
+            parent, curr = os.path.split(parent)
+        diggers = os.path.join(parent, 'dig')
+        return os.path.realpath(diggers)
+
     @property
     def basename(self):
         "Return the name of this file, without extension"
@@ -100,7 +114,7 @@ class DigFile:
         """
         Returns the relative path from the dig folder to the file
         """
-        return os.path.relpath(self.path, self.dig_dir())
+        return os.path.relpath(self.path, start = self.dig_dir())
 
     @property
     def rel_dir(self):
@@ -378,20 +392,6 @@ class DigFile:
             d['mins'][n] if n % 2 else d['maxs'][n] for n in range(len(times))
         ])
         return d
-
-    @staticmethod
-    def dig_dir():
-        """
-        Return the path to the directory of dig files
-        """
-        root = "LANL_2019_Clinic"  # This is the name of the root folder for the source.
-        # We are operating under the assumption that the data files (dig files) will be
-        # in a folder that is on the same level as this source folder.
-        parent, curr = __file__, ""
-        while curr != root:
-            parent, curr = os.path.split(parent)
-        diggers = os.path.join(parent, 'dig')
-        return diggers
 
     @staticmethod
     def all_dig_files():
