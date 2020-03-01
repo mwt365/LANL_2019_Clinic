@@ -13,6 +13,8 @@ import pandas as pd
 from spectrogram import Spectrogram
 from scipy.optimize import curve_fit
 
+import imageRot
+
 
 class Follower:
     """
@@ -34,13 +36,22 @@ class Follower:
 
     """
 
-    def __init__(self, spectrogram, start_point, span=80):
+    def __init__(self, spectrogram:Spectrogram, start_point:tuple, span:int=80, rotate:bool=True):
+        """
+            Input:
+                spectrogram: The object that we would like to trace a signal in.
+                start_point: (t, v) The actual time and velocity values (not the indices)
+                span: The number of velocity values up and down that you will check at the next time step.
+                rotate: whether or not you want to use linear extrapolation and rotation at each time step.
+        """
         assert isinstance(spectrogram, Spectrogram)
         assert isinstance(span, int)
         self.spectrogram = spectrogram
         self.t_start = start_point[0]
         self.v_start = start_point[1]
         self.span = span
+        self.rotate = rotate
+
 
         # Now establish storage for intermediate results and
         # state. time_index is the index into the spectrogram.intensity
@@ -59,6 +70,9 @@ class Follower:
         self.time = self.spectrogram.time
         self.intensity = self.spectrogram.intensity
 
+        self.dV = self.velocity[1]-self.velocity[0]
+        self.dT = self.time[1]-self.time[0]
+
     @property
     def v_of_t(self):
         "A convenience function for plotting; returns arrays for time and velocity"
@@ -72,6 +86,21 @@ class Follower:
         The default value of n (-1) indicates the last available point
         from the results dictionary. Earlier points are possible.
         """
+        if self.rotate and len(self.results['velocities']) > 1:
+            # Then we can use the last two velocities and time to extrapolate the line.
+            prevVel = self.results['velocities'][-2:]
+            prevTime = self.results['times'][-2:]
+
+            coefficents = imageRot.computeFit(prevTime, prevVel)
+            nextCenter = imageRot.extrapolate(coefficents, self.time[self.time_index])
+
+            velocity_index = self.spectrogram._velocity_to_index(nextCenter)
+            start_index = max(0, velocity_index - 2*self.span)
+            end_index = min(velocity_index + 2*self.span,
+                        len(self.spectrogram.velocity))
+            
+            return start_index, end_index, coefficents
+            # Compute the angle.
         if len(self.results['velocities']) > 0:
             last_v = self.results['velocities'][n]
         else:
@@ -83,6 +112,25 @@ class Follower:
         return (start_index, end_index)
 
     def data(self, n=-1):
+        if self.rotate and len(self.results['velocities']) > 1:
+
+            start_index, end_index, coefficents = self.data_range(n)
+            angle = imageRot.computeAngle(coefficents)
+
+            startT = max(0, self.time_index - 2*self.span)
+            endT = min(self.time_index + 2*self.span, len(self.time))
+
+            intensities = self.intensity[start_index:end_index, startT:endT]
+
+            rotated  = imageRot.rotate(intensities, angle)
+            newIndices = [(x,y) for x in range(rotated.shape[0]) for y in range(rotated.shape[1])]
+
+            rotatedIndices =  imageRot.computeIndices((np.array(intensities.shape[::-1])-1)/2, (np.array(rotatedIndices.shape[::-1])-1)/2, newIndices, -1*angle, (startT, start_index))
+
+            
+
+            
+
         start_index, end_index = self.data_range(n)
         velocities = self.velocity[start_index:end_index]
         intensities = self.intensity[start_index:end_index, self.time_index]

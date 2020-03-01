@@ -62,6 +62,10 @@ class PeakFollower(Follower):
         """
         velocities, intensities, p_start, p_end = self.data()
 
+        print("The list of my times",self.results['times'])
+        print("The list of my velocities", self.results['velocities'])
+
+
         if self.smoothing:
             intensities = moving_average(intensities, n=self.smoothing)
 
