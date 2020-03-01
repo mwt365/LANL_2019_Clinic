@@ -35,9 +35,10 @@ class Pipeline:
 
         # Make sure that this directory exists
         os.makedirs(self.rel_dir, exist_ok = True)
+        print(f"Making directories {self.rel_dir}")
         # Open a log file
         self.logfile = open(os.path.join(
-            self.home, self.rel_dir, 'info.txt'), 'w')
+            self.home, self.rel_dir, 'info.txt'), 'w', buffering=1)
         now = datetime.datetime.now()
         self.log(f"{self.filename} log, {now.strftime('%a %d %b %Y at %H:%M:%S')}")
         self.spectrogram = None
@@ -59,9 +60,11 @@ class Pipeline:
 
     def __del__(self):
         try:
-            print("I'm in the destructor")
+            print(f"I'm in the destructor in {os.getcwd()}")
             self.logfile.flush()
             self.logfile.close()
+            os.chdir(self.home)
+            print(os.getcwd())
         except:
             pass
 
