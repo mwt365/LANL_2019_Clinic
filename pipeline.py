@@ -7,14 +7,33 @@
 """
 import datetime
 import os
-import inspect
+import sys
 from time import time
+import inspect
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
 
 from ProcessingAlgorithms.preprocess.digfile import DigFile
+
+
+def all_pipeline_functions():
+    funcs = []
+    for name, obj in inspect.getmembers(sys.modules[__name__]):
+        if inspect.isfunction(obj):
+            sig = list(inspect.signature(obj).parameters.keys())
+            if sig and sig[0] == 'pipeline' and len(sig) == 2:
+                funcs.append(obj)
+    return funcs
+
+
+def describe_pipeline_functions():
+    """
+    List all defined pipeline functions, with their docstrings.
+    """
+    thestrs = [f"{x.__name__}\n{x.__doc__}" for x in all_pipeline_functions()]
+    return "\n\n".join(thestrs)
 
 
 class Pipeline:
@@ -44,46 +63,72 @@ class Pipeline:
         now = datetime.datetime.now()
         self.log(f"{self.filename} log, {now.strftime('%a %d %b %Y at %H:%M:%S')}")
         self.spectrogram = None
-        make_spectrogram(self, **kwargs)
         self.baselines = []
         self.gaps = []
         self.jumpoff = None
         self.probe_destruction = None
         self.signals = []
+        self.pandas_format = dict(
+            times = lambda x: f"{x*1e6:.3f}",
+            velocities = self.onedigit,
+            intensities = self.onedigit,
+            center = self.onedigit,
+            width = self.onedigit,
+            amplitude = self.onedigit,
+            dcenter = lambda x: f"{x:.2f}"
+        )
 
         # How do we specify spectrogram parameters?
+        # If the first command is not a specification for computing
+        # a spectrogram, use the defaults
+
+        if orders[0][0] != make_spectrogram:
+            orders.insert(0, (make_spectrogram, {}))
 
         for order in orders:
             routine, kwargs = order
+            self.start(routine, kwargs)
+            print(f"{routine.__name__} ...", end="", flush = True)
             routine(self, **kwargs)
+            print(self.end())
+
+    def onedigit(self, val):
+        return f"{val:.1f}"
 
     def log(self, x):
         self.logfile.write(x + '\n')
 
-    def entry(self, message = ""):
+    def open(self, message: str, kwargs: dict):
+        """
+        Start a frame with label message. If kwargs is not
+        empty, include the parameters in the dictionary.
+        """
+        self.log(f"<<<<< {message}")
+        if kwargs:
+            for k, v in kwargs.items():
+                self.log(f"+ {k} = {v}")
+
+    def close(self, message: str):
+        msg = f">>>>> {message}"
+        self.log(msg + "\n")
+        return msg
+
+    def start(self, routine, kwargs):
         """
         Call this on entry to get the caller's information
         added to the log and to start the timer for the
         routine.
         """
-        self.t0 = time()  # start timing
-        stack = inspect.stack()
-        caller = stack[1]
-        msg = f"[[{caller.function}]]"
-        kwargs = caller.frame.f_locals['kwargs']
-        if kwargs:
-            msg += f" {kwargs}"
-        self.log(msg)
-        if message:
-            self.log(message)
+        self.t0 = time()
+        self.open(routine.__name__, kwargs)
 
-    def exit(self, message = ""):
+    def end(self):
         """
         Call this on exit
         """
-        stack = inspect.stack()
-        caller = stack[1]
-        dt = time() - self.t0
+        return self.close(self._timestr(time() - self.t0))
+
+    def _timestr(self, dt):
         if dt > 0.1:
             unit = 's'
         elif dt > 0.001:
@@ -92,8 +137,7 @@ class Pipeline:
         elif dt > 1e-6:
             dt *= 1e6
             unit = 'µs'
-        msg = f"[[!{caller.function}]] {dt:.2f} {unit}\n"
-        self.log(msg)
+        return f"{dt:.2f} {unit}"
 
     def __del__(self):
         try:
@@ -105,8 +149,17 @@ class Pipeline:
 
 
 def make_spectrogram(pipeline, **kwargs):
+    """
+    Compute a spectrogram using the passed kwargs or
+    built-in defaults and set the pipeline.spectrogram field.
+    Default values are:
+      wavelength = 1.55e-6
+      points_per_spectrum = 8192
+      overlap = 0.5
+      window_function = None
+      form = 'power'
+    """
     from spectrogram import Spectrogram
-    pipeline.entry()
 
     defaults = dict(
         t_start = kwargs.get('t_start'),
@@ -117,22 +170,29 @@ def make_spectrogram(pipeline, **kwargs):
         window_function = kwargs.get('window_function'),
         form = kwargs.get('form', 'power'),
     )
-    t0 = time()
     allargs = {**defaults, **kwargs}
+    # list the arguments we use in the log
+    for k, v in allargs.items():
+        pipeline.log(f"+ {k} = {v}")
+
     pipeline.spectrogram = Spectrogram(
         pipeline.df,
         **allargs)
-    pipeline.exit()
 
 
 def find_baselines(pipeline, **kwargs):
-    pipeline.entry()
+    """
+    Compute baselines for pipeline.spectrogram using the
+    baselines_by_squash method. If baseline_limit is
+    passed as a keyword argument, only keep baseline values
+    that are larger than this value (which should be between
+    0 and 1).
+    """
     from baselines import baselines_by_squash as bline
     peaks, widths, heights = bline(pipeline.spectrogram)
-    baseline_limit = kwargs.get('baseline_limit', 0.1)
+    baseline_limit = kwargs.get('baseline_limit', 0)
     pipeline.baselines = peaks[heights > baseline_limit]
     pipeline.log(f"Baselines > {baseline_limit*100}%: {pipeline.baselines}")
-    pipeline.exit()
 
 
 def find_signal(pipeline, **kwargs):
@@ -140,8 +200,9 @@ def find_signal(pipeline, **kwargs):
     Start at t_start and look for a peak above the baseline
     """
     from scipy.signal import find_peaks
-    pipeline.entry()
-    ts = kwargs.get('t_start', 2e-5)  # guess 20 µs if no info provided
+
+    # guess 20 µs if no info provided
+    ts = float(kwargs.get('t_start', 2e-5))
     sg = pipeline.spectrogram
     t_index = sg._time_to_index(ts)
     # average over a small time neighborhood
@@ -163,13 +224,12 @@ def find_signal(pipeline, **kwargs):
 
     pipeline.signal_guess = (ts, peaks[0])
     pipeline.log(f"find_signal guesses signal is at {pipeline.signal_guess}")
-    pipeline.exit()
 
 
 def follow_signal(pipeline, **kwargs):
-    """We'll first look left, then right.
     """
-    pipeline.entry()
+    Using the peak_follower, look first look left, then right.
+    """
     from ProcessingAlgorithms.SignalExtraction.peak_follower import PeakFollower
     follower = PeakFollower(
         pipeline.spectrogram,
@@ -181,24 +241,19 @@ def follow_signal(pipeline, **kwargs):
     follower.run()
 
     signal = pd.DataFrame(follower.results)
-    format_dict = dict(
-        times = lambda x: f"{x*1e6:.3f}",
-        velocities = lambda x: f"{x:.1f}",
-        intensities = lambda x: f"{x:.1f}"
-    )
-    signal.style.format(format_dict)
+    signal.style.format(pipeline.pandas_format)
     pipeline.signals.append(signal)
 
     pipeline.log(f"follow_signal generated {len(signal)} points")
     pipeline.log(signal.to_string(
-        formatters = format_dict, sparsify = False))
+        formatters = pipeline.pandas_format, sparsify = False))
 
     plt.clf()
     plt.plot(signal['times'] * 1e6, signal['velocities'])
     plt.xlabel('$t~(\mu \mathrm{s})$')
     plt.ylabel('$v~(\mathrm{m/s})$')
+    plt.title(pipeline.df.basename, usetex = False)
     plt.savefig(os.path.join(pipeline.output_dir, 'follower.pdf'))
-    pipeline.exit()
 
 
 def gaussian_fit(pipeline, **kwargs):
@@ -207,7 +262,7 @@ def gaussian_fit(pipeline, **kwargs):
     add columns for gaussian centers, widths, and amplitudes.
     """
     from ProcessingAlgorithms.Fitting.gaussian import Gaussian
-    pipeline.entry()
+
     for signal in pipeline.signals:
         # First add the requisite columns
         blanks = np.zeros(len(signal)) + np.nan
@@ -230,68 +285,123 @@ def gaussian_fit(pipeline, **kwargs):
                 diff = gus.center - signal.loc[n, 'velocities']
                 signal.loc[n, 'dcenter'] = diff
                 discrepancy = abs(diff / gus.width)
-                if discrepancy > 1:
+                if discrepancy > 2:
                     # The difference between the peak follower and the gaussian
                     # fit was more than 1 value of the width.
                     # Let's print out a plot to show what's going on
                     plt.clf()
-                    plt.plot([signal.loc[n, 'velocities'], ],
+                    vpeak = signal.loc[n, 'velocities']
+                    vmin = min(gus.center - 25 * gus.width, vpeak - 20)
+                    vmax = max(gus.center + 25 * gus.width, vpeak + 20)
+
+                    plt.plot([vpeak, ],
                              [signal.loc[n, 'intensities'], ], 'k*')
                     plt.plot(speeds, powers, 'r.')
-                    vels = np.linspace(speeds[0], speeds[-1], 200)
+                    vels = np.linspace(vmin, vmax, 100)
                     plt.plot(vels, gus(vels), 'b-', alpha = 0.5)
                     plt.title(f"Time index = {t_index} $\\to$ {pipeline.spectrogram.time[t_index]*1e6:.2f}")
                     plt.xlabel(r"$v {\rm(m/s)}$")
                     plt.ylabel(r"$I$")
+                    plt.xlim(vmin, vmax)
                     plt.savefig(os.path.join(pipeline.output_dir, f'bad{t_index}.pdf'))
 
-    def oned(x): return f"{x:.1f}"
-
-    format_dict = dict(
-        times = lambda x: f"{x*1e6:.3f}",
-        velocities = oned,
-        intensities = oned,
-        center = oned,
-        width = oned,
-        amplitude = oned,
-        dcenter = lambda x: f"{x:.2f}"
-    )
     for signal in pipeline.signals:
         pipeline.log(signal.to_string(
-            formatters = format_dict, sparsify = False))
+            formatters = pipeline.pandas_format, sparsify = False))
         pipeline.log("\n\n")
         plt.clf()
-        plt.errorbar(signal['times'] * 1e6,
-                     signal.dcenter, yerr = signal.width, fmt = 'b.',
-                     markersize = 1.0, lw = 0.5)
-        plt.xlabel(r'$t~(\mu \mathrm{s})$')
-        plt.ylabel(r'$\delta v~(\mathrm{m/s})$')
+        fig, axes = plt.subplots(3, 1, sharex = True, figsize = (6, 6))
+        top, middle, bottom = axes
+        top.semilogy(signal.times * 1e6, signal.intensities)
+        top.set_ylabel('Intensity')
+        top.set_title(pipeline.df.basename)
+        middle.plot(signal.times * 1e6, signal.velocities)
+        middle.set_ylabel(r'$v~(\mathrm{m/s})$')
+        bottom.errorbar(signal['times'] * 1e6,
+                        signal.dcenter, yerr = signal.width, fmt = 'b.',
+                        markersize = 1.0, lw = 0.5)
+        bottom.set_xlabel(r'$t~(\mu \mathrm{s})$')
+        bottom.set_ylabel(r'$\delta v~(\mathrm{m/s})$')
         plt.savefig(os.path.join(pipeline.output_dir, 'gauss.pdf'))
 
-    pipeline.exit()
-
-    # def find_gaps(pipeline, *args, **kwargs):
-    # """
-    # Look for regions where the signal is constant at one extreme or the other.
-    # """
-
-    # def find_probe_destruction(self):
-    # """
-    # Look for signs of probe destruction
-    # """
-
-
-sample_orders = (
-    (find_baselines, {}),
-    (find_signal, dict(t_start = 2e-5)),
-    (follow_signal, dict()),
-    (gaussian_fit, dict())
-)
 
 if __name__ == '__main__':
     # sys.path.insert(0, '../')
-    for seg in range(16):
-        print(seg)
-        pipe = Pipeline(
-            f'../dig/new/CH_1_009/seg{seg:02d}.dig', sample_orders, overlap = 0.75)
-    print("Done!")
+    import argparse
+    import re
+    import shutil
+
+    curdir = os.getcwd()
+    parser = argparse.ArgumentParser(
+        description = 'Run a pipeline to process .dig files',
+        prog = "pipeline",
+        formatter_class = argparse.RawDescriptionHelpFormatter,
+        epilog = "Available operations:\n\n" + describe_pipeline_functions()
+    )
+
+    parser.add_argument('-q', '--quiet', help = "Don't report progress")
+    parser.add_argument('-s', '--segments', default = True,
+                        help = "Only process segments")
+    parser.add_argument('-r', '--regex', default = r'.*',
+                        help = "Regular expression to select files")
+    parser.add_argument('-e', '--exclude', default = None,
+                        help = "Regular expression to exclude files")
+    parser.add_argument('-i', '--input', default = 'script.txt',
+                        help = "Input file of commands")
+    parser.add_argument('-o', '--output', default = os.getcwd(),
+                        help = "top directory for results")
+    parser.add_argument('-d', '--delete', action = 'store_true',
+                        help = "Delete existing files before the run")
+
+    args = parser.parse_args()
+
+    if args.output:
+        os.chdir(args.output)
+
+    # Look for marching orders in an file called script.txt
+    assert os.path.isfile(args.input), f"You must supply file {args.input} in the output directory"
+    order_text = open(args.input, 'r').readlines()
+    orders = []
+    for line in order_text:
+        # first remove any white space around equal signs
+        line = re.sub(r' .= .', "=", line)
+        fields = line.strip().split()
+        routine = fields.pop(0).strip(',')
+        if routine:
+            func = globals()[routine]
+            kwargs = {}
+            for x in fields:
+                k, v = x.split('=')
+                kwargs[k] = v
+            orders.append((func, kwargs))
+
+    if args.delete:
+        # remove all contents of subdirectories first
+        for candidate in os.listdir('.'):
+            if os.path.isdir(candidate):
+                shutil.rmtree(candidate, ignore_errors=True)
+
+    include = re.compile(args.regex)
+    exclude = re.compile(args.exclude) if args.exclude else None
+
+    for file in DigFile.all_dig_files():
+
+        if not include.search(file):
+            continue
+        if exclude and exclude.search(file):
+            continue
+        path = os.path.join(DigFile.dig_dir(), file)
+        if args.segments:
+            df = DigFile(path)
+            if not df.is_segment:
+                continue
+
+        pipe = Pipeline(path, orders)
+
+    # restore the working directory (is this necessary?)
+    os.chdir(curdir)
+    # for seg in range(16):
+    # print(seg)
+    # pipe = Pipeline(
+    # f'../dig/new/CH_1_009/seg{seg:02d}.dig', sample_orders, overlap = 0.75)
+    # print("Done!")
