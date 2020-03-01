@@ -304,6 +304,7 @@ def gaussian_fit(pipeline, **kwargs):
                     plt.ylabel(r"$I$")
                     plt.xlim(vmin, vmax)
                     plt.savefig(os.path.join(pipeline.output_dir, f'bad{t_index}.pdf'))
+                    plt.close()
 
     for signal in pipeline.signals:
         pipeline.log(signal.to_string(
