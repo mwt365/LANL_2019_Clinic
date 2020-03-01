@@ -95,8 +95,11 @@ def baselines_by_squash(
         if pk_pos >= delta:
             totes = 0
             for sq in squash:
-                if sq[pk_pos + delta] < max_side_lobe * sq[pk_pos] > sq[pk_pos - delta]:
-                    totes += 1
+                try:
+                    if sq[pk_pos + delta] < max_side_lobe * sq[pk_pos] > sq[pk_pos - delta]:
+                        totes += 1
+                except IndexError:
+                    pass
             strong_peaks.append(totes >= segments * min_percent * 0.01)
             # print(f"[{pk_pos}] -> {spectrogram.velocity[pk_pos]} ({heights[n]})) got {totes}")
         else:

@@ -15,6 +15,74 @@ from scipy.optimize import curve_fit
 from scipy.interpolate import InterpolatedUnivariateSpline as ius
 
 
+def smooth(xvals, n=10, forward=True):
+    """Provide an exponential smoothing of the values in xvals,
+    yielding a single value representing the final smoothed value
+    in the array. If forward is False, proceed in reverse order."""
+
+    if not forward:
+        xvals = np.flip(xvals)
+    fraction = 1 - 1 / n
+    num_to_use = min(n, len(xvals))
+    s = xvals[-num_to_use]
+    for x in xvals[-num_to_use:]:
+        s *= fraction
+        s += (1 - fraction) * x
+    return s
+
+
+def extrapolate(xvals, yvals, x, grouping = 5, order = 3):
+    """Given equal-length arrays xvals and yvals, with the
+    xvals in ascending order, produce an interpolated or extrapolated
+    estimate for y at corresponding x. If there are enough points to
+    use grouping to smooth out noise in the yvals, average over
+    consecutive points up to groups of size grouping.
+    """
+
+    assert len(xvals) == len(yvals)
+    n = len(xvals)
+
+    if n == 1:
+        return yvals[0]
+
+    if n == 0:
+        raise IndexError
+
+    # Do we have enough points to form (order+1) groups of size
+    # grouping?
+    while True:
+        points = grouping * (order + 1)
+        if points <= n:
+            break
+        if order > 1:
+            order -= 1
+        elif grouping > 1:
+            grouping -= 1
+        else:
+            break
+
+    if grouping > 1:
+        pts = grouping * (order + 1)
+        for array in (xvals, yvals):
+            if x <= xvals[0]:
+                tmp = array[:pts]
+            else:
+                tmp = array[-pts:]
+            tmp = np.mean(
+                np.reshape(tmp, (grouping, -1)), axis=1)
+            if array == xvals:
+                xvals = tmp
+            else:
+                yvals = tmp
+
+    try:
+        spline = ius(xvals, yvals, k = order)
+        return float(spline(x))
+    except Exception as eeps:
+        print(eeps)
+    return yvals[0]  # ???
+
+
 class Follower:
     """
     Given a spectrogram and a starting point (t, v) --
@@ -110,14 +178,12 @@ class Follower:
         """
 
         r = self.results
+        times, vels = r['times'], r['velocities']
         if len(r['times']) == 0:
             v_guess = self.v_start
-        elif len(r['times']) == 1:
-            v_guess = r['velocities'][0]
         else:
-            k = min(4, len(r['velocities'])) - 1
-            spline = ius(r['time_index'], r['velocities'], k = k)
-            v_guess = spline(t_index)
+            v_guess = extrapolate(
+                times, vels, self.spectrogram.time[t_index])
 
         velocity_index = self.spectrogram._velocity_to_index(v_guess)
         start_index = max(0, velocity_index - self.span)
@@ -128,16 +194,28 @@ class Follower:
     def guess_intensity(self, t_index):
         """Attempt to guess the expected intensity based on extrapolation"""
         r = self.results
-        ti = r['time_index']
-        n = len(ti)
+        times = r['time_index']
+        intensity = r['intensities']
+        n = len(times)
         if n == 0:
             return 0
         if n == 1:
-            return self.results['intensities'][0]
+            return intensity[0]
         else:
-            k = min(4, n) - 1
-            spline = ius(ti, r['intensities'], k = k)
-            return spline(t_index)
+            return smooth(intensity, forward = t_index >= times[-1])
+
+    def guess_intensity_old(self, t_index):
+        """Attempt to guess the expected intensity based on extrapolation"""
+        r = self.results
+        times = r['time_index']
+        intensity = r['intensities']
+        n = len(times)
+        if n == 0:
+            return 0
+        if n == 1:
+            return intensity[0]
+        else:
+            return extrapolate(times, intensity, t_index)
 
     def data_range(self, n=-1):
         """
