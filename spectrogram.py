@@ -14,7 +14,9 @@ import matplotlib.pyplot as plt
 from scipy import signal
 
 from ProcessingAlgorithms.preprocess.digfile import DigFile
+from plotter import COLORMAPS
 
+DEFMAP = 'blue-orange-div'
 
 class Spectrogram:
     """
@@ -410,17 +412,28 @@ class Spectrogram:
             axes.set_ylim(bot=kwargs['min_vel'])
             del kwargs['min_vel']
 
+        cmapUsed = COLORMAPS[DEFMAP]
+        if 'cmap' in kwargs:
+            attempt = kwargs['cmap']
+            if attempt in COLORMAPS.keys():
+                cmapUsed = COLORMAPS[attempt]
+                del kwargs['cmap']
+
+
         pcm = axes.pcolormesh(
             self.time * 1e6,
             self.velocity,
             self.intensity,
+            cmap = cmapUsed,
             **kwargs)
 
         plt.gcf().colorbar(pcm, ax=axes)
-        axes.set_ylabel('Velocity (m/s)')
-        axes.set_xlabel('Time ($\mu$s)')
+        axes.set_ylabel('Velocity (m/s)', fontsize = 18)
+        axes.set_xlabel('Time ($\mu$s)', fontsize = 18)
+        axes.xaxis.set_tick_params(labelsize=14)
+        axes.yaxis.set_tick_params(labelsize=14)        
         title = self.data.filename.split('/')[-1]
-        axes.set_title(title.replace("_", "\\_"))
+        axes.set_title(title.replace("_", "-"), fontsize = 24)
         return pcm
 
 
