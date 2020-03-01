@@ -353,6 +353,8 @@ if __name__ == '__main__':
                         help = "top directory for results")
     parser.add_argument('-d', '--delete', action = 'store_true',
                         help = "Delete existing files before the run")
+    parser.add_argument('--dry', action = 'store_true',
+                        help = 'List the files that would be handled and where the output would be written')
 
     args = parser.parse_args()
 
@@ -385,6 +387,9 @@ if __name__ == '__main__':
     include = re.compile(args.regex)
     exclude = re.compile(args.exclude) if args.exclude else None
 
+    if args.dry:
+        print(f"Dry run, storing output in base directory {os.getcwd()}")
+
     for file in DigFile.all_dig_files():
 
         if not include.search(file):
@@ -396,8 +401,10 @@ if __name__ == '__main__':
             df = DigFile(path)
             if not df.is_segment:
                 continue
-
-        pipe = Pipeline(path, orders)
+        if args.dry:
+            print(path)
+        else:
+            pipe = Pipeline(path, orders)
 
     # restore the working directory (is this necessary?)
     os.chdir(curdir)
