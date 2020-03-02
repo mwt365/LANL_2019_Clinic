@@ -452,6 +452,14 @@ class Spectrogram:
 
 
 if __name__ == '__main__':
-    sp = Spectrogram('../dig/GEN3CH_4_009.dig', None,
+    sp = Spectrogram('../dig/new/CH_4_009/seg00.dig', None,
                      None, overlap_shift_factor=1 / 4)
+
+    # print(COLORMAPS)
+
+    sp.intensity = np.where(sp.intensity < 0, 0, sp.intensity)
+
+    sp.plot(max_vel=6000, min_vel=1700, max_time=40, min_time=0, cmap="3w_gby")
+    plt.show()
+
     print(sp)
