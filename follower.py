@@ -32,8 +32,6 @@ class Follower:
     """
 
     def __init__(self, spectrogram, start_point, span=80):
-        assert isinstance(spectrogram, Spectrogram)
-        assert isinstance(span, int)
         self.spectrogram = spectrogram
         self.t_start = start_point[0]
         self.v_start = start_point[1]

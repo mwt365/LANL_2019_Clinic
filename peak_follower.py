@@ -21,6 +21,7 @@ class PeakFollower(Follower):
                  max_hop=50   # require peaks at successive time steps
                  # to be within this many velocity indices
                  ):
+        print(type(spectrogram))
         super().__init__(spectrogram, start_point, span)
         self.smoothing = smoothing
         self.max_hop = max_hop
@@ -31,6 +32,13 @@ class PeakFollower(Follower):
         """
         while self.step():
             pass
+        
+        quadMesh, axis = self.spectrogram.plot()
+
+        v = self.results["velocities"]
+        t = self.results["times"]
+
+        axis.plot(np.array(t)*1e6, v, "r.", alpha=0.4)
 
     def step(self):
         """
