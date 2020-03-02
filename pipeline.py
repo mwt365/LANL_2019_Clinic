@@ -7,7 +7,9 @@ import numpy as np
 import os
 import pipelineProcessor as process
 from peak_follower import PeakFollower
-from jsonDriver import JsonDriver
+from jsonDriver import JsonReadDriver
+from jsonDriver import JsonWriteDriver
+import datetime
 
 # process command line args
 import argparse
@@ -16,6 +18,8 @@ parser.add_argument('--file_name',type=str,default=False)
 parser.add_argument('--peak_follow', type = bool,default = True)
 parser.add_argument('--manual_start', type = bool, default = True)
 parser.add_argument('-json_name',type = str)
+parser.add_argument('--velocity_cutoff', type = int, default = 10000)
+parser.add_argument('--denoise', type=bool,default = False)
 # parser.add_argument('--process_name',type=)
 args = parser.parse_args()
 
@@ -24,17 +28,29 @@ args = parser.parse_args()
 directory = '/home/lanl/Documents/dig/new/002/'
 saveTo = '/home/lanl/Documents/dig/digImages/'
 
+a = datetime.datetime.now()
+time = ('%02d.%02d %02d:%02d'%(a.month,a.day,a.hour,a.minute))
+try:
+    os.mkdir(saveTo + time + '/')
+except FileExistsError:
+    print("Oooops! you tried again to fast, storing in same directory")
+newDirectory = saveTo + time + '/'
 
+
+jsondata = JsonReadDriver(args.json_name)
+
+#Create the dictionary to store the succesful runs
+jsonwriting = JsonWriteDriver(newDirectory+time)
 
 for filename in os.listdir(directory):
     if filename.endswith(".dig"):
         
         spec = Spectrogram(directory+filename)
-        # print(args.json_name)
-        data = JsonDriver(args.json_name)
+        # print(args.JsonRead_name)
+        
 
         if args.manual_start:
-            start_coords = data.getManualStart(filename)
+            start_coords = jsondata.getManualStart(filename)
 
 
 
@@ -44,29 +60,21 @@ for filename in os.listdir(directory):
         peaks.run()
         # tsec, v = peaks.v_of_t
         # print(peaks.results)        
-        t,v,i = spec.slice((spec.t_start,spec.t_end),(0,10000))
+        t,v,i = spec.slice((spec.t_start,spec.t_end),(0,args.velocity_cutoff))
         trace_v = np.array(peaks.results['velocities'])
         trace_t = np.array(peaks.results['times'])
+        jsonwriting.store_time_length(filename,trace_t.size)
+
+        #plotting the results
         plt.pcolormesh(t*1e6,v,i)
         plt.plot(trace_t*1e6,trace_v,color = "red")
-        plt.show()
+        plt.savefig(newDirectory + filename+'.png')
+        plt.clf()
 
-        # process.saveToFile(spec,filename, saveTo)
-        # print(filename)
-        # spec = Spectrogram(directory+filename)
-        # spec.plot()
-        # plt.savefig(saveTo + filename+'.png')
-        # plt.clf()
-        # del spec
 
         continue
     else:
         continue
 
-# def doProcessing(filename):
-# 			print(filename)
-# 			spec = Spectrogram(directory+filename)
-# 			spec.plot()
-# 			plt.savefig(saveTo + filename+'.png')
-# 			plt.clf()
-# 			del spec
+jsonwriting.flush()
+print("done")
