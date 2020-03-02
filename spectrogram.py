@@ -11,6 +11,7 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy import signal
+from plotter import COLORMAPS
 
 from digfile import DigFile
 
@@ -456,26 +457,26 @@ if __name__ == '__main__':
     # templates = [template, template2, template3, template4, template5]
 
     # print(interesting_points)
+    print(COLORMAPS)
 
-    plot = sgram.plot(max_vel=10000, min_vel=0)
+    plot = sgram.plot(max_vel=10000, min_vel=0, cmap="blue-orange-div")
     
+    # templates = [template, template2, template3]
 
-    templates = [template, template2, template3]
+    # baseline_scores, baselines = tm.find_regions(sgram, templates)
 
-    baseline_scores, baselines = tm.find_regions(sgram, templates)
+    # for baseline in baselines:
 
-    for baseline in baselines:
+    #     interesting_points = tm.find_potenital_start_points(sgram, baseline_scores[baseline])
 
-        interesting_points = tm.find_potenital_start_points(sgram, baseline_scores[baseline])
+    #     for pair in interesting_points:
+    #         time, velo = pair
+    #         y = velo
+    #         x = time * 10**6
+    #         # y = sp._velocity_to_index(velo)
+    #         # x = sp._time_to_index(time)
 
-        for pair in interesting_points:
-            time, velo = pair
-            y = velo
-            x = time * 10**6
-            # y = sp._velocity_to_index(velo)
-            # x = sp._time_to_index(time)
-
-            plt.plot(x, y, 'ro', markersize=.7)
+    #         plt.plot(x, y, 'ro', markersize=.7)
 
     plt.show()
 

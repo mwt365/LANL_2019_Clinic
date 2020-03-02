@@ -19,7 +19,11 @@ from matplotlib import pyplot as plt
 from matplotlib.patches import Rectangle
 
 
-#TODO 'Genetic' algorithm for finding templates
+#TODO Mask baselines before expanding the searchable region
+#TODO Find a way to make a sorted list of coordinates from the image
+
+#TODO 'Genetic' algorithm for finding templates (Not doing yet)
+
 
 class TemplateMatcher():
     """
@@ -97,7 +101,16 @@ class TemplateMatcher():
 
         new_matrix = np.where(matrix > threshold_percentile, matrix+threshold_percentile, threshold_percentile)
         new_matrix = np.flip(np.flip(new_matrix), axis=1)
-        
+
+        print(velo_bounds)
+        print(time_bounds)
+
+        print(self.click)
+
+        # nice_v_bounds = (520, 580)
+        # nice_t_bounds = (80, 120)
+        # spec = new_matrix[(-1 * nice_v_bounds[1]):(-1 * nice_v_bounds[0]), nice_t_bounds[0]:nice_t_bounds[1]]
+
         spec = new_matrix[(-1 * velo_bounds[1]):(-1 * velo_bounds[0]), time_bounds[0]:time_bounds[1]]
 
         imsave("./full.png", new_matrix[:])
@@ -141,7 +154,7 @@ class TemplateMatcher():
             method = eval(meth)
 
             # Apply template Matching
-            res = cv2.matchTemplate(img,template,method)
+            res = cv2.matchTemplate(img, template, method)
 
             # print(res.shape)
             # print(res)
@@ -153,7 +166,20 @@ class TemplateMatcher():
             # CAN'T REASSIGN VALUES IN RES TO RERUN THE MINMAXLOC FUNCTION
             # IN ORDER TO FIND A LIST OF THE SORTED 2D ARRAY OF ELEMENTS AND 
             # THEIR CORRESPONDING LOCATIONS 
-            
+
+
+
+            # sorted_mat = np.argsort(-res, axis=1)
+
+            # print(sorted_mat)
+            # print(max_loc)
+            # print(res[max_loc[0]][max_loc[1]])
+            # print(res[max_loc[0], max_loc[1]])
+            # print(self.spectrogram.time[max_loc[0]])
+            # print(self.spectrogram.velocity[max_loc[1]])
+
+
+
             # values = []
             # values.append(max_loc)
             # res[max_loc[0]][max_loc[1]] = 0
@@ -220,15 +246,14 @@ if __name__ == "__main__":
     # print("   time : ",time)
     # print("velocity: ",velo,'\n')
 
-
     template_matcher = TemplateMatcher(spec, user_click, template, span=80)
     times, velos = template_matcher.main()
 
 
     print(times, velos)
 
-    spec.plot()
-    plt.plot(times, velos, 'ro', markersize=1.5)
-    plt.show()
+    # spec.plot()
+    # plt.plot(times, velos, 'ro', markersize=1.5)
+    # plt.show()
 
 

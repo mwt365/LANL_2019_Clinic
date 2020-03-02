@@ -61,6 +61,9 @@ def baselines_by_squash(spectrogram: Spectrogram):
         height=0.01 * tallest,  # peaks must be this tall to count
         distance=100,  # peaks must be separated by this much at minimum
     )
+
+
+
     heights = properties['peak_heights']
     peak_ht = heights.max()
     ordering = np.flip(np.argsort(heights))
