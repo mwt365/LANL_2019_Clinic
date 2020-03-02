@@ -428,6 +428,7 @@ class SpectrogramWidget:
             fitter = GaussianFitter(self.spectrogram, (t, v))
             self.gauss = fitter
         elif action == "Peak":
+            print("Looking at t:", t, "and and v:", v)
             follower = PeakFollower(self.spectrogram, (t, v))
             self.peak = follower
             follower.run()
