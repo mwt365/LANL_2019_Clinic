@@ -10,6 +10,7 @@ from peak_follower import PeakFollower
 from jsonDriver import JsonReadDriver
 from jsonDriver import JsonWriteDriver
 import datetime
+import cv2
 
 # process command line args
 import argparse
@@ -61,6 +62,11 @@ for filename in os.listdir(directory):
         # tsec, v = peaks.v_of_t
         # print(peaks.results)        
         t,v,i = spec.slice((spec.t_start,spec.t_end),(0,args.velocity_cutoff))
+
+        if args.denoise:
+            i = cv2.fastNlMeansDenoising(i,None,3,7,21)
+
+
         trace_v = np.array(peaks.results['velocities'])
         trace_t = np.array(peaks.results['times'])
         jsonwriting.store_time_length(filename,trace_t.size)
