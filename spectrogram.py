@@ -418,14 +418,20 @@ class Spectrogram:
             if attempt in COLORMAPS.keys():
                 cmapUsed = COLORMAPS[attempt]
                 del kwargs['cmap']
-
-
-        pcm = axes.pcolormesh(
-            self.time * 1e6,
-            self.velocity,
-            self.intensity,
-            cmap = cmapUsed,
-            **kwargs)
+        pcm = None # To define the scope.
+        if 'cmap' not in kwargs:
+            pcm = axes.pcolormesh(
+                self.time * 1e6,
+                self.velocity,
+                self.intensity,
+                cmap = cmapUsed,
+                **kwargs)
+        else:
+            pcm = axes.pcolormesh(
+                self.time * 1e6,
+                self.velocity,
+                self.intensity,
+                **kwargs)
 
         plt.gcf().colorbar(pcm, ax=axes)
         axes.set_ylabel('Velocity (m/s)', fontsize = 18)
