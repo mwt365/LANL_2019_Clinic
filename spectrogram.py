@@ -409,8 +409,16 @@ class Spectrogram:
             axes.set_ylim(top=kwargs['max_vel'])
             del kwargs['max_vel']
         if 'min_vel' in kwargs:
-            axes.set_ylim(bot=kwargs['min_vel'])
+            axes.set_ylim(bottom=kwargs['min_vel'])
             del kwargs['min_vel']
+
+        if 'max_time' in kwargs:
+            axes.set_xlim(right=kwargs['max_time'])
+            del kwargs['max_time']
+        if 'min_time' in kwargs:
+            axes.set_xlim(left=kwargs['min_time'])
+            del kwargs['min_time']
+        
 
         cmapUsed = COLORMAPS[DEFMAP]
         if 'cmap' in kwargs:
