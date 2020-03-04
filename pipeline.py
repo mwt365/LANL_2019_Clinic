@@ -214,20 +214,24 @@ def find_signal(pipeline, **kwargs):
     peaks, properties = find_peaks(spectrum, height = 0.001 * spectrum.max(),
                                    distance = 40)
     heights = properties['peak_heights']
-    # produce an ordering of the peaks from high to low
-    ordering = np.flip(np.argsort(heights))
-    peak_index = peaks[ordering]
-    peaks = sg.velocity[peak_index]
-    hts = heights[ordering]
-    hts = hts / hts[0]  # normalize to largest peak of 1 (e.g., the baseline)
-    blines = sorted(pipeline.baselines)
-    # filter out any peaks on or below the baseline
-    hts = hts[peaks > blines[0]]
-    peaks = peaks[peaks > blines[0]]
-    # Our guess for the signal is now at the first peak
-
-    pipeline.signal_guess = (ts, peaks[0])
-    pipeline.log(f"find_signal guesses signal is at {pipeline.signal_guess}")
+    try:
+        # produce an ordering of the peaks from high to low
+        ordering = np.flip(np.argsort(heights))
+        peak_index = peaks[ordering]
+        peaks = sg.velocity[peak_index]
+        hts = heights[ordering]
+        hts = hts / hts[0]  # normalize to largest peak of 1 (e.g., the baseline)
+        blines = sorted(pipeline.baselines)
+        # filter out any peaks on or below the baseline
+        hts = hts[peaks > blines[0]]
+        peaks = peaks[peaks > blines[0]]
+        # Our guess for the signal is now at the first peak
+    
+        pipeline.signal_guess = (ts, peaks[0])
+        pipeline.log(f"find_signal guesses signal is at {pipeline.signal_guess}")
+    except:
+        pipeline.signal_guess = None
+        pipeline.log(f"find_signal could not find a signal")
 
 
 def follow_signal(pipeline, **kwargs):
@@ -235,6 +239,10 @@ def follow_signal(pipeline, **kwargs):
     Using the peak_follower, look first look left, then right.
     """
     from ProcessingAlgorithms.SignalExtraction.peak_follower import PeakFollower
+    if not pipeline.signal_guess:
+        pipeline.log("No signal_guess so not following signal")
+        return
+    
     follower = PeakFollower(
         pipeline.spectrogram,
         pipeline.signal_guess,
