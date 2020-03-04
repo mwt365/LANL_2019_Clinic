@@ -175,9 +175,7 @@ def make_spectrogram(pipeline, **kwargs):
     for k, v in allargs.items():
         pipeline.log(f"+ {k} = {v}")
 
-    pipeline.spectrogram = Spectrogram(
-        pipeline.df,
-        **allargs)
+    pipeline.spectrogram = Spectrogram(pipeline.df, **allargs)
 
 
 def find_baselines(pipeline, **kwargs):
@@ -209,28 +207,43 @@ def find_signal(pipeline, **kwargs):
     spectrum = np.sum(sg.intensity[:, t_index - 2:t_index + 2], axis = 1)
     peaks, properties = find_peaks(spectrum, height = 0.001 * spectrum.max(),
                                    distance = 40)
-    heights = properties['peak_heights']
-    # produce an ordering of the peaks from high to low
-    ordering = np.flip(np.argsort(heights))
-    peak_index = peaks[ordering]
-    peaks = sg.velocity[peak_index]
-    hts = heights[ordering]
-    hts = hts / hts[0]  # normalize to largest peak of 1 (e.g., the baseline)
-    blines = sorted(pipeline.baselines)
-    # filter out any peaks on or below the baseline
-    hts = hts[peaks > blines[0]]
-    peaks = peaks[peaks > blines[0]]
-    # Our guess for the signal is now at the first peak
+    try:
+        heights = properties['peak_heights']
+        # produce an ordering of the peaks from high to low
+        ordering = np.flip(np.argsort(heights))
+        peak_index = peaks[ordering]
+        peaks = sg.velocity[peak_index]
+        hts = heights[ordering]
+        # normalize to largest peak of 1 (e.g., the baseline)
+        hts = hts / hts[0]
+        blines = sorted(pipeline.baselines)
+        # filter out any peaks on or below the baseline
+        hts = hts[peaks > blines[0]]
+        peaks = peaks[peaks > blines[0]]
+        # Our guess for the signal is now at the first peak
 
-    pipeline.signal_guess = (ts, peaks[0])
-    pipeline.log(f"find_signal guesses signal is at {pipeline.signal_guess}")
+        pipeline.signal_guess = (ts, peaks[0])
+        pipeline.log(f"find_signal guesses signal is at {pipeline.signal_guess}")
+    except:
+        pipeline.signal_guess = None
+        pipeline.log("find_signal could not find a signal")
 
 
 def follow_signal(pipeline, **kwargs):
     """
     Using the peak_follower, look first look left, then right.
+    Optional kwargs:
+      plot = extension of the plot file type to save, or None;
+             default is 'pdf'
+
     """
     from ProcessingAlgorithms.SignalExtraction.peak_follower import PeakFollower
+    if not pipeline.signal_guess:
+        pipeline.log("No signal_guess so not following a signal.")
+        return
+
+    plot = kwargs.get('plot', 'pdf')
+
     follower = PeakFollower(
         pipeline.spectrogram,
         pipeline.signal_guess,
@@ -248,20 +261,35 @@ def follow_signal(pipeline, **kwargs):
     pipeline.log(signal.to_string(
         formatters = pipeline.pandas_format, sparsify = False))
 
-    plt.clf()
-    plt.plot(signal['times'] * 1e6, signal['velocities'])
-    plt.xlabel('$t~(\mu \mathrm{s})$')
-    plt.ylabel('$v~(\mathrm{m/s})$')
-    plt.title(pipeline.df.basename, usetex = False)
-    plt.savefig(os.path.join(pipeline.output_dir, 'follower.pdf'))
+    if plot:
+        plt.clf()
+        plt.plot(signal['times'] * 1e6, signal['velocities'])
+        plt.xlabel('$t~(\mu \mathrm{s})$')
+        plt.ylabel('$v~(\mathrm{m/s})$')
+        plt.title(pipeline.df.basename, usetex=False)
+        plt.savefig(os.path.join(pipeline.output_dir, 'follower.' + plot))
 
 
 def gaussian_fit(pipeline, **kwargs):
     """
     Run through signals (which are pandas DataFrames) and
-    add columns for gaussian centers, widths, and amplitudes.
+    add columns for gaussian parameters: (center, width,
+    amplitude, and dcenter), where dcenter represents the
+    difference between the peak found by the peak follower
+    and the center found by the Gaussian fit.
+
+    The optional kwarg neighborhood specifies the number of
+    points to include on either side of the peak found by the
+    follower. If no value is given, a default of 10 points on
+    either side of the peak is used.
     """
     from ProcessingAlgorithms.Fitting.gaussian import Gaussian
+    from ProcessingAlgorithms.Fitting.moments import moment
+
+    neighborhood = kwargs.get('neighborhood', 10)
+    sigmas = kwargs.get('sigmas', 1.5)  # discrepancy greater than this
+    # will be reported
+    sg = pipeline.spectrogram
 
     for signal in pipeline.signals:
         # First add the requisite columns
@@ -270,14 +298,25 @@ def gaussian_fit(pipeline, **kwargs):
         signal['width'] = blanks
         signal['amplitude'] = blanks
         signal['dcenter'] = blanks
+        signal['mean'] = blanks
+        signal['sigma'] = blanks
 
         for n in range(len(signal)):
             row = signal.iloc[n]
             t_index = row['time_index']
-            vfrom, vto = row['velocity_index_spans']
-            powers = pipeline.spectrogram.intensity[vfrom:vto, t_index]
-            speeds = pipeline.spectrogram.velocity[vfrom:vto]
-            gus = Gaussian(speeds, powers)
+            vpeak = sg._velocity_to_index(row['velocities'])
+            # vfrom, vto = row['velocity_index_spans']
+            vfrom, vto = vpeak - neighborhood, vpeak + neighborhood
+            powers = sg.intensity[vfrom:vto, t_index]
+            speeds = sg.velocity[vfrom:vto]
+            mom = moment(speeds, powers)
+            signal.loc[n, 'mean'] = mom['center']
+            signal.loc[n, 'sigma'] = mom['std_dev']
+            gus = Gaussian(
+                speeds, powers,
+                center = row['velocities'],
+                width = sg.velocity[2] - sg.velocity[0]
+            )
             if gus.valid:
                 signal.loc[n, 'center'] = gus.center
                 signal.loc[n, 'width'] = gus.width
@@ -285,26 +324,34 @@ def gaussian_fit(pipeline, **kwargs):
                 diff = gus.center - signal.loc[n, 'velocities']
                 signal.loc[n, 'dcenter'] = diff
                 discrepancy = abs(diff / gus.width)
-                if discrepancy > 2:
+                if discrepancy > sigmas:
                     # The difference between the peak follower and the gaussian
                     # fit was more than 1 value of the width.
                     # Let's print out a plot to show what's going on
                     plt.clf()
-                    vpeak = signal.loc[n, 'velocities']
-                    vmin = min(gus.center - 25 * gus.width, vpeak - 20)
-                    vmax = max(gus.center + 25 * gus.width, vpeak + 20)
+                    vmin, vmax = sg.velocity[vfrom], sg.velocity[vto]
+                    # make sure we have all the freshest values
+                    row = signal.iloc[n]
 
-                    plt.plot([vpeak, ],
-                             [signal.loc[n, 'intensities'], ], 'k*')
+                    plt.plot([row['velocities'], ],
+                             [row['intensities'], ], 'k*')
+                    plt.plot([row['mean'] + n * row['sigma'] for n in (-1, 0, 1)],
+                             [row['intensities'] for x in (-1, 0, 1)],
+                             'gs')
                     plt.plot(speeds, powers, 'r.')
-                    vels = np.linspace(vmin, vmax, 100)
+                    vels = np.linspace(gus.center - 6 * gus.width,
+                                       gus.center + 6 * gus.width, 100)
                     plt.plot(vels, gus(vels), 'b-', alpha = 0.5)
-                    plt.title(f"Time index = {t_index} $\\to$ {pipeline.spectrogram.time[t_index]*1e6:.2f}")
-                    plt.xlabel(r"$v {\rm(m/s)}$")
-                    plt.ylabel(r"$I$")
+                    tval = f"${pipeline.spectrogram.time[t_index]*1e6:.2f}"
+                    plt.title(tval + "$~ µs")
+                    plt.xlabel("Velocity (m/s)")
+                    plt.ylabel(r"Intensity")
                     plt.xlim(vmin, vmax)
                     plt.savefig(os.path.join(pipeline.output_dir, f'bad{t_index}.pdf'))
                     plt.close()
+                    with open(os.path.join(pipeline.output_dir, f'bad{t_index}.txt'), 'w') as f:
+                        f.write(pd.DataFrame(
+                            {'power': powers, }, index = speeds).to_csv())
 
     for signal in pipeline.signals:
         pipeline.log(signal.to_string(
@@ -326,6 +373,20 @@ def gaussian_fit(pipeline, **kwargs):
         plt.savefig(os.path.join(pipeline.output_dir, 'gauss.pdf'))
 
 
+def decode_arg(x):
+    """
+    Attempt to convert the value x to an int, a float, or a string
+    """
+    x = x.strip()
+    try:
+        return int(x)
+    except:
+        try:
+            return float(x)
+        except:
+            return x
+
+
 if __name__ == '__main__':
     # sys.path.insert(0, '../')
     import argparse
@@ -344,11 +405,11 @@ if __name__ == '__main__':
     parser.add_argument('-s', '--segments', default = True,
                         help = "Only process segments")
     parser.add_argument('-r', '--regex', default = r'.*',
-                        help = "Regular expression to select files")
+                        help = "Regular expression to select files; defaults to '.*'")
     parser.add_argument('-e', '--exclude', default = None,
-                        help = "Regular expression to exclude files")
-    parser.add_argument('-i', '--input', default = 'script.txt',
-                        help = "Input file of commands")
+                        help = "Regular expression for files to exclude")
+    parser.add_argument('-i', '--input', default = None,
+                        help = "Input file of commands; defaults to script.txt")
     parser.add_argument('-o', '--output', default = os.getcwd(),
                         help = "top directory for results")
     parser.add_argument('-d', '--delete', action = 'store_true',
@@ -358,16 +419,24 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
+    # First look for a valid path expressed in the input argument
+    infile = ""
+    if args.input:
+        if os.path.isfile(args.input):
+            infile = os.path.abspath(args.input)
+    else:
+        infile = 'script.txt'
+
     if args.output:
         os.chdir(args.output)
 
     # Look for marching orders in an file called script.txt
-    assert os.path.isfile(args.input), f"You must supply file {args.input} in the output directory"
-    order_text = open(args.input, 'r').readlines()
+    assert os.path.isfile(infile), f"You must supply file script.txt in the output directory"
+    order_text = open(infile, 'r').readlines()
     orders = []
     for line in order_text:
         # first remove any white space around equal signs
-        line = re.sub(r' .= .', "=", line)
+        line = re.sub(r' *= *', "=", line)
         fields = line.strip().split()
         routine = fields.pop(0).strip(',')
         if routine:
@@ -375,14 +444,14 @@ if __name__ == '__main__':
             kwargs = {}
             for x in fields:
                 k, v = x.split('=')
-                kwargs[k] = v
+                kwargs[k] = decode_arg(v)
             orders.append((func, kwargs))
 
     if args.delete:
         # remove all contents of subdirectories first
         for candidate in os.listdir('.'):
             if os.path.isdir(candidate):
-                shutil.rmtree(candidate, ignore_errors=True)
+                shutil.rmtree(candidate, ignore_errors = True)
 
     include = re.compile(args.regex)
     exclude = re.compile(args.exclude) if args.exclude else None
@@ -408,8 +477,3 @@ if __name__ == '__main__':
 
     # restore the working directory (is this necessary?)
     os.chdir(curdir)
-    # for seg in range(16):
-    # print(seg)
-    # pipe = Pipeline(
-    # f'../dig/new/CH_1_009/seg{seg:02d}.dig', sample_orders, overlap = 0.75)
-    # print("Done!")

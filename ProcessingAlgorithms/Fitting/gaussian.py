@@ -40,29 +40,38 @@ class Gaussian:
         else:
             self.x = x
             self.y = y
-            # sort y and use the boundaries to estimate
-            # the background and amplitude
-            ysorted = sorted(y)
-            # the gaussian could be a peak or a dip
+
+            # Figure out whether the data represent a peak
+            # or a dip by sorting the y values and comparing
+            # the largest to the midpoint and the smallest to
+            # the midpoint.
+
+            ysorted = sorted(y)  # low to high
             midpt = ysorted[len(y) // 2]
+            # peak is True if the Gaussian should rise above
             peak = (ysorted[-1] - midpt) > (midpt - ysorted[0])
-            amplitude = (ysorted[-1] - ysorted[len(y) // 8]
-                         ) * (1 if peak else -1)
-            background = ysorted[len(
-                y) // 8] if peak else ysorted[(7 * len(y)) // 8]
+
+            average = y.mean()
+            if 'amplitude' in kwargs:
+                amplitude = kwargs['amplitude']
+            else:
+                amplitude = ysorted[-1 if peak else 0] - average
+
+            background = kwargs.get('background', average)
             if background == 0:
                 background = 0.01 * amplitude
-            center = x[y.argmax()]
+            center = kwargs.get('center', x[y.argmax()])
+
+            width = kwargs.get('width', 0)
             self.p0 = [
-                kwargs.get('amplitude', amplitude),
-                kwargs.get('center', center),
-                kwargs.get('width', 0),
-                kwargs.get('background', background)
-            ]
-            self.params = []
-            self.error = None
+                amplitude,
+                center,
+                width,
+                background]
             if self.p0[2] == 0:
                 self.estimate_width(y.argmax())
+            self.params = []
+            self.error = None
             self.valid = self.do_fit()
 
     @property

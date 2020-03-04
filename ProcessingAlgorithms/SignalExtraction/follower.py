@@ -147,7 +147,7 @@ class Follower:
         """
         r = self.results
         v_index = self.spectrogram._velocity_to_index(v)
-        d = dict(
+        dic = dict(
             times = self.time[t_index],
             time_index = t_index,
             velocities = v,
@@ -157,10 +157,10 @@ class Follower:
 
         if len(r['times']) and t_index < r['time_index'][0]:
             # We need to insert at the beginning
-            for k, v in d.items():
+            for k, v in dic.items():
                 r[k].insert(0, v)
         else:
-            for k, v in d.items():
+            for k, v in dic.items():
                 r[k].append(v)
 
     @property
