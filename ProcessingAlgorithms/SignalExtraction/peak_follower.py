@@ -101,8 +101,7 @@ class PeakFollower(Follower):
             intensities = moving_average(intensities, n=self.smoothing)
 
         # generate an index array to sort the intensities (low to high)
-        low_to_high = np.argsort(intensities)
-        high_to_low = np.flip(low_to_high)
+        high_to_low = np.flip(np.argsort(intensities))
 
         # remove any peaks that are too close to the baseline
         # Since argsort only sorts from low to high, we will use negative
@@ -120,7 +119,7 @@ class PeakFollower(Follower):
         # At this point, we need a criterion for accepting or rejecting
         # this point.
         reject = False
-        if len(self.results['times']) > 0:
+        if len(self.results['time']) > 0:
             i_guess = self.guess_intensity(self.time_index)
             reject = 0.05 * i_guess > intensities[top]
 
@@ -146,5 +145,45 @@ class PeakFollower(Follower):
         if self.time_index >= len(self.time) or self.time_index < 0:
             raise IndexError  # we're out of data
 
+
+def signal_finder(
+        spectrogram: Spectrogram,
+        baseline: float,
+        t_start: float,
+        dt: int = 2,
+        min_separation = 200):  # m/s
+    """
+    Look above the baseline for a signal corresponding to a surface velocity.
+    """
+    from scipy.signal import find_peaks
+
+    t_index = spectrogram._time_to_index(t_start)
+    spectra = np.sum(spectrogram.intensity[:, t_index - dt:t_index + dt],
+                     axis = 1)
+    # limit the region we look at to points above the baseline
+    # get the index of the baseline
+    bline = spectrogram._velocity_to_index(baseline) + 5
+    velocity = spectrogram.velocity[bline:]
+    spectrum = spectra[bline:]
+    smax = spectrum.max()
+    min_sep = int(min_separation / spectrogram.dv)
+    peaks, properties = find_peaks(spectrum, height = 0.05 * smax,
+                                   distance = min_sep)
+
+    try:
+        heights = properties['peak_heights']
+        # produce an ordering of the peaks from high to low
+        ordering = np.flip(np.argsort(heights))
+        peak_index = peaks[ordering]
+        peaks = velocity[peak_index]
+        hts = heights[ordering]
+
+        # normalize to largest peak of 1 (e.g., the baseline)
+        hts = hts / hts[0]
+
+        return peaks[0]
+    except Exception as eeps:
+        print(eeps)
+        return None
 
 

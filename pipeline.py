@@ -201,6 +201,20 @@ def find_signal(pipeline, **kwargs):
     """
     Start at t_start and look for a peak above the baseline
     """
+    from ProcessingAlgorithms.SignalExtraction.peak_follower import signal_finder
+
+    t_start = float(kwargs.get('t_start', 2e-5))
+    blines = sorted(pipeline.baselines)
+    sg = pipeline.spectrogram
+    guess = signal_finder(sg, blines[0] + 5 * sg.dv, t_start)
+    pipeline.signal_guess = (t_start, guess)
+    pipeline.log(f"find_signal guesses signal is at {pipeline.signal_guess}")
+
+
+def find_signal_old(pipeline, **kwargs):
+    """
+    Start at t_start and look for a peak above the baseline
+    """
     from scipy.signal import find_peaks
 
     # guess 20 µs if no info provided
@@ -224,9 +238,11 @@ def find_signal(pipeline, **kwargs):
 
         blines = sorted(pipeline.baselines)
         # filter out any peaks on or below the baseline
-        hts = hts[peaks > blines[0]]
-        peaks = peaks[peaks > blines[0] + 5] # need to give us a little
-        # margin because the baselines may move a bit
+        # We'll slide up a couple of velocity steps, just to be sure
+        main_baseline = blines[0] + 5 * sg.dv
+        hts = hts[peaks > main_baseline]
+        peaks = peaks[peaks > main_baseline]
+        # Our guess for the signal is now at the first peak
 
         # Our guess for the signal is now at the first peak
         pipeline.signal_guess = (ts, peaks[0])
@@ -312,7 +328,7 @@ def gaussian_fit(pipeline, **kwargs):
             row = signal.iloc[n]
             t_index = row['time_index']
             vpeak = sg._velocity_to_index(row['velocities'])
-            # vfrom, vto = row['velocity_index_spans']
+            # vfrom, vto = row['velocity_index_span']
             vfrom, vto = vpeak - neighborhood, vpeak + neighborhood
             powers = sg.intensity[vfrom:vto, t_index]
             speeds = sg.velocity[vfrom:vto]

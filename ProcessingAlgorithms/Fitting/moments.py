@@ -34,4 +34,9 @@ def moment(x, y):
     squares = np.dot(x * x, prob)
     variance = squares - x_center ** 2
     std_dev = np.sqrt(variance)
-    return dict(center = x_center, variance = variance, std_dev = std_dev)
+    return dict(
+        center = x_center,
+        variance = variance,
+        std_dev = std_dev,
+        background = noise_level
+    )
