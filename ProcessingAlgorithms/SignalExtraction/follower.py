@@ -414,7 +414,11 @@ class FollowHood(object):
 
         # Compute width from moments
         # moment is a dictionary with fields 'center' and 'std_dev'
-        self.moment = moment(self.velocity, self.intensity)
+        # We want to narrow the range of points used for computing moments
+        # to those around the central peak
+        pfrom, pto = [x + self.velocity_index - vfrom for x in (-6, 6)]
+        self.moment = moment(
+            self.velocity[pfrom:pto], self.intensity[pfrom:pto])
 
         # Fit a gaussian
         self.gaussian = Gaussian(
@@ -431,10 +435,10 @@ class FollowHood(object):
         g = self.gaussian
         if g.valid:
             sig = g.width
-            middle = np.arange(g.center - 2 * sig,
-                               g.center + 2 * sig, 0.1 * sig)
-            left = np.arange(g.center - 10 * sig, g.center - 2 * sig, sig)
-            right = np.arange(g.center + 2 * sig, g.center + 10 * sig, sig)
+            middle = np.arange(g.center - 3 * sig,
+                               g.center + 3 * sig, 0.1 * sig)
+            left = np.arange(g.center - 10 * sig, g.center - 3 * sig, sig)
+            right = np.arange(g.center + 3 * sig, g.center + 10 * sig, sig)
             v = np.concatenate((left, middle, right))
             i = g(v)
             ax.plot(v, i, 'b-', alpha = 0.5)
