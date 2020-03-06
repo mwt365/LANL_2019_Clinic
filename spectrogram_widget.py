@@ -596,7 +596,6 @@ class SpectrogramWidget:
         self.update_cmap()
 
     def update_threshold(self, x):
-        n = x
         sg = self.spectrogram
         if int(x) == 0:
             self.threshold = None
@@ -669,6 +668,15 @@ class SpectrogramWidget:
         if char == 'x':
             # remove the all spectra
             self.clear_spectra()
+        if char in ('f', 'b', 'F', 'B'):
+            # We'd like to go exploring
+            if not hasattr(self, 'explorer_mark'):
+                self.explorer_mark = 2
+            else:
+                shifts = dict(f = 4, F = 20, b = -4, B = -40)
+                self.explorer_mark += shifts[char]
+
+            self.gaussian_explorer(self.explorer_mark)
         if char in ('m', 'M'):
             self.selecting = not self.selecting
             self.controls['marquee'].set_active(self.selecting)
@@ -716,12 +724,16 @@ class SpectrogramWidget:
         # print("Create a figure and axes, then call self.gauss.show_fit(axes)")
 
     def gauss_out(self, n: int):
+        """
+        Show center velocity, width, and amplitude for gaussian
+        fits to the data in follower n.
+        """
         if n >= len(self.peak_followers):
             return 0
         WRITEOUT, fnum = False, 0
         pf = self.peak_followers[n]
         times, centers, widths, amps = [], [], [], []
-        vind = pf.frame['velocity_index_spans'].to_numpy()
+        vind = pf.frame['velocity_index_span'].to_numpy()
         tind = pf.frame['time_index'].to_numpy()
         sp = self.spectrogram
         for j in range(len(tind)):
@@ -773,6 +785,58 @@ class SpectrogramWidget:
             amplitude=np.array(amps)
         )
 
+    def gaussian_explorer(self, follower_pt: int):
+        """
+        Show center velocity, width, and amplitude for gaussian
+        fits to the data in follower n.
+        """
+        if len(self.peak_followers) == 0:
+            return 0
+        pf = self.peak_followers[0]
+        res = pf.results
+
+        # We'd like to show data for this index, the previous one,
+        #  and the next one, along with the gaussian fit
+        hoods = [pf.hood(n = ((x + follower_pt) % len(res['time_index'])))
+                 for x in (-2, -1, 0, 1, 2)]
+
+        # Check that we have the requisite figure, and make it if we don't
+        if not hasattr(self, 'explorer_fig'):
+            self.explorer_fig, self.explorer_axes = plt.subplots(
+                1, 5, sharey = True)
+            # also add a marker to the follower's representation on the
+            # spectrogram to make it easier to see where we are
+            self.explorer_marker = self.axSpectrogram.plot([], [], 'k*')[0]
+
+        # show where we are
+        tsec, v = pf.v_of_t
+        self.explorer_marker.set_data(
+            [tsec[follower_pt] * 1e6, ], [v[follower_pt], ])
+
+        max_peak = 0
+        for ax, hood in zip(self.explorer_axes, hoods):
+            ax.clear()
+            # plot the data
+            ax.plot(hood.velocity, hood.intensity, 'ko', alpha = 0.5)
+            # plot the background level used for the moment calculation
+            bg = hood.moment['background']
+            ax.plot([hood.velocity[0], hood.velocity[-1]], [bg, bg], 'r-')
+            # show the center and widths from the moment calculation
+            pk = hood.peak_intensity
+            max_peak = max(pk, max_peak)
+            ax.plot([hood.moment['center'] + x * hood.moment['std_dev'] for x in
+                     (-1, 0, 1)], [pk, pk, pk], 'rs')
+            # show the gaussian
+            hood.plot_gaussian(ax)
+            vcenter, width = hood.peak_velocity, hood.moment['std_dev']
+            ax.set_xlim(vcenter - 4 * width, vcenter + 4 * width)
+            ax.set_xlabel(f"$v$ (m/s)")
+
+        # label the common velocity axis
+        ax = self.explorer_axes[0]
+        ax.set_ylim(-0.1 * max_peak, 2 * max_peak)
+        ax.set_ylabel("Intensity")
+
     def analyze_roi(self):
         """
         Extract the region(s) of interest and process them
@@ -787,7 +851,7 @@ class SpectrogramWidget:
         if n >= len(self.peak_followers):
             return 0
         pf = self.peak_followers[n]
-        vind = pf.frame['velocity_index_spans'].to_numpy()
+        vind = pf.frame['velocity_index_span'].to_numpy()
         tind = pf.frame['time_index'].to_numpy()
         self.subfig, axes = plt.subplots(
             nrows=1, ncols=2, sharey=True,

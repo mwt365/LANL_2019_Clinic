@@ -381,6 +381,11 @@ class Spectrogram:
         return self.intensity.min()
 
     @property
+    def dv(self):
+        "The velocity step size"
+        return self.velocity[1] - self.velocity[0]
+
+    @property
     def v_max(self):
         return self.wavelength * 0.25 / self.data.dt
 

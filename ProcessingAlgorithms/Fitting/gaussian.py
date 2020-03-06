@@ -26,7 +26,8 @@ class Gaussian:
       - width
 
     If the fit is successful, the field Gaussian.valid is
-    set to True.
+    set to True, and the properties center, width, amplitude, and background
+    are set.
     """
 
     def __init__(self, x: np.ndarray, y: np.ndarray, **kwargs):
@@ -129,7 +130,12 @@ class Gaussian:
         if np.inf in covar or np.nan in covar:
             self.error = 'infinity or nan in cavariance matrix'
             return False
-        self.errors = np.sqrt(np.diag(covar))
+        diag = np.diag(covar)
+        try:
+            self.errors = np.sqrt(diag)
+        except:
+            self.errors = None
+
         # if width is negative, flip it
         self.params[2] = abs(self.params[2])
         # How do we know that it worked?
