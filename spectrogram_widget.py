@@ -817,24 +817,24 @@ class SpectrogramWidget:
         for ax, hood in zip(self.explorer_axes, hoods):
             ax.clear()
             # plot the data
-            ax.plot(hood.velocity, hood.intensity, 'ko', alpha = 0.5)
+            ax.plot(hood.velocity, hood.intensity, 'k.-', alpha = 0.95)
             # plot the background level used for the moment calculation
             bg = hood.moment['background']
             ax.plot([hood.velocity[0], hood.velocity[-1]], [bg, bg], 'r-')
             # show the center and widths from the moment calculation
             pk = hood.peak_intensity
-            max_peak = max(pk, max_peak)
+            max_peak = max(np.max(hood.intensity), max_peak)
             ax.plot([hood.moment['center'] + x * hood.moment['std_dev'] for x in
                      (-1, 0, 1)], [pk, pk, pk], 'rs')
             # show the gaussian
             hood.plot_gaussian(ax)
             vcenter, width = hood.peak_velocity, hood.moment['std_dev']
-            ax.set_xlim(vcenter - 4 * width, vcenter + 4 * width)
+            ax.set_xlim(vcenter - 2 * width, vcenter + 2 * width)
             ax.set_xlabel(f"$v$ (m/s)")
 
         # label the common velocity axis
         ax = self.explorer_axes[0]
-        ax.set_ylim(-0.1 * max_peak, 2 * max_peak)
+        ax.set_ylim(-0.05 * max_peak, 1.2 * max_peak)
         ax.set_ylabel("Intensity")
 
     def analyze_roi(self):
