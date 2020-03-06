@@ -225,7 +225,8 @@ def find_signal(pipeline, **kwargs):
         blines = sorted(pipeline.baselines)
         # filter out any peaks on or below the baseline
         hts = hts[peaks > blines[0]]
-        peaks = peaks[peaks > blines[0]]
+        peaks = peaks[peaks > blines[0] + 5] # need to give us a little
+        # margin because the baselines may move a bit
 
         # Our guess for the signal is now at the first peak
         pipeline.signal_guess = (ts, peaks[0])
