@@ -3,7 +3,7 @@ import numpy as np
 # Potential Graph algorithms that can be used to solve the network flow problem.
 from networkx.algorithms.flow import *
 
-from NetworkFlow.gaussianMixtureModels import GMM_Image_Seg
+from ImageProcessing.NetworkFlow.gaussianMixtureModels import GMM_Image_Seg
 
 def setUpGraph(Intensity: np.array, lenVelocity: int, lenTime: int, sigma: int = 30):
     G = nx.DiGraph()
@@ -69,7 +69,7 @@ def segmentImage(Intensity: np.array, lenVelocity: int, lenTime: int, sigma: int
     print("The graph will now be set up.")
     G = setUpGraph(Intensity, lenVelocity, lenTime)
 
-    cutVal, partition = minimum_cut(G, "s", "t", flow_func= edmonds_karp)
+    cutVal, partition = minimum_cut(G, "s", "t") #flow_func= edmonds_karp)
 
     print("This is the value of the minimum cost s-t cut", cutVal)
 
