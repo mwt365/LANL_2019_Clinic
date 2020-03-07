@@ -78,12 +78,12 @@ def split(indicies:np.array, timeArray, timeBetweenSlices):
     return np.array([indicies[data[i]] for i in range(len(data))])
 
 
-def splitIntoDigFiles(SpectrogramObject:Spectrogram, fracOfMedian = 0.1, timeBetweenSlices = 5e-5):
+def splitIntoDigFiles(SpectrogramObject:Spectrogram, fracOfMax = 0.1, timeBetweenSlices = 5e-5):
     intensity = SpectrogramObject.intensity
     totalInten = np.sum(intensity, axis = 0)
     totalInten -= np.min(totalInten)
     
-    inds = threshold(totalInten, fracOfMedian)
+    inds = threshold(totalInten, fracOfMax)
 
     timeForSplits = split(inds, SpectrogramObject.time, timeBetweenSlices)
 

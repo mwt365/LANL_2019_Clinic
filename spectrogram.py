@@ -205,6 +205,9 @@ class Spectrogram:
         # scale the frequency axis to velocity
         self.velocity = freqs * 0.5 * self.wavelength  # velocities
 
+        # Now compute the probe destruction time.
+        self.probeDestructionTime()
+
     def transform(self, vals):
         """
         Perform any modification to values dictated by the value of self.form
@@ -401,6 +404,47 @@ class Spectrogram:
                 np.mean(timeVelInten[ind])
         return answer
 
+    def probeDestructionTime(self):
+        """
+        Compute an approximate value for the probe destruction time based
+        upon the maximum total intensity for each time slice.
+        """
+        totalInten = np.sum(self.intensity, axis=0)
+        maxInten = np.max(totalInten)
+        inds = np.where(totalInten == maxInten)
+        self.probe_destruction_time = self.time[inds][0]
+        self.probe_destruction_index = inds[0][0]
+
+        # Compute the maximum single intensity value and use that as another
+        # estimate of probe destruction. Choose the smaller of the two options.
+        a = self.max
+        maxArray = np.max(self.intensity, axis=0)
+        inds2 = np.where(maxArray == a)
+        self.probe_destruction_index_max = inds2[0][0]
+        if False:
+            print("The value of PD index using the max estimate is", self.probe_destruction_index_max, "it has type", type(self.probe_destruction_index_max))
+            print("The time array has shape", self.time.shape)
+
+        self.probe_destruction_time_max = self.time[self.probe_destruction_index_max]
+
+    def plotHist(self, fig = None, minFrac=0.0, maxFrac = 1.0, numBins = 1001, **kwargs):
+        if fig == None:
+            fig = plt.figure()
+        bins = np.linspace(self.min, self.max, numBins)
+
+        threshold = bins[int(numBins*minFrac):int(numBins*maxFrac)]
+
+        plt.hist(self.intensity.flatten(), threshold, **kwargs)
+        axes = plt.gca()
+        axes.set_ylabel('Counts', fontsize = 18)
+        axes.set_xlabel('Intensity', fontsize = 18)
+        axes.xaxis.set_tick_params(labelsize=14)
+        axes.yaxis.set_tick_params(labelsize=14)        
+        title = self.data.filename.split('/')[-1]
+        axes.set_title(title.replace("_", "-")+" Intensity Histogram", fontsize = 24)
+        
+        return fig
+
     def plot(self, axes=None, **kwargs):
         # max_vel=6000, vmin=-200, vmax=100):
         if axes == None:
@@ -419,7 +463,7 @@ class Spectrogram:
             axes.set_xlim(left=kwargs['min_time'])
             del kwargs['min_time']
         
-
+        endTime = self._time_to_index((self.probe_destruction_time + self.probe_destruction_time_max)/2)
         cmapUsed = COLORMAPS[DEFMAP]
         if 'cmap' in kwargs:
             attempt = kwargs['cmap']
@@ -429,18 +473,18 @@ class Spectrogram:
         pcm = None # To define the scope.
         if 'cmap' not in kwargs:
             pcm = axes.pcolormesh(
-                self.time * 1e6,
+                self.time[:endTime] * 1e6,
                 self.velocity,
-                self.intensity,
+                self.intensity[:,:endTime],
                 cmap = cmapUsed,
                 **kwargs)
         else:
             pcm = axes.pcolormesh(
-                self.time * 1e6,
+                self.time[:endTime] * 1e6,
                 self.velocity,
-                self.intensity,
+                self.intensity[:,:endTime],
                 **kwargs)
-
+        print("The current maximum of the colorbar is", np.max(self.intensity[:,:endTime]))
         plt.gcf().colorbar(pcm, ax=axes)
         axes.set_ylabel('Velocity (m/s)', fontsize = 18)
         axes.set_xlabel('Time ($\mu$s)', fontsize = 18)
@@ -452,6 +496,22 @@ class Spectrogram:
 
 
 if __name__ == '__main__':
-    sp = Spectrogram('../dig/GEN3CH_4_009.dig', None,
-                     None, overlap_shift_factor=1 / 4)
-    print(sp)
+    # Then I am calling this from the command line and not jupyter. This is an assumption!
+
+    import tkinter as tk
+    root = tk.Tk()
+    width_px = root.winfo_screenwidth()
+    height_px = root.winfo_screenheight()
+    width_mm = root.winfo_screenmmwidth()
+    height_mm = root.winfo_screenmmheight()
+    # 2.54 cm = in
+    width_in = width_mm / 25.4
+    height_in = height_mm / 25.4
+
+    # Set the default window size for matplotlib to be the fullscreen - 0.5 inches on the side and the top.
+
+    plt.rcParams["figure.figsize"] = [width_in-0.5, height_in-0.5]
+
+    # sp = Spectrogram('../dig/GEN3CH_4_009.dig', None,
+    #                  None, overlap_shift_factor=1 / 4)
+    # print(sp)
