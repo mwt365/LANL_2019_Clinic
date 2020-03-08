@@ -102,10 +102,10 @@ class TemplateMatcher():
         new_matrix = np.where(matrix > threshold_percentile, matrix+threshold_percentile, threshold_percentile)
         new_matrix = np.flip(np.flip(new_matrix), axis=1)
 
-        print(velo_bounds)
-        print(time_bounds)
+        # print(velo_bounds)
+        # print(time_bounds)
 
-        print(self.click)
+        # print(self.click)
 
         # nice_v_bounds = (520, 580)
         # nice_t_bounds = (80, 120)
@@ -136,14 +136,14 @@ class TemplateMatcher():
         w, h = template.shape[::-1]
 
         # All the 6 methods for comparison in a list
-        # methods = ['cv2.TM_CCOEFF', 'cv2.TM_CCOEFF_NORMED', 'cv2.TM_CCORR',
-        #             'cv2.TM_CCORR_NORMED', 'cv2.TM_SQDIFF', 'cv2.TM_SQDIFF_NORMED']
+        methods = ['cv2.TM_CCOEFF', 'cv2.TM_CCOEFF_NORMED', 'cv2.TM_CCORR',
+                    'cv2.TM_CCORR_NORMED', 'cv2.TM_SQDIFF', 'cv2.TM_SQDIFF_NORMED']
 
         # methods = ['cv2.TM_CCOEFF', 'cv2.TM_CCOEFF_NORMED']
         # methods = ['cv2.TM_CCORR', 'cv2.TM_CCORR_NORMED']
         # methods = ['cv2.TM_SQDIFF', 'cv2.TM_SQDIFF_NORMED']
 
-        methods = ['cv2.TM_CCORR'] # the 'best' method for matching
+        # methods = ['cv2.TM_CCORR'] # the 'best' method for matching
 
         xcoords = []
         ycoords = []
@@ -208,9 +208,17 @@ class TemplateMatcher():
             bottom_right = (top_left[0] + w, top_left[1] + h)
 
             velo_offset = self.spectrogram.velocity[self.velo_bounds[0]]
-            time_offset = self.spectrogram.time[self.time_bounds[0]] * 10**6
+            time_offset = self.spectrogram.time[self.time_bounds[0]] * 1e6
 
-            xcoords.append( (self.spectrogram.time[top_left[0]] * 10**6) + time_offset)
+            start_time = self.spectrogram.time[0] * 1e6
+            start_time_offset = start_time * -1
+            total_time_offset = start_time_offset + time_offset
+
+            print(time_offset)
+            print(start_time)
+            print(total_time_offset)
+
+            xcoords.append( (self.spectrogram.time[top_left[0]] * 10**6) + total_time_offset)
             ycoords.append( self.spectrogram.velocity[top_left[1]] + velo_offset)
 
             # cv2.rectangle(img, top_left, bottom_right, 255, thickness=1)
