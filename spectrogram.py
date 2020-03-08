@@ -12,6 +12,7 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy import signal
+from scipy.signal import find_peaks
 
 from ProcessingAlgorithms.preprocess.digfile import DigFile
 
@@ -47,7 +48,7 @@ class Spectrogram:
         .dig file to voltage before computing the spectrogram. If False,
         the raw integral values are used.
     detrend: ("linear") the background subtraction method.
-    complex_value: (False) do you want to maintain the phase information as well. 
+    complex_value: (False) do you want to maintain the phase information as well.
     **Computed fields**
 
     time:      array of times at which the spectra are computed
@@ -71,13 +72,13 @@ class Spectrogram:
                  digfile: DigFile,
                  t_start=None,
                  ending=None,
-                 wavelength: float=1550.0e-9,
-                 points_per_spectrum: int=8192,
-                 overlap: float=0.25,
+                 wavelength: float = 1550.0e-9,
+                 points_per_spectrum: int = 8192,
+                 overlap: float = 0.25,
                  window_function=None,  # 'hanning',
-                 form: str='db',
-                 convert_to_voltage: bool=True,
-                 detrend: str="linear",
+                 form: str = 'db',
+                 convert_to_voltage: bool = True,
+                 detrend: str = "linear",
                  **kwargs
                  ):
         """
@@ -307,16 +308,53 @@ class Spectrogram:
         # ovals = self.orig_spec_output[vel0:vel1 + 1, time0:time1 + 1]
         return tvals, vvals, ivals,  # ovals
 
-    def squash(self, along = 'time', dB = False):
-        """Sum along either rows or columns (as power) and return an
-        array normalized to unit height.
+    def noise_level(self, percentile=0.75):
         """
-        vals = np.sum(self.power(self.intensity),
-                      axis = 0 if along == 'time' else 1)
+        Estimate the noise level by sorting all intensities and
+        returning the level of the point at the given percentile.
+        """
+        all_intensity = np.sort(self.intensity.flatten())
+        index = int(percentile * len(all_intensity))
+        return all_intensity[index]
+
+    def squash(self, along='time', dB=False):
+        """
+        Sum along either rows (along = 'time') or columns
+        (along = 'velocity') as power and return a one-dimensional
+        array normalized to unit height. The array is
+        intensity vs time if along is 'velocity' and it is
+        intensity vs velocity if along is 'time'
+        """
+        axis = 1 if along == "time" else 0
+        vals = np.sum(self.power(self.intensity), axis=axis)
         vals /= np.max(vals)
         if dB:
             vals = 20 * np.log10(vals)
         return vals
+
+    def vertical_spike(self):
+        """
+        Look for an outstanding peak with intensity spread across a broad
+        band of frequencies.
+        """
+        intensity = self.squash(along='velocity')
+        peaks, props = find_peaks(
+            intensity,
+            height=0.1,  # squash produces a normalized output
+            distance=10  # does this make any sense that spikes must
+            # be at least 10 pixels apart?
+        )
+        if len(peaks) == 0:
+            return None
+        # peaks holds the time_indices
+        heights = props['peak_heights']
+        ordering = np.flip(np.argsort(heights))
+        peak_t_indices = peaks[ordering]
+        peak_times = self.time[peak_t_indices]
+        peak_heights = heights[ordering]  # do I need this?
+        # If we're lucky, the first peak corresponds to
+        # destruction
+        return peak_times[0]
 
     # Routines to archive the computed spectrogram and reload from disk
 
@@ -384,6 +422,11 @@ class Spectrogram:
     def dv(self):
         "The velocity step size"
         return self.velocity[1] - self.velocity[0]
+
+    @property
+    def dt(self):
+        "The time step size"
+        return self.time[1] - self.time[0]
 
     @property
     def v_max(self):

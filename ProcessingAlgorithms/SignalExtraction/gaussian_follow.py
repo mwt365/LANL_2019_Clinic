@@ -77,12 +77,12 @@ class GaussianFitter(Follower):
         else:
             # add this to our results
             self.results['time_index'].append(self.time_index)
-            self.results['times'].append(
+            self.results['time'].append(
                 self.spectrogram._point_to_time(self.time_index))
-            self.results['velocities'].append(coeff[1])
-            self.results['widths'].append(coeff[2])
-            self.results['amplitudes'].append(coeff[0])
-            self.results['backgrounds'].append(coeff[3])
+            self.results['velocity'].append(coeff[1])
+            self.results['width'].append(coeff[2])
+            self.results['amplitude'].append(coeff[0])
+            self.results['background'].append(coeff[3])
         return True
 
     def show_fit(self, axes, n=-1):
@@ -101,7 +101,7 @@ class GaussianFitter(Follower):
         # compute the fitted curve
         # A, mu, sigma, background = p
         params = [self.results[x][n] for x in
-                  ('amplitudes', 'velocities', 'widths', 'backgrounds')]
+                  ('amplitude', 'velocity', 'width', 'background')]
         curve = _gauss(velocities, *params)
         axes.plot(velocities, curve, 'b-', alpha=0.8)
 

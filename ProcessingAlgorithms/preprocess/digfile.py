@@ -17,15 +17,15 @@ from scipy.optimize import curve_fit
 
 class DigFile:
     """
-    Representation of a photon Doppler velocimetry file stored in 
+    Representation of a photon Doppler velocimetry file stored in
     the .dig format. On creation, the file header is read and processed;
     information in the top 512 bytes is stored in a notes dictionary.
     Information from the second 512-byte segment is decoded to infer
-    the number of data points, the number of bytes per point, the 
+    the number of data points, the number of bytes per point, the
     start time and sampling interval, and the voltage scaling.
 
     The actual data remain on disk and are loaded only as required either
-    to generate a spectrogram for a range in time or a spectrum from a 
+    to generate a spectrogram for a range in time or a spectrum from a
     shorter segment. The values are loaded from disk and decoded using
     the **values** method which takes a start time and either an end time
     or an integer number of points to include. Alternatively, the raw values
@@ -110,11 +110,20 @@ class DigFile:
         return os.path.splitext(os.path.split(self.path)[1])[0]
 
     @property
+    def title(self):
+        "Name of the file without extension, but including folder for segments"
+        head, file = os.path.split(self.path)
+        file_or_seg = os.path.splitext(file)[0]  # discard the extension
+        if self.is_segment:
+            file_or_seg = os.path.join(os.path.split(head)[1], file_or_seg)
+        return file_or_seg.replace("_", "-")
+
+    @property
     def rel_path(self):
         """
         Returns the relative path from the dig folder to the file
         """
-        return os.path.relpath(self.path, start = self.dig_dir())
+        return os.path.relpath(self.path, start=self.dig_dir())
 
     @property
     def rel_dir(self):

@@ -24,25 +24,27 @@ class PeakFollower(Follower):
 
     - spectrogram: an instance of Spectrogram
     - start_point: (t, v), the coordinates at which to begin the search
-    - span: (80) the number of pixels on either side of the starting value of v
-      at which to search for a peak at the next time step.
+    - max_acceleration: (2000 m/s/µs), used to determine how many pixels
+      on either side of the starting value of v
     - smoothing: (4) the number of points on either side of a given velocity
       in a spectrum to average over to produce a smoothed representation of the
       spectrum prior to searching for a peak.
     - max_hop: (70) the largest change in v from the previous time step to consider
       as a continuation.
+    - min_intensity_drop: (0.01)
     """
 
     def __init__(self,
                  spectrogram: Spectrogram,
                  start_point,  # either a tuple or a list of tuples
-                 span=80,      # width of neighborhood to search
+                 max_acceleration=1000,
                  smoothing=4,  # average this many points on each side
                  max_hop=500,  # require peaks at successive time steps
                                # to be within this many m/s
                  direction=1,  # go forward in time (1), backward (-1)
                  ):
-        super().__init__(spectrogram, start_point, span)
+        span = max_acceleration * spectrogram.dt * 1e6 / spectrogram.dv
+        super().__init__(spectrogram, start_point, int(span))
         self.smoothing = smoothing
         self.max_hop = max_hop
         assert direction in (-1, 1), "Direction must be +1 or -1"
@@ -50,6 +52,7 @@ class PeakFollower(Follower):
         peaks, dv, heights = bline(spectrogram)
         # Let's take only the peaks greater than 10% of the strongest peak
         self.baselines = peaks[heights > 0.1]
+        self.noise_level = spectrogram.noise_level() * 3
 
     def reverse(self):
         """Switch directions"""
@@ -59,10 +62,10 @@ class PeakFollower(Follower):
         if len(tindex) > 0:
             if self.direction > 0:
                 self.time_index = tindex[-1] + 1
-                self.last_peak = self.results['velocities'][-1]
+                self.last_peak = self.results['peak_velocity'][-1]
             else:
                 self.time_index = tindex[0] - 1
-                self.last_peak = self.results['velocities'][0]
+                self.last_peak = self.results['peak_velocity'][0]
 
     def run(self):
         """
@@ -95,6 +98,7 @@ class PeakFollower(Follower):
         The order of the parameters in the coefficients array is
         amplitude, center, width, and background.
         """
+        USE_INTENSITIES = False
         velocities, intensities, p_start, p_end = self.data(self.time_index)
 
         if self.smoothing:
@@ -120,16 +124,20 @@ class PeakFollower(Follower):
         # this point.
         reject = False
         if len(self.results['time']) > 0:
+            reject = intensities[top] < self.noise_level
+        if not reject and USE_INTENSITIES:
             i_guess = self.guess_intensity(self.time_index)
-            reject = 0.05 * i_guess > intensities[top]
+            reject = 0.01 * i_guess > intensities[top]
+            if reject:
+                i_guess = self.guess_intensity(self.time_index)
 
         hop = None if not hasattr(self, 'last_peak') else abs(
             v_high - self.last_peak)
         if hop and hop > self.max_hop:
             reject = True
-        # add this to our results
+
         if not reject:
-            self.add_point(self.time_index, v_high, span = (p_start, p_end))
+            self.add_point(self.time_index, v_high, span=(p_start, p_end))
             try:
                 hop = abs(v_high - self.last_peak)
                 if hop > self.max_hop:
@@ -144,14 +152,16 @@ class PeakFollower(Follower):
 
         if self.time_index >= len(self.time) or self.time_index < 0:
             raise IndexError  # we're out of data
+        if reject:
+            raise Exception("failed")
 
 
 def signal_finder(
         spectrogram: Spectrogram,
-        baseline: float,
+        baseline: np.ndarray,
         t_start: float,
         dt: int = 2,
-        min_separation = 200):  # m/s
+        min_separation=200):  # m/s
     """
     Look above the baseline for a signal corresponding to a surface velocity.
     """
@@ -159,16 +169,20 @@ def signal_finder(
 
     t_index = spectrogram._time_to_index(t_start)
     spectra = np.sum(spectrogram.intensity[:, t_index - dt:t_index + dt],
-                     axis = 1)
+                     axis=1)
     # limit the region we look at to points above the baseline
     # get the index of the baseline
-    bline = spectrogram._velocity_to_index(baseline) + 5
-    velocity = spectrogram.velocity[bline:]
-    spectrum = spectra[bline:]
+    blo = spectrogram._velocity_to_index(baseline[0]) + 5
+    if len(baseline) > 1:
+        bhi = spectrogram._velocity_to_index(baseline[1]) - 5
+    else:
+        bhi = len(spectrogram.velocity) - 1
+    velocity = spectrogram.velocity[blo:bhi]
+    spectrum = spectra[blo:bhi]
     smax = spectrum.max()
     min_sep = int(min_separation / spectrogram.dv)
-    peaks, properties = find_peaks(spectrum, height = 0.05 * smax,
-                                   distance = min_sep)
+    peaks, properties = find_peaks(spectrum, height=0.05 * smax,
+                                   distance=min_sep)
 
     try:
         heights = properties['peak_heights']

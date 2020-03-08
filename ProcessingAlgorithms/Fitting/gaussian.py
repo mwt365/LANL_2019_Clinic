@@ -78,22 +78,34 @@ class Gaussian:
     @property
     def center(self):
         "The location of the peak of the gaussian"
-        return self.params[1]
+        try:
+            return self.params[1]
+        except:
+            return None
 
     @property
     def width(self):
         "The standard deviation of the gaussian"
-        return self.params[2]
+        try:
+            return self.params[2]
+        except:
+            return None
 
     @property
     def amplitude(self):
         "The amplitude of the gaussian"
-        return self.params[0]
+        try:
+            return self.params[0]
+        except:
+            return None
 
     @property
     def background(self):
         "The (constant) background level surrounding the gaussian"
-        return self.params[3]
+        try:
+            return self.params[3]
+        except:
+            return None
 
     def __str__(self):
         if self.valid:
