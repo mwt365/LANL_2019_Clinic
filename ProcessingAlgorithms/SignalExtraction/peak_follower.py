@@ -170,21 +170,21 @@ def signal_finder(
     t_index = spectrogram._time_to_index(t_start)
     spectra = np.sum(spectrogram.intensity[:, t_index - dt:t_index + dt],
                      axis=1)
-    # limit the region we look at to points above the baseline
-    # get the index of the baseline
-    blo = spectrogram._velocity_to_index(baseline[0]) + 5
-    if len(baseline) > 1:
-        bhi = spectrogram._velocity_to_index(baseline[1]) - 5
-    else:
-        bhi = len(spectrogram.velocity) - 1
-    velocity = spectrogram.velocity[blo:bhi]
-    spectrum = spectra[blo:bhi]
-    smax = spectrum.max()
-    min_sep = int(min_separation / spectrogram.dv)
-    peaks, properties = find_peaks(spectrum, height=0.05 * smax,
-                                   distance=min_sep)
 
     try:
+        # limit the region we look at to points above the baseline
+        # get the index of the baseline
+        blo = spectrogram._velocity_to_index(baseline[0]) + 5
+        if len(baseline) > 1:
+            bhi = spectrogram._velocity_to_index(baseline[1]) - 5
+        else:
+            bhi = len(spectrogram.velocity) - 1
+        velocity = spectrogram.velocity[blo:bhi]
+        spectrum = spectra[blo:bhi]
+        smax = spectrum.max()
+        min_sep = int(min_separation / spectrogram.dv)
+        peaks, properties = find_peaks(spectrum, height=0.05 * smax,
+                                       distance=min_sep)
         heights = properties['peak_heights']
         # produce an ordering of the peaks from high to low
         ordering = np.flip(np.argsort(heights))
