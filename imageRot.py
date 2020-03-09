@@ -66,7 +66,8 @@ def buildRotationMatrix(angle):
 
     return np.array([[np.cos(a), -np.sin(a)], [np.sin(a), np.cos(a)]])
 
-
+def center(matrix):
+    return (np.array(matrix.shape[::-1])-1)/2
 
 if __name__ == "__main__":
     fig = plt.figure(figsize=(10, 3))

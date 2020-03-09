@@ -44,8 +44,6 @@ class Follower:
                 span: The number of velocity values up and down that you will check at the next time step.
                 rotate: whether or not you want to use linear extrapolation and rotation at each time step.
         """
-        assert isinstance(spectrogram, Spectrogram)
-        assert isinstance(span, int)
         self.spectrogram = spectrogram
         self.t_start = start_point[0]
         self.v_start = start_point[1]
@@ -123,11 +121,17 @@ class Follower:
             intensities = self.intensity[start_index:end_index, startT:endT]
 
             rotated  = imageRot.rotate(intensities, angle)
+
+            rotated = rotated[:,int(imageRot.center(intensities)[0])]
             newIndices = [(x,y) for x in range(rotated.shape[0]) for y in range(rotated.shape[1])]
 
-            rotatedIndices =  imageRot.computeIndices((np.array(intensities.shape[::-1])-1)/2, (np.array(rotatedIndices.shape[::-1])-1)/2, newIndices, -1*angle, (startT, start_index))
+            rotatedIndices =  imageRot.computeIndices(imageRot.center(intensities), imageRot.center(rotatedIndices), newIndices, -1*angle, (startT, start_index))
 
-            
+            velocities, times = imageRot.calculateNewVelocityAndTime(self.dV, self.dT, self.t_start, self.v_start, rotatedIndices)
+
+            # Need to slice the rotated array.
+
+            return (velocities, times), self.spectrogram.power(rotated), start_index, end_index
 
             
 

@@ -39,7 +39,7 @@ class PeakFollower(Follower):
                  max_hop=70   # require peaks at successive time steps
                  # to be within this many velocity indices
                  ):
-        super().__init__(spectrogram, start_point, span)
+        super().__init__(spectrogram, start_point, span, rotate=False)
         self.smoothing = smoothing
         self.max_hop = max_hop
         peaks, dv, heights = bline(spectrogram)
@@ -49,6 +49,7 @@ class PeakFollower(Follower):
         """
         Repeatedly call step until it fails.
         """
+        count = 0
         while self.step():
             pass
 
@@ -61,6 +62,10 @@ class PeakFollower(Follower):
         amplitude, center, width, and background.
         """
         velocities, intensities, p_start, p_end = self.data()
+        times = []
+        if self.rotate and len(self.results['velocities']) > 1:
+            velAndTime, intensities, p_start, p_end = self.data()
+            velocities, times = velAndTime
 
         print("The list of my times",self.results['times'])
         print("The list of my velocities", self.results['velocities'])
@@ -82,32 +87,50 @@ class PeakFollower(Follower):
             n -= 1
 
         top = low_to_high[n]  # index of the tallest intensity peak
-        v_high = velocities[top]
+        v_high = velocities[top]        
+        
+        if self.rotate and len(self.results['velocities']) > 1:
+            time = times[top]
+            # add this to our results.
+            self.results['time_index'].append(self.spectrogram._time_to_index(time))
+            self.results['times'].append(time)
+            self.results['velocities'].append(v_high)
 
-        # add this to our results
-        self.results['velocity_index_spans'].append((p_start, p_end))
-        self.results['time_index'].append(self.time_index)
-        self.results['times'].append(
-            self.spectrogram._point_to_time(self.time_index))
-        self.results['velocities'].append(velocities[top])
-        # we need to call transform to return to whatever format is being used
-        # for the plot (?)
-        self.results['intensities'].append(
-            self.spectrogram.transform(intensities[top]))
-        # on success we increment to the next time index
-        self.time_index += 1
+            self.results['intensities'].append(self.spectrogram.transform(intensities[top]))
+
+            self.results['velocity_index_spans'].append((p_start, p_end))
+
+            if self.results['time_index'][-1] > self.results['time_index'][-2]:
+                # Going forward.
+                self.time_index += 1
+            elif self.results['time_index'][-1] < self.results['time_index'][-2]:
+                # Going backward.
+                self.time_index -= 1
+            # Otherwise we are doing nothing.
+
+        else:
+            # add this to our results
+            self.results['velocity_index_spans'].append((p_start, p_end))
+            self.results['time_index'].append(self.time_index)
+            self.results['times'].append(
+                self.spectrogram._point_to_time(self.time_index))
+            self.results['velocities'].append(velocities[top])
+            # we need to call transform to return to whatever format is being used
+            # for the plot (?)
+            self.results['intensities'].append(
+                self.spectrogram.transform(intensities[top]))
+            # on success we increment to the next time index
+            self.time_index += 1
+
+            try:
+                hop = v_high - self.results['velocities'][-2]
+                hop = np.abs(hop / (velocities[1] - velocities[0]))
+                return hop <= self.max_hop
+            except IndexError:
+                return True
+            except Exception as eeps:
+                print(eeps)
+                return False
 
         if self.time_index >= len(self.time):
             return False  # we're out of data
-
-        try:
-            hop = v_high - self.results['velocities'][-2]
-            hop = np.abs(hop / (velocities[1] - velocities[0]))
-            return hop <= self.max_hop
-        except IndexError:
-            return True
-        except Exception as eeps:
-            print(eeps)
-            return False
-
-

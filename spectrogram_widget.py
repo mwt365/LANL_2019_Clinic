@@ -27,7 +27,7 @@ from peak_follower import PeakFollower
 from UI_Elements.value_sliders import ValueSlider
 from UI_Elements.percent_slider import PercentSlider # Note that this class is not actually used yet. 02/07/20
 
-DEFMAP = '3W_gby'  # should really be in an .ini file
+DEFMAP = '3w_gby'  # should really be in an .ini file
 
 class SpectrogramWidget:
     """
