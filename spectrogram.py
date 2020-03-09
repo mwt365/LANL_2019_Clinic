@@ -412,7 +412,7 @@ class Spectrogram:
             self.time * 1e6,
             self.velocity,
             self.intensity,
-            cmap='plasma',
+            cmap='gist_gray_r',
             **kwargs)
 
         pcm.set_clim(-5,100)

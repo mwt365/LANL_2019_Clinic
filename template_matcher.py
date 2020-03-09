@@ -156,23 +156,24 @@ class TemplateMatcher():
             # print(self.spectrogram.velocity[bottom_right[1]])
 
             velo_match = self.spectrogram.velocity[bottom_right[1]]
-            template_offset_velo = self.spectrogram.velocity[4]
-            # velo_offset = self.spectrogram.velocity[self.velo_bounds[0]]
+            template_offset_velo = self.spectrogram.velocity[0]
+            velo_offset = self.spectrogram.velocity[self.velo_bounds[0]]
 
-            velo_total = velo_match + template_offset_velo# + velo_offset
+            velo_total = velo_match + template_offset_velo + velo_offset
 
             time_match = self.spectrogram.time[top_left[0]] * 1e6
-            template_offset_time = self.spectrogram.time[45] * 1e6
+            template_offset_time = self.spectrogram.time[74] * 1e6
             start_time = self.spectrogram.time[0] * 1e6 * -1
             time_offset = self.spectrogram.time[self.time_bounds[0]] * 1e6
 
             time_total = time_match + template_offset_time + time_offset + start_time
 
+
             max_velo_index = self.spectrogram.intensity.shape[0] - 1
             max_velo = self.spectrogram.velocity[max_velo_index]
 
             true_velo = max_velo - velo_total
-            
+
             # print(true_velo)
             # print(time_total,'\n')
             # print(x_value, y_value, "\n")
@@ -181,16 +182,16 @@ class TemplateMatcher():
             xcoords.append(time_total)
             ycoords.append(true_velo)
 
-            cv2.rectangle(img, top_left, bottom_right, 255, thickness=1)
-            plt.subplot(121),plt.imshow(res,cmap = 'gray')
-            plt.title('Matching Result'), plt.xticks([]), plt.yticks([])
-            plt.subplot(122),plt.imshow(img,cmap = 'gray')
-            plt.title('Detected Point'), plt.xticks([]), plt.yticks([])
-            plt.suptitle(meth)
-            plt.show()
+            # cv2.rectangle(img, top_left, bottom_right, 255, thickness=1)
+            # plt.subplot(121),plt.imshow(res,cmap = 'gray')
+            # plt.title('Matching Result'), plt.xticks([]), plt.yticks([])
+            # plt.subplot(122),plt.imshow(img,cmap = 'gray')
+            # plt.title('Detected Point'), plt.xticks([]), plt.yticks([])
+            # plt.suptitle(meth)
+            # plt.show()
 
 
-        return xcoords, ycoords
+        return xcoords, ycoords, scores
 
 
 
@@ -199,19 +200,19 @@ if __name__ == "__main__":
     path = "/Users/trevorwalker/Desktop/Clinic/dig/new/WHITE_CH1_SHOT/seg00.dig"
     spec = Spectrogram(path, 0.0, 60.0e-6, overlap_shift_factor= 1/8, form='db')
 
+    span = spec.intensity.shape[1]
 
-    template = opencv_long_start_pattern2
+    template = opencv_long_start_pattern4
     # template_offset_time_index = 45 #where should the actual start index be in the template?
     # template_offset_velo_index = 12
 
     time = 0
     velo = 5
 
-
     user_click = (time*1e-6, velo)
 
 
-    template_matcher = TemplateMatcher(spec, user_click, template, span=340)
+    template_matcher = TemplateMatcher(spec, user_click, template, span=span)
     times, velos = template_matcher.main()
 
     print(times, velos)
