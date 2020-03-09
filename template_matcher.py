@@ -63,11 +63,11 @@ class TemplateMatcher():
 
         start_time = self.spectrogram._time_to_index(time)
         end_time = self.spectrogram._time_to_index(time) + self.span
-        max_time_index = self.spectrogram.intensity.shape[1]
+        max_time_index = self.spectrogram.intensity.shape[1] - 1
 
         start_velo = self.spectrogram._velocity_to_index(velocity)
-        end_velo = self.spectrogram._velocity_to_index(velocity) + (3*self.span)
-        max_velo_index = self.spectrogram.intensity.shape[0]
+        end_velo = self.spectrogram._velocity_to_index(velocity) + (10 * self.span)
+        max_velo_index = self.spectrogram.intensity.shape[0] - 1
 
         if start_time < 0:
             start_time = 0
@@ -80,10 +80,17 @@ class TemplateMatcher():
 
         zero_index = self.spectrogram._time_to_index(0)
 
+        max_velo = self.spectrogram.velocity[max_velo_index]
+        max_time = self.spectrogram.time[max_time_index]
+
+        print(max_velo)
+
         # print(zero_index)
         # print(start_time)
         # print(zero_index+start_time)
         # print(self.spectrogram.time[zero_index+start_time])
+
+        print((start_velo, end_velo))
 
         self.time_bounds = (start_time, end_time) #indices, not actual time/velo values
         self.velo_bounds = (start_velo, end_velo)
@@ -93,13 +100,15 @@ class TemplateMatcher():
     def crop_intensities(self, matrix, time_bounds, velo_bounds):
 
         # baselines, ws, hs = baselines_by_squash(self.spectrogram)
-
         # print(baselines)
 
         sortedmatrix = sorted(matrix.flatten(), reverse=True)
         threshold_percentile = np.percentile(sortedmatrix, 90)
 
         new_matrix = np.where(matrix > threshold_percentile, matrix+threshold_percentile, threshold_percentile)
+
+        imsave("./original.png", new_matrix[:])
+
         new_matrix = np.flip(np.flip(new_matrix), axis=1)
 
         # print(velo_bounds)
@@ -111,12 +120,14 @@ class TemplateMatcher():
         # nice_t_bounds = (80, 120)
         # spec = new_matrix[(-1 * nice_v_bounds[1]):(-1 * nice_v_bounds[0]), nice_t_bounds[0]:nice_t_bounds[1]]
 
+        print((-1 * velo_bounds[1]),(-1 * velo_bounds[0]))
+
         spec = new_matrix[(-1 * velo_bounds[1]):(-1 * velo_bounds[0]), time_bounds[0]:time_bounds[1]]
 
         imsave("./full.png", new_matrix[:])
         imsave("./debug.png", spec[:])
 
-        return spec
+        return new_matrix
 
 
 
@@ -157,7 +168,7 @@ class TemplateMatcher():
             res = cv2.matchTemplate(img, template, method)
 
             # print(res.shape)
-            # print(res)
+            # print(res[0][0])
 
             min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(res)
 
@@ -172,11 +183,12 @@ class TemplateMatcher():
             # sorted_mat = np.argsort(-res, axis=1)
 
             # print(sorted_mat)
-            # print(max_loc)
-            # print(res[max_loc[0]][max_loc[1]])
-            # print(res[max_loc[0], max_loc[1]])
+            # print(max_val)
+            # print(res[max_loc[1]][max_loc[0]])
+            # print(res[0][0])
             # print(self.spectrogram.time[max_loc[0]])
             # print(self.spectrogram.velocity[max_loc[1]])
+
 
 
 
@@ -207,29 +219,44 @@ class TemplateMatcher():
                 scores.append(max_val)
             bottom_right = (top_left[0] + w, top_left[1] + h)
 
-            velo_offset = self.spectrogram.velocity[self.velo_bounds[0]]
+
+            # print(self.spectrogram.time[top_left[0]])
+            # print(self.spectrogram.velocity[bottom_right[1]])
+
+            velo_match = self.spectrogram.velocity[bottom_right[1]]
+            template_offset_velo = self.spectrogram.velocity[4]
+            # velo_offset = self.spectrogram.velocity[self.velo_bounds[0]]
+
+            velo_total = velo_match + template_offset_velo# + velo_offset
+
+            time_match = self.spectrogram.time[top_left[0]] * 1e6
+            template_offset_time = self.spectrogram.time[45] * 1e6
+            start_time = self.spectrogram.time[0] * 1e6 * -1
             time_offset = self.spectrogram.time[self.time_bounds[0]] * 1e6
 
-            start_time = self.spectrogram.time[0] * 1e6
-            start_time_offset = start_time * -1
-            total_time_offset = start_time_offset + time_offset
+            time_total = time_match + template_offset_time + time_offset + start_time
 
-            print(time_offset)
-            print(start_time)
-            print(total_time_offset)
+            max_velo_index = self.spectrogram.intensity.shape[0] - 1
+            max_velo = self.spectrogram.velocity[max_velo_index]
 
-            xcoords.append( (self.spectrogram.time[top_left[0]] * 10**6) + total_time_offset)
-            ycoords.append( self.spectrogram.velocity[top_left[1]] + velo_offset)
+            true_velo = max_velo - velo_total
+            print(true_velo)
+            print(time_total,'\n')
 
-            # cv2.rectangle(img, top_left, bottom_right, 255, thickness=1)
-            # plt.subplot(121),plt.imshow(res,cmap = 'gray')
-            # plt.title('Matching Result'), plt.xticks([]), plt.yticks([])
-            # plt.subplot(122),plt.imshow(img,cmap = 'gray')
-            # plt.title('Detected Point'), plt.xticks([]), plt.yticks([])
-            # plt.suptitle(meth)
-            # plt.show()
+            # print(x_value, y_value, "\n")
+            # print(scores[-1], "\n")
 
-        # print(scores)
+            xcoords.append(time_total)
+            ycoords.append(true_velo)
+
+            cv2.rectangle(img, top_left, bottom_right, 255, thickness=1)
+            plt.subplot(121),plt.imshow(res,cmap = 'gray')
+            plt.title('Matching Result'), plt.xticks([]), plt.yticks([])
+            plt.subplot(122),plt.imshow(img,cmap = 'gray')
+            plt.title('Detected Point'), plt.xticks([]), plt.yticks([])
+            plt.suptitle(meth)
+            plt.show()
+
 
         return xcoords, ycoords
 
@@ -237,16 +264,25 @@ class TemplateMatcher():
 
 if __name__ == "__main__":
 
-    path = "/Users/trevorwalker/Desktop/Clinic/For_Candace/newdigs/CH_2_009.dig"
+    # path = "/Users/trevorwalker/Desktop/Clinic/For_Candace/newdigs/CH_2_009.dig"
+    # spec = Spectrogram(path, 0.0, 60.0e-6, overlap_shift_factor= 1/8, form='db')
+
+    path = "/Users/trevorwalker/Desktop/Clinic/dig/new/WHITE_CH1_SHOT/seg00.dig"
     spec = Spectrogram(path, 0.0, 60.0e-6, overlap_shift_factor= 1/8, form='db')
 
-    import random
-    secure_random = random.SystemRandom()
+    # import random
+    # secure_random = random.SystemRandom()
 
-    template = opencv_start_pattern2
+    template = opencv_long_start_pattern2
+    template_offset_time_index = 45 #where should the actual start index be in the template?
+    template_offset_velo_index = 12
 
-    time = round(secure_random.uniform(8.5, 13.5), 3)
-    velo = round(secure_random.uniform(2400.5, 2700.5), 3)
+
+    # time = round(secure_random.uniform(8.5, 13.5), 3)
+    # velo = round(secure_random.uniform(2400.5, 2700.5), 3)
+
+    time = 0
+    velo = 5
 
 
     user_click = (time*1e-6, velo)
@@ -254,14 +290,14 @@ if __name__ == "__main__":
     # print("   time : ",time)
     # print("velocity: ",velo,'\n')
 
-    template_matcher = TemplateMatcher(spec, user_click, template, span=80)
+    template_matcher = TemplateMatcher(spec, user_click, template, span=340)
     times, velos = template_matcher.main()
 
 
     print(times, velos)
 
-    # spec.plot()
-    # plt.plot(times, velos, 'ro', markersize=1.5)
-    # plt.show()
+    spec.plot()
+    plt.plot(times, velos, 'ro', markersize=1.5)
+    plt.show()
 
 
