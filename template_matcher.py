@@ -212,29 +212,27 @@ if __name__ == "__main__":
     path = "/Users/trevorwalker/Desktop/Clinic/dig/new/WHITE_CH2_SHOT/seg00.dig"
     spec = Spectrogram(path, 0.0, 60.0e-6, overlap_shift_factor= 1/8, form='db')
 
-    span = 200
+    span = 200 # will determine the bounding box to search in
 
-    template = opencv_long_start_pattern4
+    template = opencv_long_start_pattern4 # use this template to search, you still 
+    # need to know the index of the signal
 
-    # time = 0
-    # velo = 0
-    # user_click = (time*1e-6, velo)
-
+    # gives user the option to click, by default it searches from (0,0)
     template_matcher = TemplateMatcher(spec, None, template, 70, span=span)
     times, velos, scores = template_matcher.main()
 
     print(times, velos)
 
+    # draw the space to search in, plot times and velos as red dots
     dv = spec.velocity[template_matcher.velo_scale * span]
     dt = spec.time[span] * 1e6
-
     ax = plt.gca()
-
     spec.plot(ax)
     plt.plot(times, velos, 'ro', markersize=1.5)
     patch = Rectangle((0,0), dt, dv, fill=False, color='b', alpha=0.8)
     ax.add_patch(patch)
 
+    # display image
     plt.show()
 
 
