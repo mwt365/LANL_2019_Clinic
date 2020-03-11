@@ -41,16 +41,18 @@ class TemplateMatcher():
 
     """
 
-    def __init__(self, spectrogram, start_point, template, template_time_offset_index, span=80, velo_scale=10):
+    def __init__(self, spectrogram, start_point, template, span=80, velo_scale=10):
         assert isinstance(spectrogram, Spectrogram)
         assert (len(template) > 0)
 
         self.spectrogram = spectrogram
-        self.template = template
+        self.template = template[0]
 
         self.span = int(span)
         self.velo_scale = int(velo_scale)
-        self.template_time_offset_index = int(template_time_offset_index)
+        self.template_time_offset_index = int(template[1])
+        self.template_velo_offset_index = int(template[2])
+
 
         self.zero_time_index = spectrogram._time_to_index(0)
         self.zero_velo_index = spectrogram._velocity_to_index(0)
@@ -173,13 +175,13 @@ class TemplateMatcher():
                 scores.append(max_val)
             bottom_right = (top_left[0] + w, top_left[1] + h)
 
+            velo_offset_index = self.template_velo_offset_index
+            time_offset_index = self.template_time_offset_index
 
-            real_velo_index = abs(self.flipped_velo_bounds[0] + bottom_right[1])
-
-            offset_index = self.template_time_offset_index
+            real_velo_index = abs(self.flipped_velo_bounds[0] + bottom_right[1]) + velo_offset_index
 
             time_match = self.spectrogram.time[top_left[0]] * 1e6
-            template_offset_time = self.spectrogram.time[offset_index] * 1e6
+            template_offset_time = self.spectrogram.time[time_offset_index] * 1e6
             start_time = self.spectrogram.time[self.zero_time_index] * 1e6 * -1
             # time_offset = self.spectrogram.time[self.time_bounds[0]] * 1e6
 
@@ -209,26 +211,35 @@ class TemplateMatcher():
 
 if __name__ == "__main__":
 
-    path = "/Users/trevorwalker/Desktop/Clinic/dig/new/WHITE_CH2_SHOT/seg00.dig"
+    path = "/Users/trevorwalker/Desktop/Clinic/dig/new/WHITE_CH1_SHOT/seg00.dig"
     spec = Spectrogram(path, 0.0, 60.0e-6, overlap_shift_factor= 1/8, form='db')
 
     span = 200 # will determine the bounding box to search in
 
-    template = opencv_long_start_pattern4 # use this template to search, you still 
-    # need to know the index of the signal
+    template = opencv_long_start_pattern4 # use this template to search
 
     # gives user the option to click, by default it searches from (0,0)
-    template_matcher = TemplateMatcher(spec, None, template, 70, span=span)
+    template_matcher = TemplateMatcher(spec, None, template, span=span)
     times, velos, scores = template_matcher.main()
-
-    print(times, velos)
 
     # draw the space to search in, plot times and velos as red dots
     dv = spec.velocity[template_matcher.velo_scale * span]
     dt = spec.time[span] * 1e6
     ax = plt.gca()
     spec.plot(ax)
-    plt.plot(times, velos, 'ro', markersize=1.5)
+
+    colors = ['ro', 'bo', 'go', 'mo', 'ko', 'co']
+    color_names = ['red', 'blue', 'green', 'magenta', 'black', 'cyan']
+
+    for i in range(len(times)):
+        print("time: ", times[i])
+        print("velocity: ", velos[i])
+        print("score: ", scores[i])
+        print("color: ", color_names[i],'\n')
+
+        plt.plot(times[i], velos[i], colors[i], markersize=2.5, alpha=0.7)
+    
+    
     patch = Rectangle((0,0), dt, dv, fill=False, color='b', alpha=0.8)
     ax.add_patch(patch)
 
