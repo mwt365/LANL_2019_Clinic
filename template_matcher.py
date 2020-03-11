@@ -134,7 +134,7 @@ class TemplateMatcher():
 
 
 
-    def main(self):
+    def match(self):
 
         matrix = self.spectrogram.intensity
         cropped_spectrogram = self.crop_intensities(matrix)
@@ -183,16 +183,11 @@ class TemplateMatcher():
             time_match = self.spectrogram.time[top_left[0]] * 1e6
             template_offset_time = self.spectrogram.time[time_offset_index] * 1e6
             start_time = self.spectrogram.time[self.zero_time_index] * 1e6 * -1
-            # time_offset = self.spectrogram.time[self.time_bounds[0]] * 1e6
+            time_offset = abs(self.spectrogram.time[self.time_bounds[0]] * 1e6)
 
-            time_total = time_match + template_offset_time + start_time# + time_offset
+            time_total = time_match + template_offset_time + start_time + time_offset
 
             true_velo = self.spectrogram.velocity[real_velo_index]
-
-            # print(true_velo)
-            # print(time_total,'\n')
-            # print(x_value, y_value, "\n")
-            # print(scores[-1], "\n")
 
             xcoords.append(time_total)
             ycoords.append(true_velo)
@@ -220,7 +215,7 @@ if __name__ == "__main__":
 
     # gives user the option to click, by default it searches from (0,0)
     template_matcher = TemplateMatcher(spec, None, template, span=span)
-    times, velos, scores = template_matcher.main()
+    times, velos, scores = template_matcher.match()
 
     # draw the space to search in, plot times and velos as red dots
     dv = spec.velocity[template_matcher.velo_scale * span]

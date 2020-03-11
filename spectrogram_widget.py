@@ -953,67 +953,27 @@ class SpectrogramWidget:
 
     def match_templates(self, time, velocity):
 
-        # print("start")
-        start = Time.time()
-
         template = opencv_long_start_pattern4
-        # template_offset_time_index = 45 #where should the actual start index be in the template?
-        # template_offset_velo_index = 4
-        # print("loaded template")
 
-        # span = self.spectrogram.intensity.shape[0] - 5
         span = 300
 
         dv = self.spectrogram.velocity[10*span]
         dt = self.spectrogram.time[span] * 1e6
 
-        print(self.spectrogram.intensity.shape)
-
-        # t = time * 1e6
-
-        # box_time_offset = dt / 2
-        # box_velo_offset = dv / 2
-
-        # box_coords = (t-box_time_offset, velocity-box_velo_offset)
-        # new_click = (box_coords[0]*1e-6, velocity-box_velo_offset)
+        # print(self.spectrogram.intensity.shape)
 
         new_click = (0, 10)
 
-        # time_offset = self.spectrogram._time_to_index(0)
-        # max_velo_index = self.spectrogram.intensity.shape[0] - 1
-        # _, _, ivals = self.spectrogram.slice((time_offset, max_velo_index), None)
-        # self.spectrogram.t_start = 0
-        # self.spectrogram.intensity = ivals
-
         matcher = TemplateMatcher(self.spectrogram, new_click, template, span=span)
 
-        times, velos, scores = matcher.main()
+        times, velos, scores = matcher.match()
 
-        print(times, velos, scores)
-
-        # print("done with matching")
-
-        # print(time_offset)
-
-        # zero_start_time = self.spectrogram.time[0] * 1e6
-        # start_time_offset = zero_start_time * -1
-
-        # total_time_offset = (start_time_offset + (self.spectrogram.time[template_offset_time_index] * 1e6))
-        # total_velo_offset = self.spectrogram.velocity[template_offset_velo_index]
-
-        # print(total_time_offset)
-
-        # times[:] = times[:] + (time_offset * 1e6)
-        # velos[:] = velos[:] + total_velo_offset
-
-        # print(times, velos)
+        # print(times, velos, scores)
  
         patch = Rectangle( new_click, dt, dv, fill=False, color='b', alpha=0.15)
         self.axSpectrogram.add_patch(patch)
 
         self.axSpectrogram.plot( times, velos, 'ro', markersize=2.5, alpha=0.9)
-
-        # # print(times, velos)
 
         max_follower = 0
         max_index = 0
@@ -1041,18 +1001,14 @@ class SpectrogramWidget:
         follower.line = self.axSpectrogram.plot(
             max_tsecs * 1e6, max_v, 'r-', alpha=0.3)[0]
 
-        # most_likely_time = times[max_index]
-        # most_likely_velo = velos[max_index]
+        most_likely_time = times[max_index]
+        most_likely_velo = velos[max_index]
 
-        # # end = Time.time()
+        print("(most confident) time: ",most_likely_time)
+        print("             velocity: ",most_likely_velo,"\n")
 
-        # # # print("finished in: ", round(end-start, 3), " seconds")
 
-        # # # print("done with following")
-
-        # print(most_likely_time, most_likely_velo)
-
-        # self.axSpectrogram.plot( most_likely_time, most_likely_velo, 'ro', markersize=2.5, alpha=1)
+        self.axSpectrogram.plot( most_likely_time, most_likely_velo, 'ro', markersize=2.5, alpha=1)
 
 
 
