@@ -22,16 +22,18 @@ class Fitter:
         self.f = function
         self.x = xvalues
         self.y = yvalues
+        self.notnan = np.logical_not(np.isnan(self.y))
+        self.numpts = np.sum(self.notnan)
         self.sigma = sigma
         self.p0 = param_dictionary
         self.p, self.pcov = curve_fit(
-            self.f, self.x, self.y,
+            self.f, self.x[self.notnan], self.y[self.notnan],
             list(self.p0.values()), sigma,
             absolute_sigma=True)
         self.residuals = self.y - self.f(self.x, *self.p)
         self.normalized_residuals = self.residuals / self.sigma
         self.chisq = np.sum(np.power(self.normalized_residuals, 2))
-        self.reduced_chisq = self.chisq / (len(xvalues) - len(self.p))
+        self.reduced_chisq = self.chisq / (self.numpts - len(self.p))
         self.errors = np.sqrt(np.diag(self.pcov))
 
     def format_value(self, x, err):
@@ -71,8 +73,10 @@ class Fitter:
         xvals = np.linspace(self.x[0], self.x[-1], 200)
         yvals = self.f(xvals, *self.p)
         main.plot(xvals, yvals, 'r-', alpha=0.5)
-        if 'xtitle' in kwargs:
-            main.set_xlabel(kwargs['xtitle'])
+        if 'xlabel' in kwargs:
+            main.set_xlabel(kwargs['xlabel'])
+        if 'ylabel' in kwargs:
+            main.set_ylabel(kwargs['ylabel'])
         # Now the residual panel
         res.errorbar(self.x, self.residuals, yerr=self.sigma, fmt='.')
         res.set_ylabel('Res')
@@ -80,3 +84,6 @@ class Fitter:
         # and the normalized residuals
         normres.plot(self.x, self.normalized_residuals, '.')
         normres.set_ylabel('Norm res')
+        
+        if 'title' in kwargs:
+            res.set_title(kwargs['title'])
