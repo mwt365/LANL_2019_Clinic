@@ -334,7 +334,11 @@ def follow_signal(pipe: PNSPipe, **kwargs):
             top = np.max(r['peak_v']) + 400.0
         else:
             top = 7000  # this is terrible!
-
+        try:
+            v_min = pipe.baselines[0]
+        except:
+            v_min = 0.0
+        
         v_range = v_min, top
         time, velocity, intensity = sg.slice(t_range, v_range)
         max_intensity = np.max(intensity)
