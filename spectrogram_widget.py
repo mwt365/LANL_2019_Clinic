@@ -82,7 +82,7 @@ class SpectrogramWidget:
     def __init__(self, *args, **kwargs):
         """
         If one passes in a single unnamed arg, it can either be a digfile,
-        a string pointing to a digfile, or a two-dimensional ndarray. 
+        a string pointing to a digfile, or a two-dimensional ndarray.
         If we are founded on a dig file, it is possible to recompute
         things. Only a subset of operations are possible when we're
         based on a two-dimensional array, but perhaps that is sometimes
@@ -358,7 +358,7 @@ class SpectrogramWidget:
             names="value")
 
         cd['squash'] = widgets.Button(
-            description = "Squash in Vertical"
+            description="Squash in Vertical"
         )
         cd['squash'].on_click(lambda b: self.squash_vertical())
 
@@ -569,7 +569,7 @@ class SpectrogramWidget:
             if not hasattr(self, 'explorer_mark'):
                 self.explorer_mark = 2
             else:
-                shifts = dict(f = 4, F = 20, b = -4, B = -40)
+                shifts = dict(f=4, F=20, b=-4, B=-40)
                 self.explorer_mark += shifts[char]
 
             self.gaussian_explorer(self.explorer_mark)
@@ -616,7 +616,7 @@ class SpectrogramWidget:
             follower.run()
             tsec, v = follower.v_of_t
             follower.line = self.axSpectrogram.plot(
-                tsec * 1e6, v, 'r.', alpha=0.4, markersize = 2)[0]
+                tsec * 1e6, v, 'r.', alpha=0.4, markersize=2)[0]
         # print("Create a figure and axes, then call self.gauss.show_fit(axes)")
 
     def gauss_out(self, n: int):
@@ -629,8 +629,8 @@ class SpectrogramWidget:
         WRITEOUT, fnum = False, 0
         pf = self.peak_followers[n]
         times, centers, widths, amps = [], [], [], []
-        vind = pf.frame['velocity_index_span'].to_numpy()
-        tind = pf.frame['time_index'].to_numpy()
+        vind = pf.frame['vi_span'].to_numpy()
+        tind = pf.frame['t_index'].to_numpy()
         sp = self.spectrogram
         for j in range(len(tind)):
             t = sp.time[tind[j]] * 1e6
@@ -690,20 +690,20 @@ class SpectrogramWidget:
             return 0
         pf = self.peak_followers[0]
         res = pf.results
-        points = len(res['time_index'])
+        points = len(res['t_index'])
 
         def bound(x): return x % points
         follower_pt = bound(follower_pt)
 
         # We'd like to show data for this index, the previous one,
         #  and the next one, along with the gaussian fit
-        hoods = [pf.hood(n = bound(x + follower_pt))
+        hoods = [pf.hood(n=bound(x + follower_pt))
                  for x in (-2, -1, 0, 1, 2)]
 
         # Check that we have the requisite figure, and make it if we don't
         if not hasattr(self, 'explorer_fig'):
             self.explorer_fig, self.explorer_axes = plt.subplots(
-                1, 5, sharey = True)
+                1, 5, sharey=True)
             # also add a marker to the follower's representation on the
             # spectrogram to make it easier to see where we are
             self.explorer_marker = self.axSpectrogram.plot([], [], 'k*')[0]
@@ -713,26 +713,36 @@ class SpectrogramWidget:
         self.explorer_marker.set_data(
             [tsec[follower_pt] * 1e6, ], [v[follower_pt], ])
 
-        max_peak = 0
+        min_v, max_v, max_peak = 1e10, 0, 0
         for ax, hood in zip(self.explorer_axes, hoods):
             ax.clear()
             # plot the data
-            ax.plot(hood.velocity, hood.intensity, 'ko', alpha = 0.5)
+            ax.plot(hood.velocity, hood.intensity, 'ko', alpha=0.5)
+
             # plot the background level used for the moment calculation
             bg = hood.moment['background']
             ax.plot([hood.velocity[0], hood.velocity[-1]], [bg, bg], 'r-')
             # show the center and widths from the moment calculation
-            pk = hood.peak_intensity
+            pk = hood.peak_int
             tallest = np.max(hood.intensity)
             max_peak = max(tallest, max_peak)
             ax.plot([hood.moment['center'] + x * hood.moment['std_dev'] for x in
                      (-1, 0, 1)], 0.5 * tallest * np.ones(3), 'r.')
             # show the gaussian
             hood.plot_gaussian(ax)
-            vcenter, width = hood.peak_velocity, hood.moment['std_dev']
-            ax.set_xlim(vcenter - 12 * width, vcenter + 12 * width)
+            vcenter, width = hood.peak_v, hood.moment['std_dev']
+            min_v = min(min_v, vcenter - 12 * width)
+            max_v = max(max_v, vcenter + 12 * width)
+            # ax.set_xlim(vcenter - 12 * width, vcenter + 12 * width)
             ax.set_xlabel(f"$v$ (m/s)")
-            ax.set_title(f"{hood.time*1e6:.2f}" + " $\\mu$ s")
+            ax.set_title(f"{hood.time*1e6:.2f}" + " $\\mu$s")
+            txt = f"m = {hood.moment['center']:.1f} ± {hood.moment['std_dev']:.1f}"
+            txt = f"{txt}\ng = {hood.gaussian.center:.1f} ± {hood.gaussian.width:.1f}"
+            ax.annotate(txt, xy=(0.05, 0.95), xycoords='axes fraction',
+                        horizontalalignment='left', verticalalignment='top')
+
+        for ax in self.explorer_axes:
+            ax.set_xlim(min_v, max_v)
 
         # label the common velocity axis
         ax = self.explorer_axes[0]
@@ -753,8 +763,8 @@ class SpectrogramWidget:
         if n >= len(self.peak_followers):
             return 0
         pf = self.peak_followers[n]
-        vind = pf.frame['velocity_index_span'].to_numpy()
-        tind = pf.frame['time_index'].to_numpy()
+        vind = pf.frame['vi_span'].to_numpy()
+        tind = pf.frame['t_index'].to_numpy()
         self.subfig, axes = plt.subplots(
             nrows=1, ncols=2, sharey=True,
             squeeze=True, gridspec_kw=self._gspec)
@@ -800,7 +810,7 @@ class SpectrogramWidget:
     def squash_vertical(self):
         normy = self.spectrogram.squash(dB=False) * 2000
         self.axSpectrogram.plot(self.spectrogram.time * 1e6, normy,
-                                'b-', alpha = 0.75)
+                                'b-', alpha=0.75)
 
     def update_baselines(self, method):
         """

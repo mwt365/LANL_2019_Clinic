@@ -57,15 +57,15 @@ class PeakFollower(Follower):
     def reverse(self):
         """Switch directions"""
         self.direction = -self.direction
-        # now update the value of time_index
-        tindex = self.results['time_index']
+        # now update the value of t_index
+        tindex = self.results['t_index']
         if len(tindex) > 0:
             if self.direction > 0:
-                self.time_index = tindex[-1] + 1
-                self.last_peak = self.results['peak_velocity'][-1]
+                self.t_index = tindex[-1] + 1
+                self.last_peak = self.results['peak_v'][-1]
             else:
-                self.time_index = tindex[0] - 1
-                self.last_peak = self.results['peak_velocity'][0]
+                self.t_index = tindex[0] - 1
+                self.last_peak = self.results['peak_v'][0]
 
     def run(self):
         """
@@ -99,7 +99,7 @@ class PeakFollower(Follower):
         amplitude, center, width, and background.
         """
         USE_INTENSITIES = False
-        velocities, intensities, p_start, p_end = self.data(self.time_index)
+        velocities, intensities, p_start, p_end = self.data(self.t_index)
 
         if self.smoothing:
             intensities = moving_average(intensities, n=self.smoothing)
@@ -126,10 +126,10 @@ class PeakFollower(Follower):
         if len(self.results['time']) > 0:
             reject = intensities[top] < self.noise_level
         if not reject and USE_INTENSITIES:
-            i_guess = self.guess_intensity(self.time_index)
+            i_guess = self.guess_intensity(self.t_index)
             reject = 0.01 * i_guess > intensities[top]
             if reject:
-                i_guess = self.guess_intensity(self.time_index)
+                i_guess = self.guess_intensity(self.t_index)
 
         hop = None if not hasattr(self, 'last_peak') else abs(
             v_high - self.last_peak)
@@ -137,20 +137,20 @@ class PeakFollower(Follower):
             reject = True
 
         if not reject:
-            self.add_point(self.time_index, v_high, span=(p_start, p_end))
+            self.add_point(self.t_index, v_high, span=(p_start, p_end))
             try:
                 hop = abs(v_high - self.last_peak)
                 if hop > self.max_hop:
-                    print(f"hop at [{self.time_index}] of {hop} from {self.last_peak:0f} to {self.v_high:0f}")
+                    print(f"hop at [{self.t_index}] of {hop} from {self.last_peak:0f} to {self.v_high:0f}")
 
             except:
                 pass
             self.last_peak = v_high
 
         # on success we increment to the next time index
-        self.time_index += self.direction
+        self.t_index += self.direction
 
-        if self.time_index >= len(self.time) or self.time_index < 0:
+        if self.t_index >= len(self.time) or self.t_index < 0:
             raise IndexError  # we're out of data
         if reject:
             raise Exception("failed")
