@@ -74,8 +74,8 @@ class PNSPipe:
         self.signals = []
         self.pandas_format = dict(
             time=lambda x: f"{x*1e6:.3f}",
-            peak_velocity=self.onedigit,
-            peak_intensity=self.onedigit,
+            peak_v=self.onedigit,
+            peak_int=self.onedigit,
             gaussian_center=self.onedigit,
             gaussian_width=self.onedigit,
             gaussian_background=self.twodigit,
@@ -311,7 +311,7 @@ def follow_signal(pipe: PNSPipe, **kwargs):
 
     if plot:
         plt.clf()
-        plt.plot(signal['time'] * 1e6, signal['peak_velocity'])
+        plt.plot(signal['time'] * 1e6, signal['peak_v'])
         plt.xlabel('$t~(\mu \mathrm{s})$')
         plt.ylabel('$v~(\mathrm{m/s})$')
         plt.title(pipe.df.title, usetex=False)
@@ -326,15 +326,19 @@ def follow_signal(pipe: PNSPipe, **kwargs):
         t_range = (
             sg.time[0], pipe.probe_destruction if pipe.probe_destruction else sg.time[-1])
         r = follower.results
-        if r['peak_velocity']:
-            top = np.max(r['peak_velocity']) + 400.0
+        try:
+            v_min = pipe.baselines[0]
+        except:
+            v_min = 0
+        if r['peak_v']:
+            top = np.max(r['peak_v']) + 400.0
         else:
             top = 7000  # this is terrible!
         try:
             v_min = pipe.baselines[0]
         except:
             v_min = 0.0
-            
+        
         v_range = v_min, top
         time, velocity, intensity = sg.slice(t_range, v_range)
         max_intensity = np.max(intensity)
@@ -343,7 +347,7 @@ def follow_signal(pipe: PNSPipe, **kwargs):
         image.set_cmap(COLORMAPS[DEFMAP])
         ax = plt.gca()
         ax.plot(signal['time'] * 1e6,
-                signal['peak_velocity'], 'r.', alpha=0.05)
+                signal['peak_v'], 'r.', alpha=0.05)
         plt.colorbar(image, ax=ax, fraction=0.08)
         plt.xlabel(r'$t$ ($\mu$s)')
         plt.ylabel('$v$ (m/s)')
@@ -393,12 +397,12 @@ def show_discrepancies(pipe: PNSPipe, **kwargs):
             width_discrepancies = rows[Crit1 | Crit2].index.to_numpy()
             all_discrepancies.union(width_discrepancies)
         if peak_gauss:
-            Crit3 = np.abs(rows.peak_velocity - rows.gaussian_center) / \
+            Crit3 = np.abs(rows.peak_v - rows.gaussian_center) / \
                 rows.gaussian_width > sigmas
             peak_gauss_discrepancies = rows[Crit3].index.to_numpy()
             all_discrepancies.union(peak_gauss_discrepancies)
         if peak_moment:
-            Crit4 = np.abs(rows.peak_velocity -
+            Crit4 = np.abs(rows.peak_v -
                            rows.moment_center) / rows.moment_width > sigmas
             peak_moment_discrepancies = rows[Crit4].index.to_numpy()
             all_discrepancies.union(peak_moment_discrepancies)
@@ -431,9 +435,9 @@ def gaussian_fit(pipe: PNSPipe, **kwargs):
 
         for n in range(len(signal)):
             row = signal.iloc[n]
-            t_index = row['time_index']
+            t_index = row['t_index']
             vpeak = sg._velocity_to_index(row['velocity'])
-            # vfrom, vto = row['velocity_index_span']
+            # vfrom, vto = row['vi_span']
             vfrom, vto = vpeak - neighborhood, vpeak + neighborhood
             powers = sg.intensity[vfrom:vto, t_index]
             speeds = sg.velocity[vfrom:vto]

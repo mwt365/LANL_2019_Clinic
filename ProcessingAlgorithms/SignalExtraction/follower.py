@@ -95,11 +95,11 @@ class Follower:
     It also holds a results dictionary with several obligatory
     fields, to which a subclass may add. The required fields are
 
-        velocity_index_span: the range of point indices used
+        vi_span: the range of point indices used
         time:                the times found (s)
-        time_index:          the index of the time columns
-        peak_velocity:       the peak velocities
-        peak_intensity:      the intensity at the peak
+        t_index:          the index of the time columns
+        peak_v:       the peak velocities
+        peak_int:      the intensity at the peak
 
     """
 
@@ -109,16 +109,16 @@ class Follower:
         self.spectrogram = spectrogram
 
         # Now establish storage for intermediate results and
-        # state. time_index is the index into the spectrogram.intensity
+        # state. t_index is the index into the spectrogram.intensity
         # along the time axis.
 
         self.results = dict(
-            velocity_index_span=[],  # the range of points used to look for the peak
+            vi_span=[],  # the range of points used to look for the peak
             time=[],                 # the time in s
-            time_index=[],           # the corresponding point index in the time dimension
-            peak_velocity=[],        # the peak velocity
-            velocity_index=[],       # corresponding index
-            peak_intensity=[]        # the peak intensity
+            t_index=[],           # the corresponding point index in the time dimension
+            peak_v=[],        # the peak velocity
+            v_index=[],       # corresponding index
+            peak_int=[]        # the peak intensity
         )
         # for convenience, install pointers to useful fields in spectrogram
         self.velocity = self.spectrogram.velocity
@@ -138,7 +138,7 @@ class Follower:
                 t_index = self.spectrogram._time_to_index(t)
                 self.add_point(t_index, v)
 
-        self.time_index = spectrogram._time_to_index(self.t_start)
+        self.t_index = spectrogram._time_to_index(self.t_start)
         self.span = span
 
     def add_point(self, t_index, v, span=None):
@@ -149,14 +149,14 @@ class Follower:
         v_index = self.spectrogram._velocity_to_index(v)
         dic = dict(
             time=self.time[t_index],
-            time_index=t_index,
-            peak_velocity=v,
-            peak_intensity=self.spectrogram.intensity[v_index, t_index],
-            velocity_index_span=span,
-            velocity_index=v_index
+            t_index=t_index,
+            peak_v=v,
+            peak_int=self.spectrogram.intensity[v_index, t_index],
+            vi_span=span,
+            v_index=v_index
         )
 
-        if len(r['time']) and t_index < r['time_index'][0]:
+        if len(r['time']) and t_index < r['t_index'][0]:
             # We need to insert at the beginning
             for k, v in dic.items():
                 r[k].insert(0, v)
@@ -168,7 +168,7 @@ class Follower:
     def v_of_t(self):
         "A convenience function for plotting; returns arrays for time and velocity"
         t = np.array(self.results['time'])
-        v = np.array(self.results['peak_velocity'])
+        v = np.array(self.results['peak_v'])
         return t, v
 
     def guess_range(self, t_index):
@@ -179,7 +179,7 @@ class Follower:
         """
 
         r = self.results
-        times, vels = r['time'], r['peak_velocity']
+        times, vels = r['time'], r['peak_v']
         if len(r['time']) == 0:
             v_guess = self.v_start
         else:
@@ -192,16 +192,16 @@ class Follower:
             if x >= len(self.spectrogram.velocity):
                 return len(self.spectrogram.velocity) - 1
             return x
-        velocity_index = self.spectrogram._velocity_to_index(v_guess)
-        start_index = bound(velocity_index - self.span)
-        end_index = bound(velocity_index + self.span)
+        v_index = self.spectrogram._velocity_to_index(v_guess)
+        start_index = bound(v_index - self.span)
+        end_index = bound(v_index + self.span)
 
         # If we have some prior information, make sure we adjust to include
         # prior information.
         if len(r['time']) > 0:
-            dt = np.abs(np.array(r['time_index']) - t_index)
+            dt = np.abs(np.array(r['t_index']) - t_index)
             last_index = np.argsort(dt)[0]  # Find the closest index
-            last_v_index = r['velocity_index'][last_index]
+            last_v_index = r['v_index'][last_index]
             start_index = min(last_v_index - 5, start_index)
             end_index = max(last_v_index + 5, end_index)
         return (start_index, end_index)
@@ -209,8 +209,8 @@ class Follower:
     def guess_intensity(self, t_index):
         """Attempt to guess the expected intensity based on extrapolation"""
         r = self.results
-        times = r['time_index']
-        intensity = r['peak_intensity']
+        times = r['t_index']
+        intensity = r['peak_int']
         n = len(times)
         if n == 0:
             return 0
@@ -222,8 +222,8 @@ class Follower:
     def guess_intensity_old(self, t_index):
         """Attempt to guess the expected intensity based on extrapolation"""
         r = self.results
-        times = r['time_index']
-        intensity = r['peak_intensity']
+        times = r['t_index']
+        intensity = r['peak_int']
         n = len(times)
         if n == 0:
             return 0
@@ -238,13 +238,13 @@ class Follower:
         The default value of n (-1) indicates the last available point
         from the results dictionary. Earlier points are possible.
         """
-        if len(self.results['peak_velocity']) > 0:
-            last_v = self.results['peak_velocity'][n]
+        if len(self.results['peak_v']) > 0:
+            last_v = self.results['peak_v'][n]
         else:
             last_v = self.v_start
-        velocity_index = self.spectrogram._velocity_to_index(last_v)
-        start_index = max(0, velocity_index - self.span)
-        end_index = min(velocity_index + self.span,
+        v_index = self.spectrogram._velocity_to_index(last_v)
+        start_index = max(0, v_index - self.span)
+        end_index = min(v_index + self.span,
                         len(self.spectrogram.velocity))
         return (start_index, end_index)
 
@@ -252,7 +252,7 @@ class Follower:
         #  old way: start_index, end_index = self.data_range(n)
         start_index, end_index = self.guess_range(n)
         velocities = self.velocity[start_index:end_index]
-        intensities = self.intensity[start_index:end_index, self.time_index]
+        intensities = self.intensity[start_index:end_index, self.t_index]
         return velocities, self.spectrogram.power(intensities), start_index, end_index
 
     def hood(self, **kwargs):
@@ -261,18 +261,18 @@ class Follower:
         point n of the follower.
         To indicate which hood to return, the possible kwargs are
             n = index of the point in the follower
-            time_index = time_index of the point
+            t_index = t_index of the point
             t = time (in seconds)
         """
         if 'n' in kwargs:
             n = kwargs['n']
-        elif 'time_index' in kwargs:
-            time_index = kwargs['time_index']
-            n = self.results['time_index'].find(time_index)
+        elif 't_index' in kwargs:
+            t_index = kwargs['t_index']
+            n = self.results['t_index'].find(t_index)
         elif 't' in kwargs:
             t = kwargs['t']
-            time_index = self.spectrogram._time_to_index(t)
-            n = self.results['time_index'].find(time_index)
+            t_index = self.spectrogram._time_to_index(t)
+            n = self.results['t_index'].find(t_index)
         else:
             raise Exception("I can't identify the hood")
         return FollowHood(self, n)
@@ -307,17 +307,30 @@ class Follower:
         hoods = self.neighborhoods
 
         # add columns obtained from the hoods
-        df['velocity_index'] = [h.velocity_index for h in hoods]
-        df['moment_center'] = [h.moment['center'] for h in hoods]
-        df['moment_width'] = [h.moment['std_dev'] for h in hoods]
-        df['moment_background'] = [h.moment['background'] for h in hoods]
-        df['gaussian_center'] = [h.gaussian.center for h in hoods]
-        df['gaussian_width'] = [h.gaussian.width for h in hoods]
-        df['gaussian_background'] = [h.gaussian.background for h in hoods]
-        df['gaussian_intensity'] = [h.gaussian.amplitude for h in hoods]
+        df['v_index'] = [h.v_index for h in hoods]
+        df['m_center'] = [h.moment['center'] for h in hoods]
+        df['m_width'] = [h.moment['std_dev'] for h in hoods]
+        df['m_bgnd'] = [h.moment['background'] for h in hoods]
+        df['g_center'] = [h.gaussian.center for h in hoods]
+        df['g_width'] = [h.gaussian.width for h in hoods]
+        df['g_bgnd'] = [h.gaussian.background for h in hoods]
+        df['g_int'] = [h.gaussian.amplitude for h in hoods]
         # return the frame with the index set to time in microseconds
         df.index = df['time'] * 1e6
+        # Now we need to set the formatting with
+        # df.style.format(dictionary of callables)
         return df
+
+    @property
+    def pandas_format(self):
+        def d1(x): return f"{x:.1f}"
+
+        def d2(x): return f"{x:.2f}"
+
+        formats = {x: d2 for x in
+                   "peak_v,peak_int,m_center,m_width,m_bgnd,g_center,g_width,g_bgnd,g_int".split(',')}
+        formats['time'] = lambda x: f"{x * 1e6:.2f} µs"
+        return formats
 
     def estimate_widths(self):
         """
@@ -333,20 +346,20 @@ class Follower:
         """
         res = self.results
         # Prepare a spot for the uncertainties
-        res['velocity_uncertainty'] = np.zeros(len(res['peak_velocity']))
-        for n in range(len(res['time_index'])):
+        res['velocity_uncertainty'] = np.zeros(len(res['peak_v']))
+        for n in range(len(res['t_index'])):
             fit_res = self.estimate_width(n)
-            res['peak_velocity'][n] = fit_res['center']
+            res['peak_v'][n] = fit_res['center']
             res['velocity_uncertainty'][n] = fit_res['width']
-            res['peak_intensity'][n] = fit_res['amplitude']
+            res['peak_int'][n] = fit_res['amplitude']
 
     def estimate_width(self, n, neighborhood=32):
         """
         Estimate the gaussian width of a peak
         """
         res = self.results
-        time_index = res['time_index'][n]
-        v_peak = res['peak_velocity'][n]
+        t_index = res['t_index'][n]
+        v_peak = res['peak_v'][n]
         v_peak_index = self.spectrogram._velocity_to_index(v_peak)
 
         hoods, means, stdevs = [], [], []
@@ -356,7 +369,7 @@ class Follower:
             n_high = min(v_peak_index + hood + 1, len(self.velocity))
             # fetch the true power values for this column of the spectrogram
             power = self.spectrogram.power(
-                self.intensity[n_low:n_high, time_index])
+                self.intensity[n_low:n_high, t_index])
             velocities = self.velocity[n_low:n_high]
             if hood == neighborhood:
                 res = self.fit_gaussian(
@@ -434,11 +447,11 @@ class FollowHood(object):
     identified on a curve by a follower:
 
       - time                   in seconds
-      - time_index             column of the spectrogram
-      - peak_velocity          in m/s
-      - velocity_index         row of the spectrogram
-      - peak_intensity         intensity at the peak
-      - velocity_index_span    rows used to look for peak
+      - t_index             column of the spectrogram
+      - peak_v          in m/s
+      - v_index         row of the spectrogram
+      - peak_int         intensity at the peak
+      - vi_span    rows used to look for peak
       - velocity               velocity values of above
       - intensity              intensity values of above
       - moment                 {'center', 'variance', 'std_dev', 'background}
@@ -457,19 +470,19 @@ class FollowHood(object):
 
         self.follower = follower
         self.time = res['time'][pt]
-        self.time_index = res['time_index'][pt]
-        self.peak_velocity = res['peak_velocity'][pt]
-        self.velocity_index_span = res['velocity_index_span'][pt]
-        self.peak_intensity = res['peak_intensity'][pt]
+        self.t_index = res['t_index'][pt]
+        self.peak_v = res['peak_v'][pt]
+        self.vi_span = res['vi_span'][pt]
+        self.peak_int = res['peak_int'][pt]
 
         # Now fetch the raw points from the spectrogram
         sg = follower.spectrogram
-        self.velocity_index = sg._velocity_to_index(self.peak_velocity)
-        vfrom, vto = self.velocity_index_span
+        self.v_index = sg._velocity_to_index(self.peak_v)
+        vfrom, vto = self.vi_span
 
         # The velocity array and intensity array
         self.velocity = sg.velocity[vfrom:vto]
-        self.intensity = sg.power(sg.intensity[vfrom:vto, self.time_index])
+        self.intensity = sg.power(sg.intensity[vfrom:vto, self.t_index])
 
         # Compute width from moments
         # moment is a dictionary with fields 'center' and 'std_dev'
@@ -482,7 +495,7 @@ class FollowHood(object):
         hood = 6
         m = dict(std_dev=np.nan)
         while np.isnan(m['std_dev']):
-            pfrom, pto = [bound(x + self.velocity_index - vfrom)
+            pfrom, pto = [bound(x + self.v_index - vfrom)
                           for x in (-hood, hood)]
             m = moment(self.velocity[pfrom:pto], self.intensity[pfrom:pto])
             hood += 4
@@ -491,7 +504,7 @@ class FollowHood(object):
         # Fit a gaussian
         self.gaussian = Gaussian(
             self.velocity, self.intensity,
-            center=self.peak_velocity,
+            center=self.peak_v,
             width=self.moment['std_dev']
         )
 
@@ -529,7 +542,7 @@ class FollowHood(object):
                  (-1, 0, 1)], 0.5 * tallest * np.ones(3), 'r.', label='moments')
         # show the gaussian
         self.plot_gaussian(ax)
-        vcenter, width = self.peak_velocity, self.moment['std_dev']
+        vcenter, width = self.peak_v, self.moment['std_dev']
         ax.set_xlim(vcenter - 12 * width, vcenter + 12 * width)
 
         xlabel = kwargs.get('xlabel')
