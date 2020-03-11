@@ -71,8 +71,11 @@ class Fitter:
         xvals = np.linspace(self.x[0], self.x[-1], 200)
         yvals = self.f(xvals, *self.p)
         main.plot(xvals, yvals, 'r-', alpha=0.5)
-        if 'xtitle' in kwargs:
-            main.set_xlabel(kwargs['xtitle'])
+        if 'xlabel' in kwargs:
+            main.set_xlabel(kwargs['xlabel'])
+        if 'ylabel' in kwargs:
+            main.set_ylabel(kwargs['ylabel'])
+
         # Now the residual panel
         res.errorbar(self.x, self.residuals, yerr=self.sigma, fmt='.')
         res.set_ylabel('Res')
@@ -80,3 +83,5 @@ class Fitter:
         # and the normalized residuals
         normres.plot(self.x, self.normalized_residuals, '.')
         normres.set_ylabel('Norm res')
+        if 'title' in kwargs:
+            res.set_title(kwargs['title'])
