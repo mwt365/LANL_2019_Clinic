@@ -16,11 +16,12 @@ import cv2
 import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument('--file_name',type=str,default=False)
-parser.add_argument('--peak_follow', type = bool,default = True)
+parser.add_argument('--peak_follow', type = str,default = True)
 parser.add_argument('--manual_start', type = bool, default = True)
 parser.add_argument('-json_name',type = str)
 parser.add_argument('--velocity_cutoff', type = int, default = 10000)
 parser.add_argument('--denoise', type=bool,default = False)
+parser.add_argument('--colormap', type=str, default = 'viridis')
 # parser.add_argument('--process_name',type=)
 args = parser.parse_args()
 
@@ -48,6 +49,7 @@ for filename in os.listdir(directory):
         
         spec = Spectrogram(directory+filename)
         # print(args.JsonRead_name)
+        t,v,i = spec.slice((spec.t_start,spec.t_end),(0,args.velocity_cutoff))
         
 
         if args.manual_start:
@@ -55,25 +57,39 @@ for filename in os.listdir(directory):
 
 
 
+        if (args.denoise == True):
+            max = np.amax(i)
+            # print(max)
+            data = i/max
+            data = data * 255
+            # print(data)
+            data = data.astype(np.uint8)  # normalize the data to 0 - 1
+            out = cv2.fastNlMeansDenoising(data,None,50,7,21)
+            # print('out-',out)
+            i=out
+
+        if (args.peak_follow == True):
+            print('running',args.peak_follow)
+            peaks = PeakFollower(spec,start_coords)
+            peaks.run()
+            # tsec, v = peaks.v_of_t
+            # print(peaks.results)        
+            
+            
+            trace_v = np.array(peaks.results['velocities'])
+            trace_t = np.array(peaks.results['times'])
+            jsonwriting.store_time_length(filename,trace_t.size)
+            plt.plot(trace_t*1e6,trace_v,color = "red")
 
 
-        peaks = PeakFollower(spec,start_coords)
-        peaks.run()
-        # tsec, v = peaks.v_of_t
-        # print(peaks.results)        
-        t,v,i = spec.slice((spec.t_start,spec.t_end),(0,args.velocity_cutoff))
-
-        if args.denoise:
-            i = cv2.fastNlMeansDenoising(i,None,3,7,21)
 
 
-        trace_v = np.array(peaks.results['velocities'])
-        trace_t = np.array(peaks.results['times'])
-        jsonwriting.store_time_length(filename,trace_t.size)
+
 
         #plotting the results
-        plt.pcolormesh(t*1e6,v,i)
-        plt.plot(trace_t*1e6,trace_v,color = "red")
+
+        plt.pcolormesh(t*1e6,v,i,cmap=args.colormap)
+        
         plt.savefig(newDirectory + filename+'.png')
         plt.clf()
 
