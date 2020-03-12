@@ -953,7 +953,7 @@ class SpectrogramWidget:
 
     def match_templates(self, time, velocity):
 
-        template = opencv_long_start_pattern4
+        template = opencv_start_pattern4
 
         span = 300
 
@@ -962,7 +962,7 @@ class SpectrogramWidget:
 
         # print(self.spectrogram.intensity.shape)
 
-        new_click = (0, 10)
+        new_click = (0, 0)
 
         matcher = TemplateMatcher(self.spectrogram, new_click, template, span=span)
 
