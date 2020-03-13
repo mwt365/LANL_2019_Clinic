@@ -24,7 +24,7 @@ from plotter import COLORMAPS
 from gaussian import Gaussian
 from gaussian_follow import GaussianFitter
 from peak_follower import PeakFollower
-from template_matcher import TemplateMatcher
+from template_matcherFMP import TemplateMatcher
 from ImageProcessing.Templates.templates import *
 from matplotlib.patches import Rectangle
 import time as Time
@@ -980,10 +980,10 @@ class SpectrogramWidget:
 
         colors = ['ro', 'bo', 'go', 'mo', 'ko', 'co']
         color_names = ['red', 'blue', 'green', 'magenta', 'black', 'cyan']
-        # methods = ['cv2.TM_CCOEFF', 'cv2.TM_CCOEFF_NORMED', 'cv2.TM_CCORR',
-        #     'cv2.TM_CCORR_NORMED', 'cv2.TM_SQDIFF', 'cv2.TM_SQDIFF_NORMED']
+        methods = ['cv2.TM_CCOEFF', 'cv2.TM_CCOEFF_NORMED', 'cv2.TM_CCORR',
+            'cv2.TM_CCORR_NORMED', 'cv2.TM_SQDIFF', 'cv2.TM_SQDIFF_NORMED']
 
-        methods = ['cv2.TM_SQDIFF_NORMED', 'cv2.TM_CCOEFF_NORMED', 'cv2.TM_SQDIFF'] # the 'best' method for matching
+        # methods = ['cv2.TM_SQDIFF_NORMED', 'cv2.TM_CCOEFF_NORMED', 'cv2.TM_SQDIFF'] # the 'best' method for matching
 
 
         for i in range(len(times)):

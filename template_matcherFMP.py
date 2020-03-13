@@ -149,10 +149,10 @@ class TemplateMatcher():
         w, h = template.shape[::-1]
 
         # # All the 6 methods for comparison in a list
-        # methods = ['cv2.TM_CCOEFF', 'cv2.TM_CCOEFF_NORMED', 'cv2.TM_CCORR',
-        #             'cv2.TM_CCORR_NORMED', 'cv2.TM_SQDIFF', 'cv2.TM_SQDIFF_NORMED']
+        methods = ['cv2.TM_CCOEFF', 'cv2.TM_CCOEFF_NORMED', 'cv2.TM_CCORR',
+                    'cv2.TM_CCORR_NORMED', 'cv2.TM_SQDIFF', 'cv2.TM_SQDIFF_NORMED']
 
-        methods = ['cv2.TM_SQDIFF_NORMED', 'cv2.TM_CCOEFF_NORMED'] # the 'best' method for matching
+        # methods = ['cv2.TM_SQDIFF_NORMED', 'cv2.TM_CCOEFF_NORMED'] # the 'best' method for matching
 
         xcoords = []
         ycoords = []
