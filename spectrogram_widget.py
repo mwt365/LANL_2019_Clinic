@@ -11,6 +11,7 @@
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.colors
 import matplotlib.gridspec as gridspec
 import ipywidgets as widgets
 from matplotlib import widgets as mwidgets
@@ -233,6 +234,8 @@ class SpectrogramWidget:
         if self.dig:
             self.spectrogram = Spectrogram(
                 self.digfile, None, None, **kwargs)
+
+            self.spectrogram.overlap = .125
 
         self.fig, axes = plt.subplots(
             nrows=1, ncols=2, sharey=True,
@@ -953,18 +956,19 @@ class SpectrogramWidget:
 
     def match_templates(self, time, velocity):
 
-        template = opencv_start_pattern4
+        template = opencv_long_start_pattern4
 
-        span = 300
+        span = 210
+        vscale = 9
 
-        dv = self.spectrogram.velocity[10*span]
+        dv = self.spectrogram.velocity[vscale*span]
         dt = self.spectrogram.time[span] * 1e6
 
         # print(self.spectrogram.intensity.shape)
 
         new_click = (0, 0)
 
-        matcher = TemplateMatcher(self.spectrogram, new_click, template, span=span)
+        matcher = TemplateMatcher(self.spectrogram, new_click, template, span=span, velo_scale=vscale)
 
         times, velos, scores = matcher.match()
 
@@ -973,7 +977,21 @@ class SpectrogramWidget:
         patch = Rectangle( new_click, dt, dv, fill=False, color='b', alpha=0.15)
         self.axSpectrogram.add_patch(patch)
 
-        self.axSpectrogram.plot( times, velos, 'ro', markersize=2.5, alpha=0.9)
+
+        colors = ['ro', 'bo', 'go', 'mo', 'ko', 'co']
+        color_names = ['red', 'blue', 'green', 'magenta', 'black', 'cyan']
+        methods = ['cv2.TM_SQDIFF_NORMED', 'cv2.TM_CCOEFF_NORMED', 'cv2.TM_SQDIFF'] # the 'best' method for matching
+
+
+        for i in range(len(times)):
+            print("method: ", methods[i])
+            print("color: ", color_names[i])
+            print("time: ", times[i])
+            print("velocity: ", velos[i],'\n')
+            # print("score: ", scores[i])
+            self.axSpectrogram.plot(times[i], velos[i], colors[i], markersize=3, alpha=0.7)
+
+        # self.axSpectrogram.plot( times, velos, 'ro', markersize=2.5, alpha=0.9)
 
         max_follower = 0
         max_index = 0
@@ -999,7 +1017,7 @@ class SpectrogramWidget:
                 max_v = v
 
         follower.line = self.axSpectrogram.plot(
-            max_tsecs * 1e6, max_v, 'r-', alpha=0.3)[0]
+            max_tsecs * 1e6, max_v, 'r-', alpha=0.5)[0]
 
         most_likely_time = times[max_index]
         most_likely_velo = velos[max_index]
@@ -1008,7 +1026,7 @@ class SpectrogramWidget:
         print("             velocity: ",most_likely_velo,"\n")
 
 
-        self.axSpectrogram.plot( most_likely_time, most_likely_velo, 'ro', markersize=2.5, alpha=1)
+        self.axSpectrogram.plot( most_likely_time, most_likely_velo, 'ko', markersize=2, alpha=1)
 
 
 

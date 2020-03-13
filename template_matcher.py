@@ -148,11 +148,11 @@ class TemplateMatcher():
         template = cv2.imread('./im_template.png', 0)
         w, h = template.shape[::-1]
 
-        # All the 6 methods for comparison in a list
-        methods = ['cv2.TM_CCOEFF', 'cv2.TM_CCOEFF_NORMED', 'cv2.TM_CCORR',
-                    'cv2.TM_CCORR_NORMED', 'cv2.TM_SQDIFF', 'cv2.TM_SQDIFF_NORMED']
+        # # All the 6 methods for comparison in a list
+        # methods = ['cv2.TM_CCOEFF', 'cv2.TM_CCOEFF_NORMED', 'cv2.TM_CCORR',
+        #             'cv2.TM_CCORR_NORMED', 'cv2.TM_SQDIFF', 'cv2.TM_SQDIFF_NORMED']
 
-        # methods = ['cv2.TM_CCORR_NORMED'] # the 'best' method for matching
+        methods = ['cv2.TM_SQDIFF_NORMED', 'cv2.TM_CCOEFF_NORMED'] # the 'best' method for matching
 
         xcoords = []
         ycoords = []
@@ -206,12 +206,29 @@ class TemplateMatcher():
 
 if __name__ == "__main__":
 
-    path = "/Users/trevorwalker/Desktop/Clinic/dig/new/WHITE_CH2_SHOT/seg00.dig"
+    """
+    WHITE_CH1_SHOT/seg00.dig -- opencv_long_start_pattern4 span=200 
+    WHITE_CH2_SHOT/seg00.dig -- opencv_long_start_pattern4 span=200 
+    WHITE_CH3_SHOT/seg00.dig -- ??? span=200 
+    WHITE_CH4_SHOT/seg00.dig -- ??? opencv_long_start_pattern4 span=200 
+
+    BLUE_CH1_SHOT/seg00.dig -- opencv_long_start_pattern4 span=150 
+    BLUE_CH2_SHOT/seg00.dig -- ??? opencv_long_start_pattern3 span=200
+    BLUE_CH3_SHOT/seg00.dig -- opencv_long_start_pattern4 span=200
+
+    CH_1_009/seg00.dig -- opencv_long_start_pattern2 span=200
+    CH_3_009/seg00.dig -- opencv_long_start_pattern2 span=200
+    CH_4_009/seg01.dig -- opencv_long_start_pattern2 span=200
+    CH_4_009/seg02.dig -- opencv_long_start_pattern4 span=200
+
+    """
+
+    path = "/Users/trevorwalker/Desktop/Clinic/dig/new/CH_4_009/seg02.dig"
     spec = Spectrogram(path, 0.0, 60.0e-6, overlap_shift_factor= 1/8, form='db')
 
     span = 200 # will determine the bounding box to search in
 
-    template = opencv_long_start_pattern2 # use this template to search
+    template = opencv_long_start_pattern4 # use this template to search
 
     # gives user the option to click, by default it searches from (0,0)
     template_matcher = TemplateMatcher(spec, None, template, span=span)
