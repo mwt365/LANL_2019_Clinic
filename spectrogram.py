@@ -129,7 +129,8 @@ class Spectrogram:
             if desired in available:
                 self.computeMode = desired
             else:
-                # Default to "all", but display error to the user.
+                # Default to "all", but display error to the user. 
+                # If the user specifies a mode that does not exist.
                 kwargs["mode"] = "all"
                 self.computeMode = "all"
 
@@ -219,7 +220,7 @@ class Spectrogram:
         """
         epsilon = 1e-10
         if self.form == 'db':
-            return 20 * np.log10(vals + epsilon)
+            return 10 * np.log10(vals + epsilon) # Since you are already starting with power.
         if self.form == 'log':
             return np.log10(vals + epsilon)
         return vals
