@@ -451,7 +451,7 @@ class Spectrogram:
         
         return fig
 
-    def plot(self, **kwargs):
+    def plot(self, transformData = False, **kwargs):
         # max_vel=6000, vmin=-200, vmax=100):
         pcms = {data: 0 for data in self.availableData}
         if "psd" in self.availableData:
@@ -497,8 +497,9 @@ class Spectrogram:
                 zData = np.real(self.complex)
             elif data == "imaginary":
                 zData = np.imag(self.complex)
-
-            fig = plt.figure(num=data)
+            
+            key = f"{data}" + (f" transformed to {self.form}" if transformData else " raw")
+            fig = plt.figure(num=key)
             axes = plt.gca()
 
             pcm = None # To define the scope.
@@ -506,14 +507,14 @@ class Spectrogram:
                 pcm = axes.pcolormesh(
                     self.time[:endTime] * 1e6,
                     self.velocity,
-                    zData[:,:endTime],
+                    self.transform(zData[:,:endTime]) if (data != "intensity" and transformData) else zData[:,:endTime],
                     cmap = cmapUsed,
                     **kwargs)
             else:
                 pcm = axes.pcolormesh(
                     self.time[:endTime] * 1e6,
                     self.velocity,
-                    zData[:,:endTime],
+                    self.transform(zData[:,:endTime]) if (data != "intensity" and transformData) else zData[:,:endTime],
                     **kwargs)
 
             print(f"The current maximum of the colorbar is {np.max(zData[:,:endTime])} for the dataset {data}")
@@ -528,7 +529,7 @@ class Spectrogram:
             axes.set_xlim(left, right)
             axes.set_ylim(bot, top) # The None value is the default value and does not update the axes limits.            
 
-            pcms[data] = pcm
+            pcms[key] = pcm
 
         if "complex" in self.availableData:
             self.availableData.remove("real")
