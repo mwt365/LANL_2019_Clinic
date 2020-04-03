@@ -14,7 +14,7 @@ from ProcessingAlgorithms.preprocess.digfile import DigFile
 import matplotlib.pyplot as plt
 import os
 
-def createGallery(digsToLookAt:list=None, colormap="blue-orange-div", fileext="jpeg"):
+def createGallery(digsToLookAt:list=None, colormap="blue-orange-div", fileext="jpeg", transformData = False):
 	if type(digsToLookAt) == type(None):
 		digsToLookAt = DigFile.inventory()['file']
 
@@ -27,7 +27,7 @@ def createGallery(digsToLookAt:list=None, colormap="blue-orange-div", fileext="j
 		filename = digsToLookAt[i]
 		print(filename)
 		spec = Spectrogram(os.path.join(digDir,filename), mode = "all")
-		pcms = spec.plot(cmap = colormap)
+		pcms = spec.plot(transformData, cmap = colormap)
 		fileloc, filename = os.path.split(os.path.splitext(os.path.join(imageDir,filename))[0])
 		fileloc = os.path.join(fileloc, filename)
 
