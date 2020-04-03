@@ -173,7 +173,7 @@ class TemplateMatcher():
 
             best_ten = []
 
-            for i in range(15):
+            for i in range(20):
                 best_ten.append(np.unravel_index(sort[i], res.shape)[::-1])
 
             for point in best_ten:
@@ -238,8 +238,17 @@ if __name__ == "__main__":
 
     """
 
-    path = "/Users/trevorwalker/Desktop/Clinic/dig/new/WHITE_CH1_SHOT/seg00.dig"
-    spec = Spectrogram(path, 0.0, 60.0e-6, overlap_shift_factor= 1/8, form='db')
+    path = "/Users/trevorwalker/Desktop/Clinic/dig/new/WHITE_CH4_SHOT/seg00.dig"
+    spec = Spectrogram(path, 0.0, 60.0e-6, overlap_shift_factor= 7/8, form='db')
+
+    # masks the baselines to avoid matching with saturated signals and echoes
+    peaks, _, _ = baselines_by_squash(spec)
+    for peak in peaks:
+        velo_index = spec._velocity_to_index(peak)
+        velo_index = velo_index - 10
+        for i in range(velo_index, velo_index+20, 1):
+            spec.intensity[i][:] = 0
+    
 
     span = 200 # will determine the bounding box to search in
 
