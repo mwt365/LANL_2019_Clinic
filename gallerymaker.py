@@ -14,7 +14,7 @@ from ProcessingAlgorithms.preprocess.digfile import DigFile
 import matplotlib.pyplot as plt
 import os
 
-def createGallery(digsToLookAt:list=None, colormap="blue-orange-div"):
+def createGallery(digsToLookAt:list=None, colormap="blue-orange-div", fileext="jpeg"):
 	if type(digsToLookAt) == type(None):
 		digsToLookAt = DigFile.inventory()['file']
 
@@ -38,7 +38,7 @@ def createGallery(digsToLookAt:list=None, colormap="blue-orange-div"):
 				os.makedirs(fileloc)
 
 			plt.figure(num=key) # Get to the appropriate figure.
-			plt.savefig(os.path.join(fileloc,filename) + f' {key} spectrogram.png')
+			plt.savefig(os.path.join(fileloc,filename) + f' {key} spectrogram.{fileext}')
 			plt.clf()
 		del spec
 
