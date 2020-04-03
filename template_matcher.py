@@ -149,10 +149,12 @@ class TemplateMatcher():
         w, h = template.shape[::-1]
 
         # # All the 6 methods for comparison in a list
-        methods = ['cv2.TM_CCOEFF', 'cv2.TM_CCOEFF_NORMED', 'cv2.TM_CCORR',
-                    'cv2.TM_CCORR_NORMED', 'cv2.TM_SQDIFF', 'cv2.TM_SQDIFF_NORMED']
+        # methods = ['cv2.TM_CCOEFF', 'cv2.TM_CCOEFF_NORMED', 'cv2.TM_CCORR',
+        #             'cv2.TM_CCORR_NORMED', 'cv2.TM_SQDIFF', 'cv2.TM_SQDIFF_NORMED']
 
-        # methods = ['cv2.TM_SQDIFF_NORMED', 'cv2.TM_CCOEFF_NORMED'] # the 'best' method for matching
+        # methods = ['cv2.TM_SQDIFF_NORMED', 'cv2.TM_CCOEFF_NORMED', 'cv2.TM_SQDIFF'] # the 'best' method for matching
+
+        methods = ['cv2.TM_CCOEFF_NORMED', 'cv2.TM_SQDIFF']
 
         xcoords = []
         ycoords = []
@@ -171,12 +173,12 @@ class TemplateMatcher():
             result2 = np.reshape(res, res.shape[0]*res.shape[1])
             sort = np.argsort(result2)
 
-            best_ten = []
+            best_k = []
 
-            for i in range(20):
-                best_ten.append(np.unravel_index(sort[i], res.shape)[::-1])
+            for i in range(50):
+                best_k.append(np.unravel_index(sort[i], res.shape)[::-1])
 
-            for point in best_ten:
+            for point in best_k:
 
                 methodUsed.append(meth_i)
 
@@ -238,8 +240,8 @@ if __name__ == "__main__":
 
     """
 
-    path = "/Users/trevorwalker/Desktop/Clinic/dig/new/WHITE_CH4_SHOT/seg00.dig"
-    spec = Spectrogram(path, 0.0, 60.0e-6, overlap_shift_factor= 7/8, form='db')
+    path = "/Users/trevorwalker/Desktop/Clinic/dig/new/BLUE_CH3_SHOT/seg00.dig"
+    spec = Spectrogram(path, 0.0, 60.0e-6, overlap_shift_factor= 1/8, form='db')
 
     # masks the baselines to avoid matching with saturated signals and echoes
     peaks, _, _ = baselines_by_squash(spec)
@@ -266,9 +268,11 @@ if __name__ == "__main__":
 
     colors = ['ro', 'bo', 'go', 'mo', 'ko', 'co']
     color_names = ['red', 'blue', 'green', 'magenta', 'black', 'cyan']
-    # methods = ['cv2.TM_SQDIFF_NORMED', 'cv2.TM_CCOEFF_NORMED']
-    methods = ['cv2.TM_CCOEFF', 'cv2.TM_CCOEFF_NORMED', 'cv2.TM_CCORR',
-            'cv2.TM_CCORR_NORMED', 'cv2.TM_SQDIFF', 'cv2.TM_SQDIFF_NORMED']
+    # methods = ['cv2.TM_SQDIFF_NORMED', 'cv2.TM_CCOEFF_NORMED', 'cv2.TM_SQDIFF']
+    # methods = ['cv2.TM_CCOEFF', 'cv2.TM_CCOEFF_NORMED', 'cv2.TM_CCORR',
+    #         'cv2.TM_CCORR_NORMED', 'cv2.TM_SQDIFF', 'cv2.TM_SQDIFF_NORMED']
+
+    methods = ['cv2.TM_CCOEFF_NORMED', 'cv2.TM_SQDIFF']
 
 
     for i in range(len(times)):
