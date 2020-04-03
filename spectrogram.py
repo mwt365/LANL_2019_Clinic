@@ -129,10 +129,9 @@ class Spectrogram:
             if desired in available:
                 self.computeMode = desired
             else:
-                # Default to "psd", but display error to the user.
-                print("You wanted the return value of the spectrogram to be",
-                      desired, "the supported values are:", available)
-            del kwargs["mode"]
+                # Default to "all", but display error to the user.
+                kwargs["mode"] = "all"
+                self.computeMode = "all"
 
         try:
             if False:
@@ -160,8 +159,12 @@ class Spectrogram:
         scaling = kwargs.get('scaling', 'spectrum')
         if mode in ('angle', 'phase'):
             modes = [mode, 'psd']
+        elif mode == "all":
+            modes = ["complex", "magnitude", "angle", "phase", "psd"]
         else:
             modes = [mode]
+        
+        self.availableData = modes
 
         for mode in modes:
             freqs, times, spec = signal.spectrogram(
@@ -175,9 +178,11 @@ class Spectrogram:
                 scaling=scaling,
                 mode=mode
             )
-            if mode in ('angle', 'phase'):
-                setattr(self, mode, spec)
+            spec *= 2.0 / (self.points_per_spectrum * self.data.dt)
+            setattr(self, mode, spec)
             self.orig_spec_output = spec
+
+
         times += self.t_start
 
         # Attempt to deduce baselines
@@ -187,8 +192,8 @@ class Spectrogram:
         # to suppress some noise.
         # I think the following is an attempt to normalize across
         # different numbers of points per spectrum.
-        if True:
-            spec *= 2.0 / (self.points_per_spectrum * self.data.dt)
+        # if True:
+        #     spec *= 2.0 / (self.points_per_spectrum * self.data.dt)
 
         if mode == 'complex':
             self.complex = spec
@@ -445,54 +450,90 @@ class Spectrogram:
         
         return fig
 
-    def plot(self, axes=None, **kwargs):
+    def plot(self, **kwargs):
         # max_vel=6000, vmin=-200, vmax=100):
-        if axes == None:
-            axes = plt.gca()
-        if 'max_vel' in kwargs:
-            axes.set_ylim(top=kwargs['max_vel'])
-            del kwargs['max_vel']
-        if 'min_vel' in kwargs:
-            axes.set_ylim(bottom=kwargs['min_vel'])
-            del kwargs['min_vel']
+        pcms = {data: 0 for data in self.availableData}
+        if "psd" in self.availableData:
+            self.availableData.append("intensity")
+        if "complex" in self.availableData:
+            self.availableData.append("real")
+            self.availableData.append("imaginary")
 
-        if 'max_time' in kwargs:
-            axes.set_xlim(right=kwargs['max_time'])
-            del kwargs['max_time']
-        if 'min_time' in kwargs:
-            axes.set_xlim(left=kwargs['min_time'])
-            del kwargs['min_time']
-        
+
         endTime = self._time_to_index((self.probe_destruction_time + self.probe_destruction_time_max)/2)
+        # Our prediction for the probe destruction time. Just to make it easier to plot. 
+
         cmapUsed = COLORMAPS[DEFMAP]
         if 'cmap' in kwargs:
+            # To use the sciviscolor colormaps that we have downloaded.
             attempt = kwargs['cmap']
             if attempt in COLORMAPS.keys():
                 cmapUsed = COLORMAPS[attempt]
                 del kwargs['cmap']
-        pcm = None # To define the scope.
-        if 'cmap' not in kwargs:
-            pcm = axes.pcolormesh(
-                self.time[:endTime] * 1e6,
-                self.velocity,
-                self.intensity[:,:endTime],
-                cmap = cmapUsed,
-                **kwargs)
-        else:
-            pcm = axes.pcolormesh(
-                self.time[:endTime] * 1e6,
-                self.velocity,
-                self.intensity[:,:endTime],
-                **kwargs)
-        print("The current maximum of the colorbar is", np.max(self.intensity[:,:endTime]))
-        plt.gcf().colorbar(pcm, ax=axes)
-        axes.set_ylabel('Velocity (m/s)', fontsize = 18)
-        axes.set_xlabel('Time ($\mu$s)', fontsize = 18)
-        axes.xaxis.set_tick_params(labelsize=14)
-        axes.yaxis.set_tick_params(labelsize=14)        
-        title = self.data.filename.split('/')[-1]
-        axes.set_title(title.replace("_", "-"), fontsize = 24)
-        return pcm
+        top = kwargs.get("max_vel", None)
+        bot = kwargs.get("min_vel", None)
+        right = kwargs.get("max_time", None)
+        left = kwargs.get("min_time", None)
+
+        print("The axes settings should be t,b,r,L", top, bot, right, left)
+
+        if top != None:
+            del kwargs['max_vel']
+        if bot != None:
+            del kwargs['min_vel']
+        if left != None:
+            del kwargs["min_time"]
+        if right != None:
+            del kwargs["max_time"]
+
+
+
+        for data in self.availableData:
+            zData = getattr(self, data, "psd") # getattr(object, itemname, default)
+            if data == "complex":
+                continue
+            elif data == "real":
+                zData = np.real(self.complex)
+            elif data == "imaginary":
+                zData = np.imag(self.complex)
+
+            fig = plt.figure(num=data)
+            axes = plt.gca()
+
+            pcm = None # To define the scope.
+            if 'cmap' not in kwargs:
+                pcm = axes.pcolormesh(
+                    self.time[:endTime] * 1e6,
+                    self.velocity,
+                    zData[:,:endTime],
+                    cmap = cmapUsed,
+                    **kwargs)
+            else:
+                pcm = axes.pcolormesh(
+                    self.time[:endTime] * 1e6,
+                    self.velocity,
+                    zData[:,:endTime],
+                    **kwargs)
+
+            print(f"The current maximum of the colorbar is {np.max(zData[:,:endTime])} for the dataset {data}")
+            plt.gcf().colorbar(pcm, ax=axes)
+            axes.set_ylabel('Velocity (m/s)', fontsize = 18)
+            axes.set_xlabel('Time ($\mu$s)', fontsize = 18)
+            axes.xaxis.set_tick_params(labelsize=14)
+            axes.yaxis.set_tick_params(labelsize=14)        
+            title = self.data.filename.split('/')[-1]
+            axes.set_title(title.replace("_", "-") + f" {data} spectrogram", fontsize = 24)
+
+            axes.set_xlim(left, right)
+            axes.set_ylim(bot, top) # The None value is the default value and does not update the axes limits.            
+
+            pcms[data] = pcm
+
+        if "complex" in self.availableData:
+            self.availableData.remove("real")
+            self.availableData.remove("imaginary")
+        
+        return pcms
 
 
 if __name__ == '__main__':
