@@ -149,48 +149,63 @@ class TemplateMatcher():
         w, h = template.shape[::-1]
 
         # # All the 6 methods for comparison in a list
-        # methods = ['cv2.TM_CCOEFF', 'cv2.TM_CCOEFF_NORMED', 'cv2.TM_CCORR',
-        #             'cv2.TM_CCORR_NORMED', 'cv2.TM_SQDIFF', 'cv2.TM_SQDIFF_NORMED']
+        methods = ['cv2.TM_CCOEFF', 'cv2.TM_CCOEFF_NORMED', 'cv2.TM_CCORR',
+                    'cv2.TM_CCORR_NORMED', 'cv2.TM_SQDIFF', 'cv2.TM_SQDIFF_NORMED']
 
-        methods = ['cv2.TM_SQDIFF_NORMED', 'cv2.TM_CCOEFF_NORMED'] # the 'best' method for matching
+        # methods = ['cv2.TM_SQDIFF_NORMED', 'cv2.TM_CCOEFF_NORMED'] # the 'best' method for matching
 
         xcoords = []
         ycoords = []
         scores = []
+        methodUsed = []
 
-        for meth in methods:
+        for meth_i, meth in enumerate(methods):
             img = img2.copy()
             method = eval(meth)
 
             # Apply template Matching
             res = cv2.matchTemplate(img, template, method)
             min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(res)
-            
-            # If the method is TM_SQDIFF or TM_SQDIFF_NORMED, take minimum
-            if method in [cv2.TM_SQDIFF, cv2.TM_SQDIFF_NORMED]:
-                top_left = min_loc
-                scores.append(min_val)
-            else:
-                top_left = max_loc
-                scores.append(max_val)
-            bottom_right = (top_left[0] + w, top_left[1] + h)
 
-            velo_offset_index = self.template_velo_offset_index
-            time_offset_index = self.template_time_offset_index
+            #get all the matches:
+            result2 = np.reshape(res, res.shape[0]*res.shape[1])
+            sort = np.argsort(result2)
 
-            real_velo_index = abs(self.flipped_velo_bounds[0] + bottom_right[1]) + velo_offset_index
+            best_ten = []
 
-            time_match = self.spectrogram.time[top_left[0]] * 1e6
-            template_offset_time = self.spectrogram.time[time_offset_index] * 1e6
-            start_time = self.spectrogram.time[self.zero_time_index] * 1e6 * -1
-            time_offset = abs(self.spectrogram.time[self.time_bounds[0]] * 1e6)
+            for i in range(15):
+                best_ten.append(np.unravel_index(sort[i], res.shape)[::-1])
 
-            time_total = time_match + template_offset_time + start_time + time_offset
+            for point in best_ten:
 
-            true_velo = self.spectrogram.velocity[real_velo_index]
+                methodUsed.append(meth_i)
 
-            xcoords.append(time_total)
-            ycoords.append(true_velo)
+                # If the method is TM_SQDIFF or TM_SQDIFF_NORMED, take minimum
+                if method in [cv2.TM_SQDIFF, cv2.TM_SQDIFF_NORMED]:
+                    top_left = point
+                    scores.append(min_val)
+                else:
+                    top_left = point
+                    scores.append(max_val)
+
+                bottom_right = (top_left[0] + w, top_left[1] + h)
+
+                velo_offset_index = self.template_velo_offset_index
+                time_offset_index = self.template_time_offset_index
+
+                real_velo_index = abs(self.flipped_velo_bounds[0] + bottom_right[1]) + velo_offset_index
+
+                time_match = self.spectrogram.time[top_left[0]] * 1e6
+                template_offset_time = self.spectrogram.time[time_offset_index] * 1e6
+                start_time = self.spectrogram.time[self.zero_time_index] * 1e6 * -1
+                time_offset = abs(self.spectrogram.time[self.time_bounds[0]] * 1e6)
+
+                time_total = time_match + template_offset_time + start_time + time_offset
+
+                true_velo = self.spectrogram.velocity[real_velo_index]
+
+                xcoords.append(time_total)
+                ycoords.append(true_velo)
 
             # cv2.rectangle(img, top_left, bottom_right, 255, thickness=1)
             # plt.subplot(121),plt.imshow(res,cmap = 'gray')
@@ -200,7 +215,7 @@ class TemplateMatcher():
             # plt.suptitle(meth)
             # plt.show()
 
-        return xcoords, ycoords, scores
+        return xcoords, ycoords, scores, methodUsed
 
 
 
@@ -232,7 +247,7 @@ if __name__ == "__main__":
 
     # gives user the option to click, by default it searches from (0,0)
     template_matcher = TemplateMatcher(spec, None, template, span=span)
-    times, velos, scores = template_matcher.match()
+    times, velos, scores, methodUsed = template_matcher.match()
 
     # draw the space to search in, plot times and velos as red dots
     dv = spec.velocity[template_matcher.velo_scale * span]
@@ -242,14 +257,22 @@ if __name__ == "__main__":
 
     colors = ['ro', 'bo', 'go', 'mo', 'ko', 'co']
     color_names = ['red', 'blue', 'green', 'magenta', 'black', 'cyan']
+    # methods = ['cv2.TM_SQDIFF_NORMED', 'cv2.TM_CCOEFF_NORMED']
+    methods = ['cv2.TM_CCOEFF', 'cv2.TM_CCOEFF_NORMED', 'cv2.TM_CCORR',
+            'cv2.TM_CCORR_NORMED', 'cv2.TM_SQDIFF', 'cv2.TM_SQDIFF_NORMED']
+
 
     for i in range(len(times)):
         print("time: ", times[i])
         print("velocity: ", velos[i])
         print("score: ", scores[i])
-        print("color: ", color_names[i],'\n')
+        # print("color: ", color_names[i%6])
+        print("color: ", color_names[methodUsed[i]])
+        print("method: ", methods[methodUsed[i]],'\n')
 
-        plt.plot(times[i], velos[i], colors[i], markersize=2.5, alpha=0.7)
+        # plt.plot(times[i], velos[i], colors[i%6], markersize=2.5, alpha=0.7)
+        plt.plot(times[i], velos[i], colors[methodUsed[i]], markersize=2.5, alpha=0.7)
+
     
     
     patch = Rectangle((0,0), dt, dv, fill=False, color='b', alpha=0.8)
