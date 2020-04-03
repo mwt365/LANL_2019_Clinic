@@ -16,7 +16,7 @@ try:
     for base, dirs, files in os.walk(DIR):
         for file in files:
             if file.endswith('.xml'):
-                COLORMAPS[os.path.splitext(file)[0]] = cm.make_cmap(os.path.join(base[2:], file))
+                COLORMAPS[os.path.splitext(file)[0]] = cm.make_cmap(os.path.join(base, file))
 except FileNotFoundError:
     print("No folder named 'xml color map files' in the source directory.")
 
