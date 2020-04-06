@@ -41,7 +41,7 @@ class TemplateMatcher():
 
     """
 
-    def __init__(self, spectrogram, start_point, template, span=80, velo_scale=10):
+    def __init__(self, spectrogram, start_point, template, span=80, velo_scale=10, k=10):
         assert isinstance(spectrogram, Spectrogram)
         assert (len(template) > 0)
 
@@ -52,7 +52,7 @@ class TemplateMatcher():
         self.velo_scale = int(velo_scale)
         self.template_time_offset_index = int(template[1])
         self.template_velo_offset_index = int(template[2])
-
+        self.k = int(k)
 
         self.zero_time_index = spectrogram._time_to_index(0)
         self.zero_velo_index = spectrogram._velocity_to_index(0)
@@ -154,7 +154,7 @@ class TemplateMatcher():
 
         # methods = ['cv2.TM_SQDIFF_NORMED', 'cv2.TM_CCOEFF_NORMED', 'cv2.TM_SQDIFF'] # the 'best' method for matching
 
-        methods = ['cv2.TM_CCOEFF_NORMED', 'cv2.TM_SQDIFF']
+        methods = ['cv2.TM_CCOEFF_NORMED', 'cv2.TM_SQDIFF', 'cv2.TM_SQDIFF_NORMED']
 
         xcoords = []
         ycoords = []
@@ -175,7 +175,7 @@ class TemplateMatcher():
 
             best_k = []
 
-            for i in range(50):
+            for i in range(self.k):
                 best_k.append(np.unravel_index(sort[i], res.shape)[::-1])
 
             for point in best_k:
@@ -240,24 +240,23 @@ if __name__ == "__main__":
 
     """
 
-    path = "/Users/trevorwalker/Desktop/Clinic/dig/new/BLUE_CH3_SHOT/seg00.dig"
+    path = "/Users/trevorwalker/Desktop/Clinic/dig/new/BLUE_CH2_SHOT/seg00.dig"
     spec = Spectrogram(path, 0.0, 60.0e-6, overlap_shift_factor= 1/8, form='db')
 
     # masks the baselines to avoid matching with saturated signals and echoes
-    peaks, _, _ = baselines_by_squash(spec)
-    for peak in peaks:
-        velo_index = spec._velocity_to_index(peak)
-        velo_index = velo_index - 10
-        for i in range(velo_index, velo_index+20, 1):
-            spec.intensity[i][:] = 0
+    # peaks, _, _ = baselines_by_squash(spec)
+    # for peak in peaks:
+    #     velo_index = spec._velocity_to_index(peak)
+    #     velo_index = velo_index - 10
+    #     for i in range(velo_index, velo_index+20, 1):
+    #         spec.intensity[i][:] = 0
     
 
     span = 200 # will determine the bounding box to search in
-
     template = opencv_long_start_pattern4 # use this template to search
 
     # gives user the option to click, by default it searches from (0,0)
-    template_matcher = TemplateMatcher(spec, None, template, span=span)
+    template_matcher = TemplateMatcher(spec, None, template, span=span, k=10)
     times, velos, scores, methodUsed = template_matcher.match()
 
     # draw the space to search in, plot times and velos as red dots
@@ -268,26 +267,47 @@ if __name__ == "__main__":
 
     colors = ['ro', 'bo', 'go', 'mo', 'ko', 'co']
     color_names = ['red', 'blue', 'green', 'magenta', 'black', 'cyan']
-    # methods = ['cv2.TM_SQDIFF_NORMED', 'cv2.TM_CCOEFF_NORMED', 'cv2.TM_SQDIFF']
-    # methods = ['cv2.TM_CCOEFF', 'cv2.TM_CCOEFF_NORMED', 'cv2.TM_CCORR',
-    #         'cv2.TM_CCORR_NORMED', 'cv2.TM_SQDIFF', 'cv2.TM_SQDIFF_NORMED']
-
-    methods = ['cv2.TM_CCOEFF_NORMED', 'cv2.TM_SQDIFF']
 
 
+    # methods = ['TM_SQDIFF_NORMED', 'CCOEFF_NORMED', 'SQDIFF']
+
+    # methods = ['CCOEFF', 'CCOEFF_NORMED', 'CCORR',
+    #         'CCORR_NORMED', 'SQDIFF', 'SQDIFF_NORMED']
+
+    methods = ['CCOEFF_NORMED', 'SQDIFF', 'SQDIFF_NORMED']
+
+    handles = []
+    seen_handles = []
     for i in range(len(times)):
-        print("time: ", times[i])
-        print("velocity: ", velos[i])
-        print("score: ", scores[i])
-        # print("color: ", color_names[i%6])
-        print("color: ", color_names[methodUsed[i]])
-        print("method: ", methods[methodUsed[i]],'\n')
+        # print("time: ", times[i])
+        # print("velocity: ", velos[i])
+        # print("score: ", scores[i])
+        # # print("color: ", color_names[i%6])
+        # print("color: ", color_names[methodUsed[i]])
+        # print("method: ", methods[methodUsed[i]],'\n')
 
-        # plt.plot(times[i], velos[i], colors[i%6], markersize=2.5, alpha=0.7)
-        plt.plot(times[i], velos[i], colors[methodUsed[i]], markersize=2.5, alpha=0.7)
 
+        # rank = (i % template_matcher.k)
+        # if rank == 0:
+        #     opacity = (1 / template_matcher.k)
+        # else:
+        #     opacity = ((template_matcher.k - rank) / template_matcher.k)
+        # point_method = methods[methodUsed[i]]
+        # point, = plt.plot(times[i], velos[i], colors[methodUsed[i]], markersize=2.5, alpha=opacity)
+
+
+        point_method = methods[methodUsed[i]]
+        point, = plt.plot(times[i], velos[i], colors[methodUsed[i]], markersize=2.5, alpha=.80)
+
+        if point_method not in seen_handles:
+            seen_handles.append(point_method)
+            point.set_label(point_method)
+            handles.append(point)
     
-    
+
+    plt.legend(handles=handles)
+
+
     patch = Rectangle((0,0), dt, dv, fill=False, color='b', alpha=0.8)
     ax.add_patch(patch)
 
