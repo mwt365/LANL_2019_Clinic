@@ -33,7 +33,7 @@ def baselines_by_squash(spectrogram: Spectrogram):
         isolated time. It might be better to chop the range into several
         intervals and insist on a significant peak in each.
     """
-    assert isinstance(spectrogram, Spectrogram)
+
     # Collapse along the time axis, making sure to use power,
     # not dB
     powers = spectrogram.power(spectrogram.intensity)
@@ -54,7 +54,7 @@ def baselines_by_squash(spectrogram: Spectrogram):
     tallest = combined_spectrum.max()
     peaks, properties = find_peaks(
         combined_spectrum,
-        height=0.01 * tallest,  # peaks must be this tall to count
+        height=0.05 * tallest,  # peaks must be this tall to count
         distance=100,  # peaks must be separated by this much at minimum
     )
     heights = properties['peak_heights']
