@@ -240,7 +240,7 @@ if __name__ == "__main__":
 
     """
 
-    path = "/Users/trevorwalker/Desktop/Clinic/dig/new/BLUE_CH2_SHOT/seg00.dig"
+    path = "/Users/trevorwalker/Desktop/Clinic/dig/new/WHITE_CH2_SHOT/seg00.dig"
     spec = Spectrogram(path, 0.0, 60.0e-6, overlap_shift_factor= 1/8, form='db')
 
     # masks the baselines to avoid matching with saturated signals and echoes
@@ -253,7 +253,7 @@ if __name__ == "__main__":
     
 
     span = 200 # will determine the bounding box to search in
-    template = opencv_long_start_pattern4 # use this template to search
+    template = opencv_long_start_pattern6 # use this template to search
 
     # gives user the option to click, by default it searches from (0,0)
     template_matcher = TemplateMatcher(spec, None, template, span=span, k=10)
