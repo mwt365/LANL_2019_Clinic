@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 from scipy import signal
 from plotter import COLORMAPS
 
-from digfile import DigFile
+from ProcessingAlgorithms.preprocess.digfile import DigFile
 
 
 class Spectrogram:
@@ -92,6 +92,10 @@ class Spectrogram:
         if isinstance(digfile, DigFile):
             self.data = digfile
         else:
+            print(isinstance(digfile, DigFile))
+            print(type(digfile))
+            print(digfile)
+
             raise TypeError("Unknown file type")
 
         self.t_start = t_start if t_start != None else self.data.t0
