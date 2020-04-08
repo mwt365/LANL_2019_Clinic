@@ -23,4 +23,4 @@ class JsonWriteDriver:
     
     def flush(self):
         with open(self.file_name, 'w') as f:
-            json.dump(self.datastore, f)
+            json.dump(self.datastore, f,indent=1)
