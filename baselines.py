@@ -9,9 +9,12 @@
 """
 
 import numpy as np
+import pandas as pd
 from spectrogram import Spectrogram
 from scipy.signal import find_peaks
 from scipy.fftpack import fft
+import random
+import peak_follower
 
 
 def baselines_by_squash(spectrogram: Spectrogram):
@@ -33,7 +36,7 @@ def baselines_by_squash(spectrogram: Spectrogram):
         isolated time. It might be better to chop the range into several
         intervals and insist on a significant peak in each.
     """
-    assert isinstance(spectrogram, Spectrogram)
+    # assert isinstance(spectrogram, Spectrogram)
     # Collapse along the time axis, making sure to use power,
     # not dB
     powers = spectrogram.power(spectrogram.intensity)
@@ -67,7 +70,7 @@ def baselines_by_squash(spectrogram: Spectrogram):
     return peaks, np.ones(len(peaks)) * dv, heights
 
 
-def baselines_by_fft(spectrogram):
+def baselines_by_fft(sgram):
     """
     Return a list of baseline velocities and their uncertainties.
 
@@ -86,16 +89,17 @@ def baselines_by_fft(spectrogram):
         isolated time. It might be better to chop the range into several
         intervals and insist on a significant peak in each.
     """
+    # print(type(sgram))
+    # assert isinstance(sgram, Spectrogram)
 
-    assert isinstance(spectrogram, Spectrogram)
     # Perform a single Fourier transform of the voltage data in the range
     # corresponding to this spectrogram, rounded down to the nearest power
     # of 2 (we could also zero pad up to the next higher power of two).
-    first_point, last_point = spectrogram.data._points(None, None)
+    first_point, last_point = sgram.data._points(None, None)
     nPoints = last_point - first_point + 1
     octaves = np.log2(nPoints)  # how many octaves are spanned
     num_points = int(2 ** np.floor(octaves))
-    vals = spectrogram.data.values(None, num_points)
+    vals = sgram.data.values(None, num_points)
     # Now compute the power spectrum of these points
     # At present, we aren't worrying about a window function, assuming that
     # the noise spread across all frequencies from abrupt shifts will not
@@ -103,8 +107,8 @@ def baselines_by_fft(spectrogram):
     cspec = fft(vals)[0:1 + num_points // 2]
     powers = np.power(np.abs(cspec), 2)
 
-    velocities = np.linspace(0.0, 0.25 / spectrogram.data.dt,
-                             len(cspec)) * spectrogram.wavelength
+    velocities = np.linspace(0.0, 0.25 / sgram.data.dt,
+                             len(cspec)) * sgram.wavelength
     # At this point, powers vs velocities should show some very
     # narrow spikes. Let's normalize the array of powers
     peak_power = powers.max()
@@ -131,17 +135,82 @@ def baselines_by_fft(spectrogram):
     return neighborhoods
 
 
+
+
 if __name__ == '__main__':
     import os
     from digfile import DigFile
-    os.chdir('../dig')
-    df = DigFile('GEN3CH_4_009.dig')
-    sgram = Spectrogram(df, 0.0, 50.0e-6)
-    hoods = baselines_by_fft(sgram)
-    for n, h in enumerate(hoods):
-        print(f"Peak {n}\nVelocity{n}\tIntensity{n}")
-        v, i = h
-        for j in range(len(v)):
-            print(f"{v[j]:.4f}\t{i[j]:.4f}")
-        print("\n")
+
+    path = "/Users/trevorwalker/Desktop/Clinic/For_Candace/newdigs"
+
+    os.chdir(path)
+
+    df = DigFile('CH_2_009.dig')
+
+    baselines_v = []
+
+    sgram = Spectrogram(df, 0.0, 60.0e-6, form='db')
+    # hoods = baselines_by_fft(sgram)
+
+
+    peaks, dvs, heights = baselines_by_squash(sgram) 
+
+
+
+    df = pd.DataFrame(dict(peaks=peaks, heights=heights))
+
+    print(df)
+
+
+    # print(sgram.v_max)
+
+    # for n, h in enumerate(hoods):
+    #     max_v = 0
+    #     max_i = 0
+    #     print(f"Peak {n}\nVelocity{n}\tIntensity{n}")
+    #     v, i = h
+    #     for j in range(len(v)):
+    #         print(f"{v[j]:.4f}\t{i[j]:.4f}")
+    #         if i[j] > max_i:
+    #             max_i = i[j]
+    #             max_v = v[j]
+                
+    #     print("\n")
+    #     # print("velocity:", max_v,"\nintensity:", max_i)
+    #     baselines_v.append(max_v)
+
+
+    # actual_baselines = []
+
+    # for baseline in baselines_v:
+    #     print("is there a baseline at: ", baseline, "?", end=" ")
+    #     ans = input("(y/n)\n")
+    #     if ans == "y":
+    #         actual_baselines.append(baseline)
+    #     else:
+    #         continue
+
+    # for baseline in actual_baselines:
+    #     ans = input("where does the start begin? (microseconds)")
+    #     try: 
+    #         ans = int(ans)
+    #     except:
+    #         print("input can not be converted to integer")
+    #         break
+
+    #     if (ans > 0) and (ans < sgram.v_max):
+    #         baseline_index = sgram._velocity_to_index(baseline)
+
+    #         intensity_of_baseline = sgram.intensity[baseline_index][ans]
+    #         threshold = .90
+    #         threshold_intensity = threshold * intensity_of_baseline
+
+    #         potential_starting_velos = find_start(sgram, ans, baseline_index, threshold_intensity)
+
+
+
+    #         print( potential_starting_velos ) 
+    #         print( len(sgram.signal_to_noise()) )
+
+    # print(baselines_v)
 
