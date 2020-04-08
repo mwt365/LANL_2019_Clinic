@@ -24,19 +24,23 @@ def moment(x, y):
     """
 
     ysort = np.sort(y)
-    noise_level = np.mean(ysort[:len(ysort) // 2])
+    bottom = ysort[:(len(ysort) // 2)]
+    noise_level = bottom.mean()
     prob = y - noise_level
     total = np.sum(prob)
     prob /= total
+    dx = x[1] - x[0]
 
     # Now compute the first moment
     x_center = np.dot(x, prob)
     squares = np.dot(x * x, prob)
     variance = squares - x_center ** 2
     std_dev = np.sqrt(variance)
+    npnts = 8 * std_dev / dx
     return dict(
-        center = x_center,
-        variance = variance,
-        std_dev = std_dev,
-        background = noise_level
+        center=x_center,
+        variance=variance,
+        std_dev=std_dev,
+        std_err=std_dev / np.sqrt(npnts),
+        background=noise_level
     )

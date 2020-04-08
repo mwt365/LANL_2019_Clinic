@@ -196,7 +196,8 @@ class SpectrogramWidget:
 
             # FFT size  ###########################################
             # Set the size of each spectrum
-            pps = kwargs.get('points_per_spectrum', 8192)
+            pps = self.spectrogram.points_per_spectrum
+            # pps = kwargs.get('points_per_spectrum', 8192)
             val = int(np.log2(pps))
             cd['spectrum_size'] = slide = widgets.IntSlider(
                 value=val, min=8, max=18, step=1,
@@ -726,7 +727,7 @@ class SpectrogramWidget:
             pk = hood.peak_int
             tallest = np.max(hood.intensity)
             max_peak = max(tallest, max_peak)
-            ax.plot([hood.moment['center'] + x * hood.moment['std_dev'] for x in
+            ax.plot([hood.moment['center'] + x * hood.moment['std_err'] for x in
                      (-1, 0, 1)], 0.5 * tallest * np.ones(3), 'r.')
             # show the gaussian
             hood.plot_gaussian(ax)
@@ -736,7 +737,7 @@ class SpectrogramWidget:
             # ax.set_xlim(vcenter - 12 * width, vcenter + 12 * width)
             ax.set_xlabel(f"$v$ (m/s)")
             ax.set_title(f"{hood.time*1e6:.2f}" + " $\\mu$s")
-            txt = f"m = {hood.moment['center']:.1f} ± {hood.moment['std_dev']:.1f}"
+            txt = f"m = {hood.moment['center']:.1f} ± {hood.moment['std_err']:.1f}"
             txt = f"{txt}\ng = {hood.gaussian.center:.1f} ± {hood.gaussian.width:.1f}"
             ax.annotate(txt, xy=(0.05, 0.95), xycoords='axes fraction',
                         horizontalalignment='left', verticalalignment='top')

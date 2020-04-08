@@ -7,10 +7,12 @@
    Purpose: Manage curve fits with more bells and whistles
    Created: 12/16/19
 """
+import re
 import numpy as np
 import inspect
 from scipy.optimize import curve_fit, OptimizeWarning
 from ProcessingAlgorithms.Fitting.moving_average import moving_average
+import matplotlib.pyplot as plt
 
 
 class Fit:
@@ -118,6 +120,46 @@ class Fit:
             lines.append(self.error)
         return "\n".join(lines)
 
+    def texval(self, x):
+        """
+        Render a string representation of a value in TeX format
+        """
+        if "e" not in x:
+            return x
+        m = re.search(r'([-+0-9.]*)\s?e\s?([+-])\s?([0-9]*)', x)
+        if m:
+            s = m.group(1) + r" \times 10^{"
+            if m.group(2) == '-':
+                s += '-'
+            s += str(int(m.group(3))) + "}"
+            return s
+        print("Ack! for " + x)
+        return x
+
+    def tex(self):
+        name = self._f.__name__
+        args = inspect.getfullargspec(self._f)
+        argnames = args.args[1:]
+        lines = [name, ]
+
+        has_unc = isinstance(self.sigma, np.ndarray)
+        if self.valid:
+            for n in range(len(self.params)):
+                lines.append(f"{argnames[n]:>16s} = $")
+                lines[-1] += self.texval(f"{self.params[n]:^8.4g}")
+                if has_unc:
+                    lines[-1] += "\\pm" + self.texval(f" {self.errors[n]:.2g}")
+                    if self.errors[n] > 0:
+                        lines[-1] += f" ({abs(self.errors[n]/self.params[n])*100:.2g}\\%)"
+                lines[-1] += "$"
+            if has_unc:
+                lines.append(r"$N_{\rm dof} = " + self.texval(f"{self.dof}") + ", ")
+                lines[-1] += r"\chi^2 = " + self.texval(f"{self.chisq:.3g}")
+                lines[-1] += f" ({self.reduced_chisq:.3g})$"
+        else:
+            lines.append(self.error)
+        return "\n".join(lines)
+
     def parameters(self, par):
         if self.hold:
             p = self.p0
@@ -129,6 +171,93 @@ class Fit:
     @property
     def valid(self):
         return self.error is None
+
+    def plot(self, **kwargs):
+        """
+
+        """
+        residuals, normalized_residuals = False, False
+        if self.valid:
+            # See if we should plot residuals
+            residuals = kwargs.get('residuals', True)
+            normalized_residuals = kwargs.get('normalized_residuals', True)
+        num_axes = 1 + (1 if residuals else 0) + \
+            (1 if normalized_residuals else 0)
+        gspec = dict(
+            width_ratios=[1],
+            height_ratios=[1],
+            hspace=0.05,
+            left=0.075,
+            right=0.975
+        )
+        if num_axes == 2:
+            gspec['height_ratios'] = [1, 4]
+        elif num_axes == 3:
+            gspec['height_ratios'] = [1, 1, 4]
+        fig, axes = plt.subplots(
+            nrows=num_axes, ncols=1,
+            sharex=True, gridspec_kw=gspec)
+        if residuals:
+            residuals = axes[0]
+            if normalized_residuals:
+                normalized_residuals = axes[1]
+        elif normalized_residuals:
+            normalized_residuals = axes[0]
+        if num_axes == 1:
+            main = axes
+        else:
+            main = axes[-1]
+
+        # Plot the data first, except lay down the fit curve
+        # first
+        logx = kwargs.get('logx', False)
+        logy = kwargs.get('logy', False)
+        xmin = kwargs.get('xmin', np.min(self.x))
+        xmax = kwargs.get('xmax', np.max(self.x))
+        ymin = kwargs.get('ymin', np.min(self.y))
+        ymax = kwargs.get('ymax', np.max(self.y))
+        npoints = kwargs.get('npoints', 200)
+        if logx:
+            main.set_xscale('log', nonposx='clip')
+            xfit = np.power(10, np.linspace
+                            (np.log10(xmin), np.log10(xmax), npoints))
+        else:
+            xfit = np.linspace(xmin, xmax, npoints)
+        yfit = self.__call__(xfit)
+
+        if logy:
+            main.set_yscale('log', nonposy='clip')
+        main.plot(xfit, yfit)
+        main.errorbar(self.x, self.y, yerr=self.sigma,
+                      fmt='.', alpha=0.5)
+
+        # add an annotation
+        legend = kwargs.get('legend', (0.1, 0.1))
+        xpos = (1 - legend[0]) * xmin + legend[0] * xmax
+        ypos = (1 - legend[1]) * ymin + legend[1] * ymax
+        halign = 'left' if legend[0] < 0.3 else (
+            'right' if legend[0] > 0.7 else 'center')
+        valign = 'bottom' if legend[1] < 0.3 else (
+            'top' if legend[1] > 0.7 else 'center')
+        main.text(xpos, ypos, self.tex(),
+                  horizontalalignment=halign,
+                  verticalalignment=valign)
+
+        if residuals:
+            if logx:
+                residuals.set_xscale('log', nonposx='clip')
+            # plot the zero line
+            residuals.plot([xmin, xmax], [0, 0], 'k-', alpha=0.5)
+            residuals.errorbar(self.x, self.residuals,
+                               yerr=self.sigma, fmt='.')
+            residuals.set_ylabel('Res.')
+
+        if normalized_residuals:
+            if logx:
+                normalized_residuals.set_xscale('log', nonposx='clip')
+            normalized_residuals.plot([xmin, xmax], [0, 0], 'k-', alpha=0.5)
+            normalized_residuals.plot(self.x, self.norm_residuals, '.')
+            normalized_residuals.set_ylabel('N.R.')
 
 
 if __name__ == '__main__':
@@ -173,10 +302,12 @@ if __name__ == '__main__':
     print(f'center = {center:.3g}  ({abs((center-gus.params[1])/gus.errors[1]):.1f} σ)')
     print(f'width = {width:.3g}  ({abs((width-abs(gus.params[2]))/gus.errors[2]):.1f} σ)')
     print(f'background = {background:.3g}')
-    plt.plot(x, y, 'ro', alpha=0.5)
-    plt.plot(x, moving_average(y), 'go', alpha=0.25)
-    xfine = np.linspace(x[0], x[-1], num=x.size * 10)
-    plt.plot(xfine, gus(xfine), 'k-')
+    gus.plot(legend=(1, 1))
     plt.show()
+    # plt.plot(x, y, 'ro', alpha=0.5)
+    # plt.plot(x, moving_average(y), 'go', alpha=0.25)
+    # xfine = np.linspace(x[0], x[-1], num=x.size * 10)
+    # plt.plot(xfine, gus(xfine), 'k-')
+    # plt.show()
 
 

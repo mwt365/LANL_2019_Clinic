@@ -73,8 +73,8 @@ class Spectrogram:
                  t_start=None,
                  ending=None,
                  wavelength: float = 1550.0e-9,
-                 points_per_spectrum: int = 8192,
-                 overlap: float = 0.25,
+                 points_per_spectrum: int = 4096,
+                 overlap: float = 0.875,
                  window_function=None,  # 'hanning',
                  form: str = 'db',
                  convert_to_voltage: bool = True,
@@ -125,13 +125,17 @@ class Spectrogram:
         if "mode" in kwargs:
             available = ["psd", "complex", "magnitude", "angle", "phase"]
             desired = kwargs["mode"]
-            if desired in available:
+            if isinstance(desired, (list, tuple)):
+                desired = list(desired)  # make sure it's mutable
+                for x in desired:
+                    if x not in available:
+                        desired.remove(x)
+            elif desired in available:
                 self.computeMode = desired
             else:
                 # Default to "psd", but display error to the user.
                 print("You wanted the return value of the spectrogram to be",
                       desired, "the supported values are:", available)
-            del kwargs["mode"]
 
         try:
             if False:
@@ -157,7 +161,11 @@ class Spectrogram:
         # 'angle', and 'phase'
         mode = kwargs.get('mode', 'psd')
         scaling = kwargs.get('scaling', 'spectrum')
-        if mode in ('angle', 'phase'):
+
+        # if the mode argument is a list, use the list
+        if isinstance(mode, (list, tuple)):
+            modes = mode
+        elif mode in ('angle', 'phase'):
             modes = [mode, 'psd']
         else:
             modes = [mode]
@@ -174,8 +182,14 @@ class Spectrogram:
                 scaling=scaling,
                 mode=mode
             )
-            if mode in ('angle', 'phase'):
-                setattr(self, mode, spec)
+            if mode in ('psd', 'complex', 'magnitude'):
+                # I think the following is an attempt to normalize across
+                # different numbers of points per spectrum.
+                spec *= 2.0 / (self.points_per_spectrum * self.data.dt)
+            setattr(self, mode, spec)  # store this version of the spectrum
+            if mode == 'complex':
+                self.intensity = np.abs(spec)
+                self.intensity *= self.intensity
         times += self.t_start
 
         # Attempt to deduce baselines
@@ -183,17 +197,10 @@ class Spectrogram:
 
         # Convert to a logarithmic representation and use floor to attempt
         # to suppress some noise.
-        # I think the following is an attempt to normalize across
-        # different numbers of points per spectrum.
-        if True:
-            spec *= 2.0 / (self.points_per_spectrum * self.data.dt)
+        if not hasattr(self, "intensity") or not self.intensity:
+            self.intensity = self.psd
 
-        if mode == 'complex':
-            self.complex = spec
-            self.intensity = np.abs(spec)
-            self.intensity *= self.intensity
-        else:
-            self.intensity = self.transform(spec)
+        self.intensity = self.transform(self.intensity)
         self.histogram_levels = self.histo_levels(self.intensity)
 
         # the first index is frequency, the second time
@@ -209,7 +216,7 @@ class Spectrogram:
         """
         epsilon = 1e-10
         if self.form == 'db':
-            return 20 * np.log10(vals + epsilon)
+            return 10 * np.log10(vals + epsilon)
         if self.form == 'log':
             return np.log10(vals + epsilon)
         return vals
@@ -439,7 +446,7 @@ class Spectrogram:
         if necessary).
         """
         if self.form == 'db':
-            return np.power(10.0, 0.05 * values)
+            return np.power(10.0, 0.1 * values)
         if self.form == 'log':
             return np.power(10.0, values)
         return values
@@ -482,6 +489,19 @@ class Spectrogram:
 
 
 if __name__ == '__main__':
-    sp = Spectrogram('../dig/GEN3CH_4_009.dig', None,
-                     None, overlap_shift_factor=1 / 4)
+    sp = Spectrogram(
+        '../dig/GEN3CH_4_009/seg10',
+        None,
+        None,
+        mode=('psd', 'phase', 'angle'))
     print(sp)
+    fig, ax = plt.subplots()
+    pcm = ax.pcolormesh(
+        sp.time * 1e6,
+        sp.velocity,
+        sp.angle
+    )
+    fig.colorbar(pcm, ax=ax)
+    ax.set_ylabel('Velocity (m/s)')
+    ax.set_xlabel('Time ($\mu$s)')
+    plt.show()

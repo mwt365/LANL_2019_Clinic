@@ -87,6 +87,9 @@ class DigFile:
         dateline = re.search(
             r"^(.*)(201\d)$", self.header_text, re.MULTILINE)
         if dateline:
+            dt = dateline.group(0)
+            if '=' in dt:
+                return dt.split('=')[1].strip()
             return dateline.group(0)
         return ""
 

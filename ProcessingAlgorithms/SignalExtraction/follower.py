@@ -309,7 +309,7 @@ class Follower:
         # add columns obtained from the hoods
         df['v_index'] = [h.v_index for h in hoods]
         df['m_center'] = [h.moment['center'] for h in hoods]
-        df['m_width'] = [h.moment['std_dev'] for h in hoods]
+        df['m_width'] = [h.moment['std_err'] for h in hoods]
         df['m_bgnd'] = [h.moment['background'] for h in hoods]
         df['g_center'] = [h.gaussian.center for h in hoods]
         df['g_width'] = [h.gaussian.width for h in hoods]
@@ -446,16 +446,16 @@ class FollowHood(object):
     All information about the neighborhood around a point
     identified on a curve by a follower:
 
-      - time                   in seconds
-      - t_index             column of the spectrogram
-      - peak_v          in m/s
-      - v_index         row of the spectrogram
-      - peak_int         intensity at the peak
+      - time       in seconds
+      - t_index    column of the spectrogram
+      - peak_v     in m/s
+      - v_index    row of the spectrogram
+      - peak_int   intensity at the peak
       - vi_span    rows used to look for peak
-      - velocity               velocity values of above
-      - intensity              intensity values of above
-      - moment                 {'center', 'variance', 'std_dev', 'background}
-      - gaussian               {background, amplitude, center, width}
+      - velocity   velocity values of above
+      - intensity  intensity values of above
+      - moment     {'center', 'variance', 'std_dev', 'std_err', 'background'}
+      - gaussian   {background, amplitude, center, width}
     """
 
     def __init__(self, follower: Follower, pt: int):
@@ -538,11 +538,11 @@ class FollowHood(object):
                 [bg, bg], 'r-', label='bgnd')
         # show the center and widths from the moment calculation
         tallest = np.max(self.intensity)
-        ax.plot([self.moment['center'] + x * self.moment['std_dev'] for x in
+        ax.plot([self.moment['center'] + x * self.moment['std_err'] for x in
                  (-1, 0, 1)], 0.5 * tallest * np.ones(3), 'r.', label='moments')
         # show the gaussian
         self.plot_gaussian(ax)
-        vcenter, width = self.peak_v, self.moment['std_dev']
+        vcenter, width = self.peak_v, self.moment['std_err']
         ax.set_xlim(vcenter - 12 * width, vcenter + 12 * width)
 
         xlabel = kwargs.get('xlabel')
