@@ -259,6 +259,30 @@ def find_baselines(pipe: PNSPipe, **kwargs):
     pipe.log(f"Baselines > {baseline_limit*100}%: {pipe.baselines}")
 
 
+
+def find_start_points(pipe: PNSPipe, **kwargs):
+    """
+    Find jumpoff points for pipe.spectrogram using the
+    template matching with opencv. Specify the type of template 
+    to use, or use a list of them.
+    """
+    from template_matcher import TemplateMatcher
+    from ImageProcessing.Templates.templates import opencv_long_start_pattern5 as pattern
+    template_matcher = TemplateMatcher(pipe.spectrogram, None, pattern, span=200, k=1)
+    times, velos, scores, methodUsed = template_matcher.match()
+    methods = ['CCOEFF_NORMED', 'SQDIFF       ', 'SQDIFF_NORMED']
+
+    # list the arguments we use in the log
+    for i in range(len(times)):
+        name = methods[methodUsed[i]]
+        time = times[i]
+        velo = velos[i]
+        # print(time)
+        # print(velo)
+        pipe.log(f"+ {name} --> {time:.5f} \u03bcs, {velo:.3f} m/s")
+
+
+
 def find_signal(pipe: PNSPipe, **kwargs):
     """
     Start at t_start and look for a peak above the baseline
