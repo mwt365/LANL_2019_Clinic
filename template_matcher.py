@@ -13,7 +13,11 @@ import numpy as np
 from baselines import baselines_by_squash
 from spectrogram import Spectrogram
 from ImageProcessing.Templates.templates import *
-from scipy.misc import imsave
+import scipy
+if scipy.__version__ > "1.2.1":
+    from imageio import imsave
+else:
+    from scipy.misc import imsave
 from matplotlib import pyplot as plt
 from matplotlib.patches import Rectangle
 from sklearn_extra.cluster import KMedoids
@@ -258,9 +262,8 @@ if __name__ == "__main__":
     CH_4_009/seg02.dig -- opencv_long_start_pattern4 span=200
 
     """
-
-    path = "/Users/trevorwalker/Desktop/Clinic/dig/WHITE_CH2_SHOT/seg00.dig"
-    spec = Spectrogram(path, 0.0, 60.0e-6, overlap_shift_factor= 7/8, form='db')
+    path = "../dig/new/WHITE_CH2_SHOT/seg00.dig"
+    spec = Spectrogram(path, 0.0, 60.0e-6, overlap_shift_factor= 1/8, form='db')
 
     span = 200
     # gives user the option to click, by default it searches from (0,0)

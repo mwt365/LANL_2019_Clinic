@@ -92,9 +92,7 @@ def make_spectrogram_color_map(spectrogram, number_of_bands, name):
 
 
 if __name__ == '__main__':
-    from digfile import DigFile
-    df = DigFile('../dig/GEN3CH_4_009.dig')
-    sg = Spectrogram(df)
+    sg = Spectrogram('../dig/GEN3CH_4_009.dig')
     roids = make_spectrogram_color_map(sg, 4, "Kitty")
 
 
