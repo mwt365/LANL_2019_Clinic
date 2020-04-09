@@ -7,7 +7,6 @@
   Purpose: Attempt to match templates in a user specified area.
   Created: 2/16/20
 """
-
 import cv2
 import numpy as np
 from baselines import baselines_by_squash
@@ -21,12 +20,6 @@ else:
 from matplotlib import pyplot as plt
 from matplotlib.patches import Rectangle
 from sklearn_extra.cluster import KMedoids
-
-
-#TODO Mask baselines before expanding the searchable region
-#TODO Find a way to make a sorted list of coordinates from the image
-
-#TODO 'Genetic' algorithm for finding templates (Not doing yet)
 
 
 class TemplateMatcher():
@@ -213,18 +206,11 @@ class TemplateMatcher():
                 xcoords.append(time_total)
                 ycoords.append(true_velo)
 
-            # cv2.rectangle(img, top_left, bottom_right, 255, thickness=1)
-            # plt.subplot(121),plt.imshow(res,cmap = 'gray')
-            # plt.title('Matching Result'), plt.xticks([]), plt.yticks([])
-            # plt.subplot(122),plt.imshow(img,cmap = 'gray')
-            # plt.title('Detected Point'), plt.xticks([]), plt.yticks([])
-            # plt.suptitle(meth)
-            # plt.show()
-
         return xcoords, ycoords, scores, methodUsed
 
 
-    def find_kmedoids(self, xcoords, ycoords, clusters=4, random_state=0):
+
+    def find_kmedoids(self, xcoords, ycoords, clusters=5, random_state=0):
         assert(len(xcoords) == len(ycoords))
         X = np.zeros( (len(xcoords), 2) )
         for i in range(len(xcoords)):
@@ -236,6 +222,7 @@ class TemplateMatcher():
         return cluster_centers
 
 
+
     def mask_baselines(self):
         peaks, _, _ = baselines_by_squash(self.spectrogram)
         for peak in peaks:
@@ -245,8 +232,11 @@ class TemplateMatcher():
                 self.spectrogram.intensity[i][:] = 0
 
 
+
 if __name__ == "__main__":
     """
+    known pattern/file pairs that yield good points
+
     WHITE_CH1_SHOT/seg00.dig -- opencv_long_start_pattern4 span=200 
     WHITE_CH2_SHOT/seg00.dig -- opencv_long_start_pattern4 span=200 
     WHITE_CH3_SHOT/seg00.dig -- opencv_long_start_pattern4 span=200 
@@ -260,10 +250,9 @@ if __name__ == "__main__":
     CH_3_009/seg00.dig -- opencv_long_start_pattern2 span=200
     CH_4_009/seg01.dig -- opencv_long_start_pattern2 span=200
     CH_4_009/seg02.dig -- opencv_long_start_pattern4 span=200
-
     """
-    path = "../dig/new/WHITE_CH2_SHOT/seg00.dig"
-    spec = Spectrogram(path, 0.0, 60.0e-6, overlap_shift_factor= 1/8, form='db')
+    path = "../dig/CH_4_009/seg00.dig"
+    spec = Spectrogram(path, 0.0, 60.0e-6, overlap_shift_factor= 7/8, form='db')
 
     span = 200
     # gives user the option to click, by default it searches from (0,0)
