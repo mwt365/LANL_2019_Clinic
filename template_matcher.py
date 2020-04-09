@@ -214,7 +214,7 @@ class TemplateMatcher():
         assert(len(xcoords) == len(ycoords))
         X = np.zeros( (len(xcoords), 2) )
         for i in range(len(xcoords)):
-            X[i] = [times[i], velos[i]]
+            X[i] = [xcoords[i], ycoords[i]]
         kmedoids = KMedoids(n_clusters=clusters, random_state=random_state).fit(X)
         cluster_centers = []
         for t,v in kmedoids.cluster_centers_:

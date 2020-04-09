@@ -268,18 +268,31 @@ def find_start_points(pipe: PNSPipe, **kwargs):
     """
     from template_matcher import TemplateMatcher
     from ImageProcessing.Templates.templates import opencv_long_start_pattern5 as pattern
-    template_matcher = TemplateMatcher(pipe.spectrogram, None, pattern, span=200, k=1)
+    template_matcher = TemplateMatcher(pipe.spectrogram, None, pattern, span=200, k=30)
     times, velos, scores, methodUsed = template_matcher.match()
-    methods = ['CCOEFF_NORMED', 'SQDIFF       ', 'SQDIFF_NORMED']
-
+    centers = template_matcher.find_kmedoids(times, velos, clusters=5)
     # list the arguments we use in the log
-    for i in range(len(times)):
-        name = methods[methodUsed[i]]
-        time = times[i]
-        velo = velos[i]
-        # print(time)
-        # print(velo)
-        pipe.log(f"+ {name} --> {time:.5f} \u03bcs, {velo:.3f} m/s")
+    for i,(t,v) in enumerate(centers):
+        pipe.log(f"+ Center number {i} --> {t:.5f} \u03bcs, {v:.3f} m/s")
+
+
+def find_start_points_no_baselines(pipe: PNSPipe, **kwargs):
+    """
+    Find jumpoff points for pipe.spectrogram using the
+    template matching with opencv. Specify the type of template 
+    to use, or use a list of them. This method floors all possible 
+    baselines or echoes within a certain percentage of the max
+    signal.
+    """
+    from template_matcher import TemplateMatcher
+    from ImageProcessing.Templates.templates import opencv_long_start_pattern5 as pattern
+    template_matcher = TemplateMatcher(pipe.spectrogram, None, pattern, span=200, k=30)
+    template_matcher.mask_baselines()
+    times, velos, scores, methodUsed = template_matcher.match()
+    centers = template_matcher.find_kmedoids(times, velos, clusters=5)
+    # list the arguments we use in the log
+    for i,(t,v) in enumerate(centers):
+        pipe.log(f"+ Center number {i} --> {t:.5f} \u03bcs, {v:.3f} m/s")
 
 
 
