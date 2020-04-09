@@ -11,10 +11,13 @@
 import cv2
 import numpy as np
 from baselines import baselines_by_squash
-from template_matching import Template
 from spectrogram import Spectrogram
 from ImageProcessing.Templates.templates import *
-from scipy.misc import imsave
+import scipy
+if scipy.__version__ > "1.2.1":
+    from imageio import imsave
+else:
+    from scipy.misc import imsave
 from matplotlib import pyplot as plt
 from matplotlib.patches import Rectangle
 
@@ -240,7 +243,7 @@ if __name__ == "__main__":
 
     """
 
-    path = "/Users/trevorwalker/Desktop/Clinic/dig/new/WHITE_CH2_SHOT/seg00.dig"
+    path = "../dig/new/WHITE_CH2_SHOT/seg00.dig"
     spec = Spectrogram(path, 0.0, 60.0e-6, overlap_shift_factor= 1/8, form='db')
 
     # masks the baselines to avoid matching with saturated signals and echoes
