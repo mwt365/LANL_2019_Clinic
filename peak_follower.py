@@ -60,6 +60,8 @@ class PeakFollower(Follower):
         Repeatedly call step until it fails.
         """
         print(f"The span size is {self.span}")
+        print("The list of my times",self.results['times'])
+        print("The list of my velocities", self.results['velocities'])
         while self.step():
             pass
 
