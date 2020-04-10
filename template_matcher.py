@@ -11,7 +11,9 @@ import cv2
 import numpy as np
 from baselines import baselines_by_squash
 from spectrogram import Spectrogram
-from ImageProcessing.Templates.templates import *
+import ImageProcessing.Templates.saveTemplateImages as templateHelper
+import os
+from ImageProcessing.Templates.templates import Templates
 import scipy
 if scipy.__version__ > "1.2.1":
     from imageio import imsave
@@ -19,8 +21,7 @@ else:
     from scipy.misc import imsave
 from matplotlib import pyplot as plt
 from matplotlib.patches import Rectangle
-from sklearn_extra.cluster import KMedoids
-
+# from sklearn_extra.cluster import KMedoids
 
 class TemplateMatcher():
     """
@@ -131,7 +132,7 @@ class TemplateMatcher():
 
 
 
-    def match(self):
+    def match(self, methods = ['cv2.TM_CCOEFF', 'cv2.TM_CCOEFF_NORMED', 'cv2.TM_CCORR', 'cv2.TM_CCORR_NORMED', 'cv2.TM_SQDIFF', 'cv2.TM_SQDIFF_NORMED']):
 
         matrix = self.spectrogram.intensity
         cropped_spectrogram = self.crop_intensities(matrix)
@@ -151,7 +152,7 @@ class TemplateMatcher():
 
         # methods = ['cv2.TM_CCOEFF_NORMED', 'cv2.TM_SQDIFF', 'cv2.TM_SQDIFF_NORMED']
 
-        methods = ['cv2.TM_SQDIFF', 'cv2.TM_SQDIFF_NORMED']  # the 'best' method for matching
+        # methods = ['cv2.TM_SQDIFF', 'cv2.TM_SQDIFF_NORMED']  # the 'best' method for matching
 
         xcoords = []
         ycoords = []
@@ -209,6 +210,91 @@ class TemplateMatcher():
         return xcoords, ycoords, scores, methodUsed
 
 
+    def matchMultipleTemplates(self, methods = ['cv2.TM_CCOEFF', 'cv2.TM_CCOEFF_NORMED', 'cv2.TM_CCORR', 'cv2.TM_CCORR_NORMED', 'cv2.TM_SQDIFF', 'cv2.TM_SQDIFF_NORMED'], templatesList: list = None):
+        """
+            Enable the use of multiple templates in testing.
+        """
+        if templatesList == None:
+            return self.match(methods=methods)
+
+        else:
+            # Load all the templates once. Then call all the matches from there.
+
+            matrix = self.spectrogram.intensity
+            cropped_spectrogram = self.crop_intensities(matrix)
+
+            imsave("./im_cropped_bg.png", cropped_spectrogram[:])
+
+            img = cv2.imread('./im_cropped_bg.png', 0)
+            img2 = img.copy()
+
+            outputValues = [[] for i in range(len(templatesList))]
+            imageSaveDir = templateHelper.getImageDirectory()
+
+            for tempInd, temp in enumerate(templatesList):
+                template = cv2.imread(os.path.join(imageSaveDir, f"im_template_{temp}.png"), 0)
+
+                self.template_time_offset_index, self.template_velo_offset_index = temp.value[1:]
+
+
+                w, h = template.shape[::-1]
+
+                xcoords = []
+                ycoords = []
+                scores = []
+                methodUsed = []
+
+                for meth_i, meth in enumerate(methods):
+                    img = img2.copy()
+                    method = eval(meth)
+
+                    # Apply template Matching
+                    res = cv2.matchTemplate(img, template, method)
+                    min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(res)
+
+                    #get all the matches:
+                    result2 = np.reshape(res, res.shape[0]*res.shape[1])
+                    sort = np.argsort(result2)
+
+                    best_k = []
+
+                    for i in range(self.k):
+                        best_k.append(np.unravel_index(sort[i], res.shape)[::-1])
+
+                    for point in best_k:
+
+                        methodUsed.append(meth_i)
+
+                        # If the method is TM_SQDIFF or TM_SQDIFF_NORMED, take minimum
+                        if method in [cv2.TM_SQDIFF, cv2.TM_SQDIFF_NORMED]:
+                            top_left = point
+                            scores.append(min_val)
+                        else:
+                            top_left = point
+                            scores.append(max_val)
+
+                        bottom_right = (top_left[0] + w, top_left[1] + h)
+
+                        velo_offset_index = self.template_velo_offset_index
+                        time_offset_index = self.template_time_offset_index
+
+                        real_velo_index = abs(self.flipped_velo_bounds[0] + bottom_right[1]) + velo_offset_index
+
+                        time_match = self.spectrogram.time[top_left[0]] * 1e6
+                        template_offset_time = self.spectrogram.time[time_offset_index] * 1e6
+                        start_time = self.spectrogram.time[self.zero_time_index] * 1e6 * -1
+                        time_offset = abs(self.spectrogram.time[self.time_bounds[0]] * 1e6)
+
+                        time_total = time_match + template_offset_time + start_time + time_offset
+
+                        true_velo = self.spectrogram.velocity[real_velo_index]
+
+                        xcoords.append(time_total)
+                        ycoords.append(true_velo)
+
+                outputValues[tempInd] = tuple([xcoords, ycoords, scores, methodUsed])
+        
+        return outputValues
 
     def find_kmedoids(self, xcoords, ycoords, clusters=5, random_state=0):
         assert(len(xcoords) == len(ycoords))
@@ -256,7 +342,7 @@ if __name__ == "__main__":
 
     span = 200
     # gives user the option to click, by default it searches from (0,0)
-    template_matcher = TemplateMatcher(spec, None, template=opencv_long_start_pattern5, span=span, k=20)
+    template_matcher = TemplateMatcher(spec, None, template=Templates.opencv_long_start_pattern5, span=span, k=20)
     
     # # masks the baselines to avoid matching with saturated signals and echoes
     # template_matcher.mask_baselines()
