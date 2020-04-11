@@ -158,6 +158,7 @@ class TemplateMatcher():
         ycoords = []
         scores = []
         methodUsed = []
+        print(methods)
 
         for meth_i, meth in enumerate(methods):
             img = img2.copy()
@@ -337,12 +338,12 @@ if __name__ == "__main__":
     CH_4_009/seg01.dig -- opencv_long_start_pattern2 span=200
     CH_4_009/seg02.dig -- opencv_long_start_pattern4 span=200
     """
-    path = "../dig/CH_4_009/seg00.dig"
+    path = "../dig/new/CH_4_009/seg00.dig"
     spec = Spectrogram(path, 0.0, 60.0e-6, overlap_shift_factor= 7/8, form='db')
 
     span = 200
     # gives user the option to click, by default it searches from (0,0)
-    template_matcher = TemplateMatcher(spec, None, template=Templates.opencv_long_start_pattern5, span=span, k=20)
+    template_matcher = TemplateMatcher(spec, None, template=Templates.opencv_long_start_pattern5.value, span=span, k=20)
     
     # # masks the baselines to avoid matching with saturated signals and echoes
     # template_matcher.mask_baselines()
