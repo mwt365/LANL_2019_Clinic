@@ -15,7 +15,7 @@ from scipy import signal
 from ProcessingAlgorithms.preprocess.digfile import DigFile
 from plotter import COLORMAPS
 
-DEFMAP = 'blue-orange-div'
+DEFMAP = '3w_gby'
 
 class Spectrogram:
     """
@@ -213,6 +213,7 @@ class Spectrogram:
 
         # Now compute the probe destruction time.
         self.probeDestructionTime()
+        self.estimateStartTime()
 
     def transform(self, vals):
         """
@@ -433,6 +434,15 @@ class Spectrogram:
 
         self.probe_destruction_time_max = self.time[self.probe_destruction_index_max]
 
+    def estimateStartTime(self):
+        """
+        Compute an approximate value for the jump off time based upon the change in 
+        the baseline intensity.
+        """
+        import baselineTracking
+        peaks, _, _ = baselineTracking.baselines.baselines_by_squash(self)
+        self.estimatedStartTime_ = baselineTracking.baselineTracking(self, peaks[0], 0.024761904761904763)
+
     def plotHist(self, fig = None, minFrac=0.0, maxFrac = 1.0, numBins = 1001, **kwargs):
         if fig == None:
             fig = plt.figure()
@@ -453,7 +463,7 @@ class Spectrogram:
 
     def plot(self, transformData = False, **kwargs):
         # max_vel=6000, vmin=-200, vmax=100):
-        pcms = {data: 0 for data in self.availableData}
+        pcms = {}
         if "psd" in self.availableData:
             self.availableData.append("intensity")
         if "complex" in self.availableData:
@@ -517,6 +527,10 @@ class Spectrogram:
                     self.transform(zData[:,:endTime]) if (data != "intensity" and transformData) else zData[:,:endTime],
                     **kwargs)
 
+            # Plot the start time estimate.
+            axes.plot([self.estimatedStartTime_]*len(self.velocity), self.velocity, "k-", label = "Estimated Start Time", alpha = 0.75)
+            plt.legend()
+            
             print(f"The current maximum of the colorbar is {np.max(zData[:,:endTime])} for the dataset {data}")
             plt.gcf().colorbar(pcm, ax=axes)
             axes.set_ylabel('Velocity (m/s)', fontsize = 18)
