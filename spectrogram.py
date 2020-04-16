@@ -34,12 +34,12 @@ class Spectrogram:
              representing the number of points to use; if None, the final
              point in the digfile is used.
     wavelength: (1550.0e-9) the wavelength in meters
-    points_per_spectrum: (8192) the number of values used to generate
+    points_per_spectrum: (4096) the number of values used to generate
         each spectrum. Should be a power of 2.
-    overlap: (1/4) the fraction of points_per_spectrum to overlap in
+    overlap: (7/8) the fraction of points_per_spectrum to overlap in
         successive spectra. An overlap of 0 means that each sample is used
         in only one spectrum. The default value means that successive
-        spectra share 1/4 of their source samples.
+        spectra share 7/8 of their source samples.
     window_function: (None) the window function used by signal.spectrogram.
         The default value implies a ('tukey', 0.25) window.
     form: ('db') whether to use power values ('power'), decibels ('db'),
@@ -121,7 +121,7 @@ class Spectrogram:
 
         # deal with kwargs
 
-        self.computeMode = "psd"  # This stands for power spectrum density.
+        self.computeMode = "psd"  # This stands for power spectral density.
         if "mode" in kwargs:
             available = ["psd", "complex", "magnitude", "angle", "phase"]
             desired = kwargs["mode"]
@@ -473,6 +473,10 @@ class Spectrogram:
         if 'min_vel' in kwargs:
             axes.set_ylim(bot=kwargs['min_vel'])
             del kwargs['min_vel']
+        if 'title' in kwargs:
+            title = kwargs.pop('title')
+        else:
+            title = self.data.title
 
         pcm = axes.pcolormesh(
             self.time * 1e6,
@@ -483,25 +487,75 @@ class Spectrogram:
         plt.gcf().colorbar(pcm, ax=axes)
         axes.set_ylabel('Velocity (m/s)')
         axes.set_xlabel('Time ($\mu$s)')
-        title = self.data.filename.split('/')[-1]
-        axes.set_title(title.replace("_", "\\_"))
+        if title:
+            axes.set_title(title, usetex=False)
         return pcm
+
+    def save_fig(self, **kwargs):
+        """
+        Prepare a plot and save the figure in appropriate
+        size.
+
+        Interesting possible keyword arguments:
+
+            - filename (default is data.title)
+            - folder (default is dig/../figs)
+            - min_vel and max_vel
+            - title (string)
+            - extension (.jpg)
+        """
+        from plotter import COLORMAPS
+
+        if 'folder' in kwargs:
+            folder = kwargs.pop('folder')
+        else:
+            folder = os.path.join(os.path.split(
+                DigFile.dig_dir())[0], 'figs')
+
+        filename = kwargs.pop(
+            'filename') if 'filename' in kwargs else self.data.title
+        filename = filename.replace('/', '-')
+        extension = kwargs.pop(
+            'extension') if 'extension' in kwargs else '.jpg'
+        cmap = COLORMAPS[kwargs.pop(
+            'cmap') if 'cmap' in kwargs else '3w_gby']
+
+        # Attempt to set the color_range
+        if 'color_range' in kwargs:
+            color_range = kwargs.pop('color_range')
+        else:
+            # use the 90th percentile to set the floor
+            bottom = self.transform(self.histogram_levels['ones'][0])
+            top = bottom + 40
+            color_range = (bottom, top)
+
+        fig, axes = plt.subplots(figsize=(6, 4.5))
+        image = self.plot(axes, cmap=cmap, **kwargs)
+        image.set_clim(color_range)
+        where = os.path.join(folder, filename + extension)
+        fig.savefig(where)
+        print(f"Saved {where}")
 
 
 if __name__ == '__main__':
-    sp = Spectrogram(
-        '../dig/GEN3CH_4_009/seg10',
-        None,
-        None,
-        mode=('psd', 'phase', 'angle'))
-    print(sp)
-    fig, ax = plt.subplots()
-    pcm = ax.pcolormesh(
-        sp.time * 1e6,
-        sp.velocity,
-        sp.angle
-    )
-    fig.colorbar(pcm, ax=ax)
-    ax.set_ylabel('Velocity (m/s)')
-    ax.set_xlabel('Time ($\mu$s)')
-    plt.show()
+    os.chdir(DigFile.dig_dir())
+    df = DigFile('GEN3CH_4_009/seg00')
+    sp = Spectrogram(df, ending=35.0e-6)
+    sp.save_fig(max_vel=6000, color_range=(10, 50))
+    if False:
+        sp = Spectrogram(
+            '../dig/GEN3CH_4_009/seg10',
+            None,
+            None,
+            mode=('psd', 'phase', 'angle'))
+        print(sp)
+        fig, ax = plt.subplots()
+        pcm = ax.pcolormesh(
+            sp.time * 1e6,
+            sp.velocity,
+            sp.angle
+        )
+        fig.colorbar(pcm, ax=ax)
+        ax.set_ylabel('Velocity (m/s)')
+        ax.set_xlabel('Time ($\mu$s)')
+        plt.show()

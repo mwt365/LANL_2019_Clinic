@@ -12,7 +12,6 @@ import sys
 import re
 import numpy as np
 import pandas as pd
-from scipy.optimize import curve_fit
 
 
 class DigFile:
@@ -118,6 +117,7 @@ class DigFile:
         head, file = os.path.split(self.path)
         file_or_seg = os.path.splitext(file)[0]  # discard the extension
         if self.is_segment:
+            # parent/segNN
             file_or_seg = os.path.join(os.path.split(head)[1], file_or_seg)
         return file_or_seg.replace("_", "-")
 

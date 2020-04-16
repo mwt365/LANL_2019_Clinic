@@ -40,7 +40,7 @@ class Fiducials:
 
     It is then refined by attempting to fit a hyperbolic
     tangent function to the sudden drop at the start of the timing
-    fiducial in the raw data, and another to the rise at the end. 
+    fiducial in the raw data, and another to the rise at the end.
 
     On success, the values are added to a pandas DataFrame with
     columns defined by Fiducials._columns (see below the comment).
@@ -126,7 +126,7 @@ class Fiducials:
         Look for a fiducial notch starting at t_from (s) over a temporal
         range of width dt (s). Start by preparing a smoothed version,
         using self.average_over to define how many consecutive values are combined
-        to produce the smoothed representation. Then 
+        to produce the smoothed representation. Then
         """
         self.smooth(t_from, dt)
         diff = self.diff
@@ -257,13 +257,16 @@ class Fiducials:
             self.marks.iloc[0]['t_start']
         t = self.marks.iloc[1]['t_start']
         last_time = self.digfile.t_final - self.window
-        while t < last_time:
-            t += 0.99 * spacing
-            self.find_fiducial(t, 0.02 * spacing)
-            if self.width_test and self.snr_test:
-                t = self.t_fiducial
-            else:
-                t += 0.01 * spacing
+        try:
+            while t < last_time:
+                t += 0.99 * spacing
+                self.find_fiducial(t, 0.02 * spacing)
+                if self.width_test and self.snr_test:
+                    t = self.t_fiducial
+                else:
+                    t += 0.01 * spacing
+        except Exception as eeps:
+            print(eeps)
 
     def split(self, basename=""):
         """
@@ -303,18 +306,18 @@ class Fiducials:
                 t_stop = df.t_final
             heading = OrderedDict(
                 Segment=n,
-                n_start = n_start,
-                t_start = f"{t_start:.6e}",
+                n_start=n_start,
+                t_start=f"{t_start:.6e}",
                 t_stop=f"{t_stop:.6e}",
-                date = the_date,
-                header = "\r\n" + text,
+                date=the_date,
+                header="\r\n" + text,
             )
 
             vals = df.raw_values(t_start, t_stop)
             name = f"{basename}{n:02d}.dig"
             save_as_dig(os.path.join(folder, name),
                         vals, df.data_format,
-                        top_header=heading, date = the_date, **kwargs)
+                        top_header=heading, date=the_date, **kwargs)
         return f"{len(times)} files written in {folder}"
 
 

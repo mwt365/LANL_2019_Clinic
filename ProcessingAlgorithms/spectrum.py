@@ -52,8 +52,8 @@ class Spectrum:
     @property
     def db(self):
         if hasattr(self, 'epsilon'):
-            return 20.0 * np.log10(self._power + self.epsilon)
-        return 20.0 * np.log10(self._power)
+            return 10.0 * np.log10(self._power + self.epsilon)
+        return 10.0 * np.log10(self._power)
 
     def plot(self, use_db=True, against_v=True):
         x = (self.velocities,

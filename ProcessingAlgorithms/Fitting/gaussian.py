@@ -140,7 +140,7 @@ class Gaussian:
             return False
 
         if np.inf in covar or np.nan in covar:
-            self.error = 'infinity or nan in cavariance matrix'
+            self.error = 'infinity or nan in covariance matrix'
             return False
         diag = np.diag(covar)
         try:

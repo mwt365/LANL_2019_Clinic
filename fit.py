@@ -13,6 +13,7 @@ import inspect
 from scipy.optimize import curve_fit, OptimizeWarning
 from ProcessingAlgorithms.Fitting.moving_average import moving_average
 import matplotlib.pyplot as plt
+from scipy.stats import chi2
 
 
 class Fit:
@@ -39,6 +40,10 @@ class Fit:
         self.sigma = None
         self.hold = kwargs.get("hold")
         self.dof = len(x) - len(p0)  # assumes nothing held
+        # tex representation of variables
+        self.tex_labels = kwargs.get('tex')
+        self.chisq = None
+        self.prob_greater = None
 
         try:
 
@@ -86,6 +91,7 @@ class Fit:
                     self.chisq = np.sum(
                         self.norm_residuals ** 2)
                     self.reduced_chisq = self.chisq / self.dof
+                    self.prob_greater = 1 - chi2.cdf(self.chisq, self.dof)
                 errs = np.sqrt(np.diag(self.covars))
                 if self.hold:
                     self.errors = np.zeros(self.params.size)
@@ -136,26 +142,78 @@ class Fit:
         print("Ack! for " + x)
         return x
 
+    def tex_val_unc(self, x, dx):
+        """
+        Produce a LaTeX representation of the value and its uncertainty
+        """
+
+        try:
+            xdigits = int(np.log10(abs(x)))
+            dxdigits = int(np.log10(dx))
+            digits = 2 + xdigits - dxdigits
+            round_spot = -xdigits + digits
+            xround = round(x, round_spot)
+            dxround = round(dx, round_spot)
+
+            ratio = dx / abs(x)  # this will fail if dx is 0
+            # digits = 2 + int(np.round(np.log10(ratio), 2))
+            fmt = "{:0." + str(digits) + "g}"
+            main = self.texval(fmt.format(xround))
+            # To get the right number of digits, we need to
+            # figure out the place of the LSD of x
+            unc = self.texval(f"{dxround:.2g}")
+            if ratio > 1:
+                rel = f"{ratio:.2f}"
+            else:
+                rel = f"{100*ratio:.1f}"
+                rel += "\\%"
+            return (main, unc, rel)
+        except Exception as eeps:
+            print(eeps)
+            return ("a", "b", "c")
+
     def tex(self):
-        name = self._f.__name__
-        args = inspect.getfullargspec(self._f)
-        argnames = args.args[1:]
+        name = self._f.tex if hasattr(self._f, 'tex') else self._f.__name__
+        if self.tex_labels:
+            argnames = self.tex_labels
+        else:
+            args = inspect.getfullargspec(self._f)
+            argnames = args.args[1:]
         lines = [name, ]
+        TABLE = False
 
         has_unc = isinstance(self.sigma, np.ndarray)
         if self.valid:
+            if TABLE:
+                lines.append(r"\begin{tabular}{ccc}")
+                lines.append(
+                    r"\textbf{Param} & \textbf{Value} & \textbf{Unc.} & \textbf{Rel. Unc.} \\")
             for n in range(len(self.params)):
-                lines.append(f"{argnames[n]:>16s} = $")
-                lines[-1] += self.texval(f"{self.params[n]:^8.4g}")
-                if has_unc:
-                    lines[-1] += "\\pm" + self.texval(f" {self.errors[n]:.2g}")
-                    if self.errors[n] > 0:
-                        lines[-1] += f" ({abs(self.errors[n]/self.params[n])*100:.2g}\\%)"
-                lines[-1] += "$"
+                if TABLE:
+                    lines.append(argnames[n] + " & ")
+                    lines.append(" & ".join(
+                        self.tex_val_unc(self.params[n], self.errors[n])) +
+                        r" \\")
+
+                else:
+                    lines.append(f"{argnames[n]:>16s} = $")
+                    v, u, r = self.tex_val_unc(
+                        self.params[n], self.errors[n])
+                    vals = "{0} \\pm {1}\\; ({2})$".format(v, u, r)
+                    lines[-1] += vals
+                    # lines[-1] += self.texval(f"{self.params[n]:^8.4g}")
+                    # if has_unc:
+                    #    lines[-1] += "\\pm" + self.texval(f" {self.errors[n]:.2g}")
+                    # if self.errors[n] > 0:
+                    #    lines[-1] += f" ({abs(self.errors[n]/self.params[n])*100:.2g}\\%)"
+                    # lines[-1] += "$"
+            if TABLE:
+                lines.append(r"\end{tabular}")
             if has_unc:
                 lines.append(r"$N_{\rm dof} = " + self.texval(f"{self.dof}") + ", ")
                 lines[-1] += r"\chi^2 = " + self.texval(f"{self.chisq:.3g}")
-                lines[-1] += f" ({self.reduced_chisq:.3g})$"
+                lines[-1] += r"\; " + f" ({self.reduced_chisq:.3g})$"
+                lines.append(r"$P_> = " + f"{100*self.prob_greater:.1f}" + "\%$")
         else:
             lines.append(self.error)
         return "\n".join(lines)
@@ -177,6 +235,7 @@ class Fit:
 
         """
         residuals, normalized_residuals = False, False
+        title = kwargs.get('title', '')
         if self.valid:
             # See if we should plot residuals
             residuals = kwargs.get('residuals', True)
@@ -187,7 +246,7 @@ class Fit:
             width_ratios=[1],
             height_ratios=[1],
             hspace=0.05,
-            left=0.075,
+            left=0.125,
             right=0.975
         )
         if num_axes == 2:
@@ -196,7 +255,10 @@ class Fit:
             gspec['height_ratios'] = [1, 1, 4]
         fig, axes = plt.subplots(
             nrows=num_axes, ncols=1,
-            sharex=True, gridspec_kw=gspec)
+            sharex=True, gridspec_kw=gspec,
+            figsize=kwargs.get('figsize')
+        )
+        self.fig = fig
         if residuals:
             residuals = axes[0]
             if normalized_residuals:
@@ -205,8 +267,10 @@ class Fit:
             normalized_residuals = axes[0]
         if num_axes == 1:
             main = axes
+            main.set_title(title)
         else:
             main = axes[-1]
+            axes[0].set_title(title)
 
         # Plot the data first, except lay down the fit curve
         # first
@@ -216,14 +280,19 @@ class Fit:
         xmax = kwargs.get('xmax', np.max(self.x))
         ymin = kwargs.get('ymin', np.min(self.y))
         ymax = kwargs.get('ymax', np.max(self.y))
+        xfit, yfit = kwargs.get('xfit'), kwargs.get('yfit')
         npoints = kwargs.get('npoints', 200)
         if logx:
             main.set_xscale('log', nonposx='clip')
-            xfit = np.power(10, np.linspace
-                            (np.log10(xmin), np.log10(xmax), npoints))
-        else:
+            if not isinstance(xfit, np.ndarray):
+                xfit = np.power(
+                    10, np.linspace(
+                        np.log10(xmin),
+                        np.log10(xmax), npoints))
+        elif not isinstance(xfit, np.ndarray):
             xfit = np.linspace(xmin, xmax, npoints)
-        yfit = self.__call__(xfit)
+        if not yfit:
+            yfit = self.__call__(xfit)
 
         if logy:
             main.set_yscale('log', nonposy='clip')
@@ -242,6 +311,10 @@ class Fit:
         main.text(xpos, ypos, self.tex(),
                   horizontalalignment=halign,
                   verticalalignment=valign)
+        if 'xlabel' in kwargs:
+            main.set_xlabel(kwargs['xlabel'])
+        if 'ylabel' in kwargs:
+            main.set_ylabel(kwargs['ylabel'])
 
         if residuals:
             if logx:
@@ -255,9 +328,25 @@ class Fit:
         if normalized_residuals:
             if logx:
                 normalized_residuals.set_xscale('log', nonposx='clip')
+            # Compute colors
             normalized_residuals.plot([xmin, xmax], [0, 0], 'k-', alpha=0.5)
-            normalized_residuals.plot(self.x, self.norm_residuals, '.')
+            colors = self.norm_res_colors
+            normalized_residuals.scatter(
+                self.x, self.norm_residuals,
+                s=7**2, marker='o', c=colors)
             normalized_residuals.set_ylabel('N.R.')
+
+    @property
+    def norm_res_colors(self):
+        sigmas = np.asarray(np.abs(self.norm_residuals), dtype=np.uint16)
+        sigmas[sigmas > 3] = 3
+        alpha = 0.75
+        colormap = [
+            (0, 0.7, 0, alpha),
+            (0.9, 0.9, 0, alpha),
+            (1.0, 0.7, 0, alpha),
+            (1, 0, 0, alpha)]
+        return np.array([colormap[x] for x in sigmas])
 
 
 if __name__ == '__main__':

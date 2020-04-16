@@ -123,9 +123,11 @@ class SpectrogramWidget:
         self.baselines = []
 
         # Compute the base spectrogram (do we really need this?)
+        self.spectrogram = None
         if self.dig:
             self.spectrogram = Spectrogram(
                 self.digfile, None, None, **kwargs)
+            self.spectrogram_fresh = True  # flag for the first pass
 
         self.fig, axes = plt.subplots(
             nrows=1, ncols=2, sharey=True,
@@ -434,7 +436,10 @@ class SpectrogramWidget:
         we need to recompute everything.
         """
         if self.dig:
-            self.spectrogram.set(**kwargs)
+            if self.spectrogram_fresh:
+                self.spectrogram_fresh = False
+            else:
+                self.spectrogram.set(**kwargs)
         self.update_spectrogram()
 
     def update_spectrogram(self):
@@ -861,6 +866,15 @@ class SpectrogramWidget:
         ax.set_xlabel(r"$t$ ($\mu$ s)")
         ax.set_ylabel(r"Power")
 
+    def Spectrum(self, the_time: float):
+        """
+        Return the column from the spectrogram in power form
+        """
+        sg = self.spectrogram
+        t_index = sg._time_to_index(the_time)
+        vals = sg.intensity[:, t_index]
+        return sg.power(vals)
+
     def spectrum(self, the_time: float, form: str):
         """
         Display a spectrum in the left axes corresponding to the
@@ -873,27 +887,31 @@ class SpectrogramWidget:
             self.axSpectrum.grid(axis='x', which='both',
                                  color='b', alpha=0.4)
         else:
-            delta_t = self.spectrogram.points_per_spectrum / 2 * \
-                self.digfile.dt
-            the_spectrum = Spectrum(
-                self.digfile.values(the_time - delta_t,
-                                    the_time + delta_t),
-                self.digfile.dt,
-                remove_dc=True)
-            # compute the level of the 90th percentile
-            spec = dict(spectrum=the_spectrum)
-            vals = the_spectrum.db
-            ordering = np.argsort(vals)
-            if self.baselines:
-                blines = [x['v'] for x in self.baselines]
-                n = -1
-                while the_spectrum.velocities[ordering[n]] in blines:
-                    n -= 1
+            if True:
+                delta_t = self.spectrogram.points_per_spectrum / 2 * \
+                    self.digfile.dt
+                the_spectrum = Spectrum(
+                    self.digfile.values(the_time - delta_t,
+                                        the_time + delta_t),
+                    self.digfile.dt,
+                    remove_dc=True)
+                # compute the level of the 90th percentile
+                spec = dict(spectrum=the_spectrum)
+                vals = the_spectrum.db
+                ordering = np.argsort(vals)
+                if self.baselines:
+                    blines = [x['v'] for x in self.baselines]
+                    n = -1
+                    while the_spectrum.velocities[ordering[n]] in blines:
+                        n -= 1
+                else:
+                    n = -1
+                spec['max'] = vals[ordering[n]]
+                noise_floor = int(n - 0.1 * len(vals))
+                spec['90'] = vals[ordering[noise_floor]]
             else:
-                n = -1
-            spec['max'] = vals[ordering[n]]
-            noise_floor = int(n - 0.1 * len(vals))
-            spec['90'] = vals[ordering[noise_floor]]
+                t_index = self.spectrogram._time_to_index(the_time)
+                vals = self.spectrogram.intensity[:, t_index]
 
             # We need to worry about the format of the spectrum
             db = ('dB' in form)

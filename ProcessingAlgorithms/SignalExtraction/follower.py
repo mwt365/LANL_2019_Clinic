@@ -257,7 +257,7 @@ class Follower:
 
     def hood(self, **kwargs):
         """
-        Return a FollowerHood describing the data and results at
+        Return a FollowHood describing the data and results at
         point n of the follower.
         To indicate which hood to return, the possible kwargs are
             n = index of the point in the follower
@@ -295,8 +295,7 @@ class Follower:
         microseconds = np.array(self.results['time']) * 1e6
         return pd.DataFrame(self.results, index=microseconds)
 
-    @property
-    def full_frame(self):
+    def full_frame(self, noise=0):
         """
         Return a pandas DataFrame holding the results of this
         following expedition, with an index of the times
@@ -304,6 +303,7 @@ class Follower:
         information obtained from calling hood on each point.
         """
         df = pd.DataFrame(self.results)
+        self.noise = noise
         hoods = self.neighborhoods
 
         # add columns obtained from the hoods
@@ -315,6 +315,8 @@ class Follower:
         df['g_width'] = [h.gaussian.width for h in hoods]
         df['g_bgnd'] = [h.gaussian.background for h in hoods]
         df['g_int'] = [h.gaussian.amplitude for h in hoods]
+        df['g_chisq'] = [h.gaussian.chisq for h in hoods]
+        df['g_prob'] = [h.gaussian.prob_greater for h in hoods]
         # return the frame with the index set to time in microseconds
         df.index = df['time'] * 1e6
         # Now we need to set the formatting with
@@ -462,7 +464,7 @@ class FollowHood(object):
         """
 
         """
-        from ProcessingAlgorithms.Fitting.gaussian import Gaussian
+        from gaussian import Gaussian
         from ProcessingAlgorithms.Fitting.moments import moment
 
         res = follower.results
@@ -492,20 +494,22 @@ class FollowHood(object):
             x = max(x, 0)
             return min(x, len(self.velocity) - 1)
 
-        hood = 6
+        maxhood = len(self.velocity) // 2
+        hood = min(6, maxhood)
         m = dict(std_dev=np.nan)
-        while np.isnan(m['std_dev']):
+        while np.isnan(m['std_dev']) and hood <= maxhood:
             pfrom, pto = [bound(x + self.v_index - vfrom)
                           for x in (-hood, hood)]
             m = moment(self.velocity[pfrom:pto], self.intensity[pfrom:pto])
             hood += 4
+
         self.moment = m
 
         # Fit a gaussian
         self.gaussian = Gaussian(
             self.velocity, self.intensity,
             center=self.peak_v,
-            width=self.moment['std_dev']
+            sigma=follower.noise if follower.noise else self.moment['std_dev']
         )
 
     def plot_gaussian(self, ax, **kwargs):
