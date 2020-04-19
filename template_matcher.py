@@ -7,23 +7,21 @@
   Purpose: Attempt to match templates in a user specified area.
   Created: 2/16/20
 """
-
 import cv2
 import numpy as np
 from baselines import baselines_by_squash
-from template_matching import Template
 from spectrogram import Spectrogram
-from ImageProcessing.Templates.templates import *
-from scipy.misc import imsave
+import ImageProcessing.Templates.saveTemplateImages as templateHelper
+import os
+from ImageProcessing.Templates.templates import Templates
+import scipy
+if scipy.__version__ > "1.2.1":
+    from imageio import imsave
+else:
+    from scipy.misc import imsave
 from matplotlib import pyplot as plt
 from matplotlib.patches import Rectangle
-
-
-#TODO Mask baselines before expanding the searchable region
-#TODO Find a way to make a sorted list of coordinates from the image
-
-#TODO 'Genetic' algorithm for finding templates (Not doing yet)
-
+# from sklearn_extra.cluster import KMedoids
 
 class TemplateMatcher():
     """
@@ -134,7 +132,7 @@ class TemplateMatcher():
 
 
 
-    def match(self):
+    def match(self, methods = ['cv2.TM_CCOEFF', 'cv2.TM_CCOEFF_NORMED', 'cv2.TM_CCORR', 'cv2.TM_CCORR_NORMED', 'cv2.TM_SQDIFF', 'cv2.TM_SQDIFF_NORMED']):
 
         matrix = self.spectrogram.intensity
         cropped_spectrogram = self.crop_intensities(matrix)
@@ -148,18 +146,19 @@ class TemplateMatcher():
         template = cv2.imread('./im_template.png', 0)
         w, h = template.shape[::-1]
 
-        # # All the 6 methods for comparison in a list
+        # # All 6 available comparison methods in a list
         # methods = ['cv2.TM_CCOEFF', 'cv2.TM_CCOEFF_NORMED', 'cv2.TM_CCORR',
         #             'cv2.TM_CCORR_NORMED', 'cv2.TM_SQDIFF', 'cv2.TM_SQDIFF_NORMED']
 
-        # methods = ['cv2.TM_SQDIFF_NORMED', 'cv2.TM_CCOEFF_NORMED', 'cv2.TM_SQDIFF'] # the 'best' method for matching
+        # methods = ['cv2.TM_CCOEFF_NORMED', 'cv2.TM_SQDIFF', 'cv2.TM_SQDIFF_NORMED']
 
-        methods = ['cv2.TM_CCOEFF_NORMED', 'cv2.TM_SQDIFF', 'cv2.TM_SQDIFF_NORMED']
+        # methods = ['cv2.TM_SQDIFF', 'cv2.TM_SQDIFF_NORMED']  # the 'best' method for matching
 
         xcoords = []
         ycoords = []
         scores = []
         methodUsed = []
+        print(methods)
 
         for meth_i, meth in enumerate(methods):
             img = img2.copy()
@@ -209,21 +208,122 @@ class TemplateMatcher():
                 xcoords.append(time_total)
                 ycoords.append(true_velo)
 
-            # cv2.rectangle(img, top_left, bottom_right, 255, thickness=1)
-            # plt.subplot(121),plt.imshow(res,cmap = 'gray')
-            # plt.title('Matching Result'), plt.xticks([]), plt.yticks([])
-            # plt.subplot(122),plt.imshow(img,cmap = 'gray')
-            # plt.title('Detected Point'), plt.xticks([]), plt.yticks([])
-            # plt.suptitle(meth)
-            # plt.show()
-
         return xcoords, ycoords, scores, methodUsed
+
+
+    def matchMultipleTemplates(self, methods = ['cv2.TM_CCOEFF', 'cv2.TM_CCOEFF_NORMED', 'cv2.TM_CCORR', 'cv2.TM_CCORR_NORMED', 'cv2.TM_SQDIFF', 'cv2.TM_SQDIFF_NORMED'], templatesList: list = None):
+        """
+            Enable the use of multiple templates in testing.
+        """
+        if templatesList == None:
+            return self.match(methods=methods)
+
+        else:
+            # Load all the templates once. Then call all the matches from there.
+
+            matrix = self.spectrogram.intensity
+            cropped_spectrogram = self.crop_intensities(matrix)
+
+            imsave("./im_cropped_bg.png", cropped_spectrogram[:])
+
+            img = cv2.imread('./im_cropped_bg.png', 0)
+            img2 = img.copy()
+
+            outputValues = [[] for i in range(len(templatesList))]
+            imageSaveDir = templateHelper.getImageDirectory()
+
+            for tempInd, temp in enumerate(templatesList):
+                template = cv2.imread(os.path.join(imageSaveDir, f"im_template_{temp}.png"), 0)
+
+                self.template_time_offset_index, self.template_velo_offset_index = temp.value[1:]
+
+
+                w, h = template.shape[::-1]
+
+                xcoords = []
+                ycoords = []
+                scores = []
+                methodUsed = []
+
+                for meth_i, meth in enumerate(methods):
+                    img = img2.copy()
+                    method = eval(meth)
+
+                    # Apply template Matching
+                    res = cv2.matchTemplate(img, template, method)
+                    min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(res)
+
+                    #get all the matches:
+                    result2 = np.reshape(res, res.shape[0]*res.shape[1])
+                    sort = np.argsort(result2)
+
+                    best_k = []
+
+                    for i in range(self.k):
+                        best_k.append(np.unravel_index(sort[i], res.shape)[::-1])
+
+                    for point in best_k:
+
+                        methodUsed.append(meth_i)
+
+                        # If the method is TM_SQDIFF or TM_SQDIFF_NORMED, take minimum
+                        if method in [cv2.TM_SQDIFF, cv2.TM_SQDIFF_NORMED]:
+                            top_left = point
+                            scores.append(min_val)
+                        else:
+                            top_left = point
+                            scores.append(max_val)
+
+                        bottom_right = (top_left[0] + w, top_left[1] + h)
+
+                        velo_offset_index = self.template_velo_offset_index
+                        time_offset_index = self.template_time_offset_index
+
+                        real_velo_index = abs(self.flipped_velo_bounds[0] + bottom_right[1]) + velo_offset_index
+
+                        time_match = self.spectrogram.time[top_left[0]] * 1e6
+                        template_offset_time = self.spectrogram.time[time_offset_index] * 1e6
+                        start_time = self.spectrogram.time[self.zero_time_index] * 1e6 * -1
+                        time_offset = abs(self.spectrogram.time[self.time_bounds[0]] * 1e6)
+
+                        time_total = time_match + template_offset_time + start_time + time_offset
+
+                        true_velo = self.spectrogram.velocity[real_velo_index]
+
+                        xcoords.append(time_total)
+                        ycoords.append(true_velo)
+
+                outputValues[tempInd] = tuple([xcoords, ycoords, scores, methodUsed])
+        
+        return outputValues
+
+    def find_kmedoids(self, xcoords, ycoords, clusters=5, random_state=0):
+        assert(len(xcoords) == len(ycoords))
+        X = np.zeros( (len(xcoords), 2) )
+        for i in range(len(xcoords)):
+            X[i] = [xcoords[i], ycoords[i]]
+        kmedoids = KMedoids(n_clusters=clusters, random_state=random_state).fit(X)
+        cluster_centers = []
+        for t,v in kmedoids.cluster_centers_:
+            cluster_centers.append((t,v))
+        return cluster_centers
+
+
+
+    def mask_baselines(self):
+        peaks, _, _ = baselines_by_squash(self.spectrogram)
+        for peak in peaks:
+            velo_index = self.spectrogram._velocity_to_index(peak)
+            velo_index = velo_index - 10
+            for i in range(velo_index, velo_index+20, 1):
+                self.spectrogram.intensity[i][:] = 0
 
 
 
 if __name__ == "__main__":
-
     """
+    known pattern/file pairs that yield good points
+
     WHITE_CH1_SHOT/seg00.dig -- opencv_long_start_pattern4 span=200 
     WHITE_CH2_SHOT/seg00.dig -- opencv_long_start_pattern4 span=200 
     WHITE_CH3_SHOT/seg00.dig -- opencv_long_start_pattern4 span=200 
@@ -237,11 +337,13 @@ if __name__ == "__main__":
     CH_3_009/seg00.dig -- opencv_long_start_pattern2 span=200
     CH_4_009/seg01.dig -- opencv_long_start_pattern2 span=200
     CH_4_009/seg02.dig -- opencv_long_start_pattern4 span=200
-
     """
+    path = "../dig/new/CH_4_009/seg00.dig"
+    spec = Spectrogram(path, 0.0, 60.0e-6, overlap_shift_factor= 7/8, form='db')
 
-    path = "/Users/trevorwalker/Desktop/Clinic/dig/WHITE_CH2_SHOT/seg00.dig"
-    spec = Spectrogram(path, 0.0, 60.0e-6, overlap_shift_factor= 1/8, form='db')
+    span = 200
+    # gives user the option to click, by default it searches from (0,0)
+    template_matcher = TemplateMatcher(spec, None, template=Templates.opencv_long_start_pattern5.value, span=span, k=20)
 
     # masks the baselines to avoid matching with saturated signals and echoes
     # peaks, _, _ = baselines_by_squash(spec)
@@ -250,13 +352,11 @@ if __name__ == "__main__":
     #     velo_index = velo_index - 10
     #     for i in range(velo_index, velo_index+20, 1):
     #         spec.intensity[i][:] = 0
+
     
+    # # masks the baselines to avoid matching with saturated signals and echoes
+    # template_matcher.mask_baselines()
 
-    span = 200 # will determine the bounding box to search in
-    template = opencv_long_start_pattern6 # use this template to search
-
-    # gives user the option to click, by default it searches from (0,0)
-    template_matcher = TemplateMatcher(spec, None, template, span=span, k=10)
     times, velos, scores, methodUsed = template_matcher.match()
 
     # draw the space to search in, plot times and velos as red dots
@@ -268,25 +368,28 @@ if __name__ == "__main__":
     colors = ['ro', 'bo', 'go', 'mo', 'ko', 'co']
     color_names = ['red', 'blue', 'green', 'magenta', 'black', 'cyan']
 
-
     # methods = ['TM_SQDIFF_NORMED', 'CCOEFF_NORMED', 'SQDIFF']
 
     # methods = ['CCOEFF', 'CCOEFF_NORMED', 'CCORR',
     #         'CCORR_NORMED', 'SQDIFF', 'SQDIFF_NORMED']
 
-    methods = ['CCOEFF_NORMED', 'SQDIFF', 'SQDIFF_NORMED']
+    # methods = ['CCOEFF_NORMED', 'SQDIFF', 'SQDIFF_NORMED']
+
+    methods = ['SQDIFF', 'SQDIFF_NORMED']
 
     handles = []
     seen_handles = []
     for i in range(len(times)):
+        # # added print statements to be read from the command line
         # print("time: ", times[i])
         # print("velocity: ", velos[i])
         # print("score: ", scores[i])
-        # # print("color: ", color_names[i%6])
+        # print("color: ", color_names[i%6])
         # print("color: ", color_names[methodUsed[i]])
         # print("method: ", methods[methodUsed[i]],'\n')
 
-
+        # # plot the points in descending order, decreasing their opacity so the brightest points 
+        # # can be visualized best. 
         # rank = (i % template_matcher.k)
         # if rank == 0:
         #     opacity = (1 / template_matcher.k)
@@ -295,23 +398,30 @@ if __name__ == "__main__":
         # point_method = methods[methodUsed[i]]
         # point, = plt.plot(times[i], velos[i], colors[methodUsed[i]], markersize=2.5, alpha=opacity)
 
-
+        # plot the point found from template matching in order from 'best' to 'worst' match
         point_method = methods[methodUsed[i]]
         point, = plt.plot(times[i], velos[i], colors[methodUsed[i]], markersize=2.5, alpha=.80)
-
+        
+        # add each method to the plot legend handle
         if point_method not in seen_handles:
             seen_handles.append(point_method)
             point.set_label(point_method)
             handles.append(point)
     
+    # cluster coordinates received from template matching, find cluster centers and plot them
+    centers = template_matcher.find_kmedoids(times, velos)
+    for t,v in centers:
+        center, = plt.plot(t, v, 'ko', markersize=4, alpha=.9)
+    center.set_label("cluster center")
+    handles.append(center)
 
+
+    #update the legend with the current plotting handles
     plt.legend(handles=handles)
 
-
+    #add the rectangle bounds where template matching is performed
     patch = Rectangle((0,0), dt, dv, fill=False, color='b', alpha=0.8)
     ax.add_patch(patch)
 
-    # display image
+    # display plot
     plt.show()
-
-

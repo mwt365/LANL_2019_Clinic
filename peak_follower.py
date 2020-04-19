@@ -11,7 +11,7 @@
 import numpy as np
 from follower import Follower
 from baselines import baselines_by_squash as bline
-from moving_average import moving_average
+from ProcessingAlgorithms.Fitting.moving_average import moving_average
 
 
 class PeakFollower(Follower):
@@ -68,6 +68,10 @@ class PeakFollower(Follower):
         amplitude, center, width, and background.
         """
         velocities, intensities, p_start, p_end = self.data()
+
+        print("The list of my times",self.results['times'])
+        print("The list of my velocities", self.results['velocities'])
+
 
         if self.smoothing:
             intensities = moving_average(intensities, n=self.smoothing)

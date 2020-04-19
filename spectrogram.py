@@ -11,10 +11,11 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy import signal
-from plotter import COLORMAPS
 
 from ProcessingAlgorithms.preprocess.digfile import DigFile
+from plotter import COLORMAPS
 
+DEFMAP = '3w_gby'
 
 class Spectrogram:
     """
@@ -26,7 +27,7 @@ class Spectrogram:
     Required arguments to the constructor:
         digfile: either an instance of DigFile or the filename of a .dig file
 
-    **Optional arguments and their default values**
+    **Optional arguments and their (default) values**
 
     t_start: (digfile.t0) time of the first point to use in the spectrogram
     ending:  (None) either the time of the last point or a positive integer
@@ -131,10 +132,10 @@ class Spectrogram:
             if desired in available:
                 self.computeMode = desired
             else:
-                # Default to "psd", but display error to the user.
-                print("You wanted the return value of the spectrogram to be",
-                      desired, "the supported values are:", available)
-            del kwargs["mode"]
+                # Default to "all", but display error to the user. 
+                # If the user specifies a mode that does not exist.
+                kwargs["mode"] = "all"
+                self.computeMode = "all"
 
         try:
             if False:
@@ -162,8 +163,12 @@ class Spectrogram:
         scaling = kwargs.get('scaling', 'spectrum')
         if mode in ('angle', 'phase'):
             modes = [mode, 'psd']
+        elif mode == "all":
+            modes = ["complex", "magnitude", "angle", "phase", "psd"]
         else:
             modes = [mode]
+        
+        self.availableData = modes
 
         for mode in modes:
             freqs, times, spec = signal.spectrogram(
@@ -177,8 +182,10 @@ class Spectrogram:
                 scaling=scaling,
                 mode=mode
             )
-            if mode in ('angle', 'phase'):
-                setattr(self, mode, spec)
+            setattr(self, mode, spec)
+            self.orig_spec_output = spec
+
+
         times += self.t_start
 
         # Attempt to deduce baselines
@@ -188,8 +195,6 @@ class Spectrogram:
         # to suppress some noise.
         # I think the following is an attempt to normalize across
         # different numbers of points per spectrum.
-        if True:
-            spec *= 2.0 / (self.points_per_spectrum * self.data.dt)
 
         if mode == 'complex':
             self.complex = spec
@@ -206,13 +211,17 @@ class Spectrogram:
         # scale the frequency axis to velocity
         self.velocity = freqs * 0.5 * self.wavelength  # velocities
 
+        # Now compute the probe destruction time.
+        self.probeDestructionTime()
+        self.estimateStartTime()
+
     def transform(self, vals):
         """
         Perform any modification to values dictated by the value of self.form
         """
         epsilon = 1e-10
         if self.form == 'db':
-            return 20 * np.log10(vals + epsilon)
+            return 10 * np.log10(vals + epsilon) # Since you are already starting with power.
         if self.form == 'log':
             return np.log10(vals + epsilon)
         return vals
@@ -308,9 +317,10 @@ class Spectrogram:
         tvals = self.time[time0:time1 + 1]
         vvals = self.velocity[vel0:vel1 + 1]
         ivals = self.intensity[vel0:vel1 + 1, time0:time1 + 1]
-        # ovals = self.orig_spec_output[vel0:vel1 + 1, time0:time1 + 1]
-        return tvals, vvals, ivals#, ovals
-
+        if self.computeMode != "psd":
+            ovals = self.orig_spec_output[vel0:vel1 + 1, time0:time1 + 1]
+            return tvals, vvals, ivals, ovals
+        return tvals, vvals, ivals
     # Routines to archive the computed spectrogram and reload from disk
 
     def _location(self, location, create=False):
@@ -401,88 +411,164 @@ class Spectrogram:
                 np.mean(timeVelInten[ind])
         return answer
 
-    def plot(self, axes=None, **kwargs):
-        # max_vel=6000, vmin=-200, vmax=100):
-        if axes == None:
-            axes = plt.gca()
-        if 'max_vel' in kwargs:
-            axes.set_ylim(top=kwargs['max_vel'])
-            del kwargs['max_vel']
-        if 'min_vel' in kwargs:
-            axes.set_ylim(bottom=kwargs['min_vel'])
-            del kwargs['min_vel']
+    def probeDestructionTime(self):
+        """
+        Compute an approximate value for the probe destruction time based
+        upon the maximum total intensity for each time slice.
+        """
+        totalInten = np.sum(self.intensity, axis=0)
+        maxInten = np.max(totalInten)
+        inds = np.where(totalInten == maxInten)
+        self.probe_destruction_time = self.time[inds][0]
+        self.probe_destruction_index = inds[0][0]
 
-        pcm = axes.pcolormesh(
-            self.time * 1e6,
-            self.velocity,
-            self.intensity,
-            cmap='gist_gray_r',
-            **kwargs)
+        # Compute the maximum single intensity value and use that as another
+        # estimate of probe destruction. Choose the smaller of the two options.
+        a = self.max
+        maxArray = np.max(self.intensity, axis=0)
+        inds2 = np.where(maxArray == a)
+        self.probe_destruction_index_max = inds2[0][0]
+        if False:
+            print("The value of PD index using the max estimate is", self.probe_destruction_index_max, "it has type", type(self.probe_destruction_index_max))
+            print("The time array has shape", self.time.shape)
 
-        pcm.set_clim(-5,100)
+        self.probe_destruction_time_max = self.time[self.probe_destruction_index_max]
 
-        # plt.ylim(1500, 5500)
-        # plt.xlim(20, 40)
+    def estimateStartTime(self):
+        """
+        Compute an approximate value for the jump off time based upon the change in 
+        the baseline intensity.
+        """
+        import baselineTracking
+        peaks, _, _ = baselineTracking.baselines.baselines_by_squash(self)
+        self.estimatedStartTime_ = baselineTracking.baselineTracking(self, peaks[0], 0.024761904761904763)
 
-        plt.gcf().colorbar(pcm, ax=axes)
-        axes.set_ylabel('Velocity (m/s)')
-        axes.set_xlabel('Time ($\mu$s)')
+    def plotHist(self, fig = None, minFrac=0.0, maxFrac = 1.0, numBins = 1001, **kwargs):
+        if fig == None:
+            fig = plt.figure()
+        bins = np.linspace(self.min, self.max, numBins)
+
+        threshold = bins[int(numBins*minFrac):int(numBins*maxFrac)]
+
+        plt.hist(self.intensity.flatten(), threshold, **kwargs)
+        axes = plt.gca()
+        axes.set_ylabel('Counts', fontsize = 18)
+        axes.set_xlabel('Intensity', fontsize = 18)
+        axes.xaxis.set_tick_params(labelsize=14)
+        axes.yaxis.set_tick_params(labelsize=14)        
         title = self.data.filename.split('/')[-1]
-        axes.set_title(title.replace("_", "\\"))
+        axes.set_title(title.replace("_", "-")+" Intensity Histogram", fontsize = 24)
+        
+        return fig
 
-        return pcm
+    def plot(self, transformData = False, **kwargs):
+        # max_vel=6000, vmin=-200, vmax=100):
+        pcms = {}
+        if "psd" in self.availableData:
+            self.availableData.append("intensity")
+        if "complex" in self.availableData:
+            self.availableData.append("real")
+            self.availableData.append("imaginary")
+
+
+        endTime = self._time_to_index((self.probe_destruction_time + self.probe_destruction_time_max)/2)
+        # Our prediction for the probe destruction time. Just to make it easier to plot. 
+
+        cmapUsed = COLORMAPS[DEFMAP]
+        if 'cmap' in kwargs:
+            # To use the sciviscolor colormaps that we have downloaded.
+            attempt = kwargs['cmap']
+            if attempt in COLORMAPS.keys():
+                cmapUsed = COLORMAPS[attempt]
+                del kwargs['cmap']
+        top = kwargs.get("max_vel", None)
+        bot = kwargs.get("min_vel", None)
+        right = kwargs.get("max_time", None)
+        left = kwargs.get("min_time", None)
+
+        print("The axes settings should be t,b,r,L", top, bot, right, left)
+
+        if top != None:
+            del kwargs['max_vel']
+        if bot != None:
+            del kwargs['min_vel']
+        if left != None:
+            del kwargs["min_time"]
+        if right != None:
+            del kwargs["max_time"]
+
+
+
+        for data in self.availableData:
+            zData = getattr(self, data, "psd") # getattr(object, itemname, default)
+            if data == "complex":
+                continue
+            elif data == "real":
+                zData = np.real(self.complex)
+            elif data == "imaginary":
+                zData = np.imag(self.complex)
+            
+            key = f"{data}" + (f" transformed to {self.form}" if transformData else " raw")
+            fig = plt.figure(num=key)
+            axes = plt.gca()
+
+            pcm = None # To define the scope.
+            if 'cmap' not in kwargs:
+                pcm = axes.pcolormesh(
+                    self.time[:endTime] * 1e6,
+                    self.velocity,
+                    self.transform(zData[:,:endTime]) if (data != "intensity" and transformData) else zData[:,:endTime],
+                    cmap = cmapUsed,
+                    **kwargs)
+            else:
+                pcm = axes.pcolormesh(
+                    self.time[:endTime] * 1e6,
+                    self.velocity,
+                    self.transform(zData[:,:endTime]) if (data != "intensity" and transformData) else zData[:,:endTime],
+                    **kwargs)
+
+            # Plot the start time estimate.
+            axes.plot([self.estimatedStartTime_]*len(self.velocity), self.velocity, "k-", label = "Estimated Start Time", alpha = 0.75)
+            plt.legend()
+            
+            print(f"The current maximum of the colorbar is {np.max(zData[:,:endTime])} for the dataset {data}")
+            plt.gcf().colorbar(pcm, ax=axes)
+            axes.set_ylabel('Velocity (m/s)', fontsize = 18)
+            axes.set_xlabel('Time ($\mu$s)', fontsize = 18)
+            axes.xaxis.set_tick_params(labelsize=14)
+            axes.yaxis.set_tick_params(labelsize=14)        
+            title = self.data.filename.split('/')[-1]
+            axes.set_title(title.replace("_", "-") + f" {data} spectrogram", fontsize = 24)
+
+            axes.set_xlim(left, right)
+            axes.set_ylim(bot, top) # The None value is the default value and does not update the axes limits.            
+
+            pcms[key] = pcm
+
+        if "complex" in self.availableData:
+            self.availableData.remove("real")
+            self.availableData.remove("imaginary")
+        
+        return pcms
 
 
 if __name__ == '__main__':
-    import template_matching as tm
-    import baselines
+    # Then I am calling this from the command line and not jupyter. This is an assumption!
 
-    path = "/Users/trevorwalker/Desktop/Clinic/For_Candace/newdigs/CH_2_009.dig"
+    import tkinter as tk
+    root = tk.Tk()
+    width_px = root.winfo_screenwidth()
+    height_px = root.winfo_screenheight()
+    width_mm = root.winfo_screenmmwidth()
+    height_mm = root.winfo_screenmmheight()
+    # 2.54 cm = in
+    width_in = width_mm / 25.4
+    height_in = height_mm / 25.4
 
-    sp = Spectrogram(path, 0.0, 60.0e-6, overlap_shift_factor= 1/8, form='power')
-    sgram = Spectrogram(path, 0.0, 60.0e-6, overlap_shift_factor= 1/8, form='db')
+    # Set the default window size for matplotlib to be the fullscreen - 0.5 inches on the side and the top.
 
+    plt.rcParams["figure.figsize"] = [width_in-0.5, height_in-0.5]
 
-    # template = tm.Template(values=tm.bigger_end_pattern)
-    # template2 = tm.Template(values=tm.bigger_end_pattern2)
-    # template3 = tm.Template(values=tm.bigger_end_pattern3)
-
-    template = tm.Template(values=tm.bigger_start_pattern)
-    template2 = tm.Template(values=tm.bigger_start_pattern2)
-    template3 = tm.Template(values=tm.bigger_start_pattern3)
-
-    # template = tm.Template(values=tm.start_pattern)
-    # template2 = tm.Template(values=tm.start_pattern2)
-    # template3 = tm.Template(values=tm.start_pattern3)
-    # template4 = tm.Template(values=tm.start_pattern4)
-    # template5 = tm.Template(values=tm.start_pattern5)
-
-
-    # templates = [template, template2, template3, template4, template5]
-
-    # print(interesting_points)
-    print(COLORMAPS)
-
-    plot = sgram.plot(max_vel=10000, min_vel=0, cmap="blue-orange-div")
-    
-    # templates = [template, template2, template3]
-
-    # baseline_scores, baselines = tm.find_regions(sgram, templates)
-
-    # for baseline in baselines:
-
-    #     interesting_points = tm.find_potenital_start_points(sgram, baseline_scores[baseline])
-
-    #     for pair in interesting_points:
-    #         time, velo = pair
-    #         y = velo
-    #         x = time * 10**6
-    #         # y = sp._velocity_to_index(velo)
-    #         # x = sp._time_to_index(time)
-
-    #         plt.plot(x, y, 'ro', markersize=.7)
-
-    plt.show()
-
-
-
+    # sp = Spectrogram('../dig/GEN3CH_4_009.dig', None,
+    #                  None, overlap_shift_factor=1 / 4)
+    # print(sp)

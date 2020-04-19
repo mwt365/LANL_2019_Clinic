@@ -2,7 +2,7 @@
 # coding: utf-8
 
 import numpy as np
-
+from datetime import datetime
 
 def save_as_dig(filename, vvals, datatype, dt=20e-12, initialTime=0,
                 voltageMultiplier=6.103516e-5, voltageOffset=0,
@@ -33,6 +33,7 @@ def save_as_dig(filename, vvals, datatype, dt=20e-12, initialTime=0,
             The rest of the file will be writing the datapoints in binary.
     """
     dataformat = ""
+    print(datatype)
     if isinstance(datatype, type(str("example"))
                   ) or isinstance(datatype, type('8')):
         if datatype == '8':
@@ -40,18 +41,18 @@ def save_as_dig(filename, vvals, datatype, dt=20e-12, initialTime=0,
             datatype = np.dtype("ubyte")
         elif datatype == '16':
             dataformat = '16'
-            datatype = np.dtype(">uint16")
+            datatype = np.dtype("<u2")
         elif datatype == '32':
             dataformat = '32'
-            datatype = np.dtype(">uint32")
+            datatype = np.dtype("<u4")
         else:
             raise ValueError(
                 "datatype corresponds to an unsupported data type.")
     elif datatype == np.dtype("ubyte"):
         dataformat = '8'
-    elif datatype == np.dtype(">uint16"):
+    elif datatype == np.dtype("<u2"):
         dataformat = '16'
-    elif datatype == np.dtype(">uint32"):
+    elif datatype == np.dtype("<u4"):
         dataformat = '32'
     else:
         raise ValueError("datatype corresponds to an unsupported data type.")
@@ -67,7 +68,9 @@ def save_as_dig(filename, vvals, datatype, dt=20e-12, initialTime=0,
         f.write(top_header)  # write 512 bytes of spaces
         stuff = "\r\n".join([
             # todays date Day Mon NumDay HH:MM:SS: YEAR
-            "Fri Sep 20 08:00:00 2019",
+            # This is achieved using ctime() in the datetime library. 
+            # Reference https://docs.python.org/3/library/datetime.html
+            datetime.now().ctime(),
             # the number of samples used.
             str(nsamples),
             # format for the data to be read as.
