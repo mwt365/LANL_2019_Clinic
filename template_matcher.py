@@ -240,7 +240,7 @@ if __name__ == "__main__":
 
     """
 
-    path = "/Users/trevorwalker/Desktop/Clinic/dig/new/WHITE_CH2_SHOT/seg00.dig"
+    path = "/Users/trevorwalker/Desktop/Clinic/dig/WHITE_CH2_SHOT/seg00.dig"
     spec = Spectrogram(path, 0.0, 60.0e-6, overlap_shift_factor= 1/8, form='db')
 
     # masks the baselines to avoid matching with saturated signals and echoes
