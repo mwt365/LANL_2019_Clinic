@@ -213,7 +213,9 @@ class Spectrogram:
 
         # Now compute the probe destruction time.
         self.probeDestructionTime()
-        self.estimateStartTime()
+        
+        # self.estimateStartTime()
+        self.estimatedStartTime_ = 0
 
     def transform(self, vals):
         """
@@ -440,6 +442,7 @@ class Spectrogram:
         the baseline intensity.
         """
         import baselineTracking
+        print(self.data)
         peaks, _, _ = baselineTracking.baselines.baselines_by_squash(self)
         self.estimatedStartTime_ = baselineTracking.baselineTracking(self, peaks[0], 0.024761904761904763)
 
@@ -568,7 +571,3 @@ if __name__ == '__main__':
     # Set the default window size for matplotlib to be the fullscreen - 0.5 inches on the side and the top.
 
     plt.rcParams["figure.figsize"] = [width_in-0.5, height_in-0.5]
-
-    # sp = Spectrogram('../dig/GEN3CH_4_009.dig', None,
-    #                  None, overlap_shift_factor=1 / 4)
-    # print(sp)

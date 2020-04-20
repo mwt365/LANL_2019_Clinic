@@ -54,7 +54,7 @@ def baselines_by_squash(spectrogram: Spectrogram):
     tallest = combined_spectrum.max()
     peaks, properties = find_peaks(
         combined_spectrum,
-        height=0.01 * tallest,  # peaks must be this tall to count
+        height=0.05 * tallest,  # peaks must be this tall to count
         distance=100,  # peaks must be separated by this much at minimum
     )
     heights = properties['peak_heights']
@@ -134,12 +134,19 @@ def baselines_by_fft(spectrogram):
 if __name__ == '__main__':
     import os
     os.chdir('../dig')
-    sgram = Spectrogram('GEN3CH_4_009.dig', 0.0, 50.0e-6)
-    hoods = baselines_by_fft(sgram)
-    for n, h in enumerate(hoods):
-        print(f"Peak {n}\nVelocity{n}\tIntensity{n}")
-        v, i = h
-        for j in range(len(v)):
-            print(f"{v[j]:.4f}\t{i[j]:.4f}")
-        print("\n")
+    sgram = Spectrogram('./CH_4_009/seg00.dig', 0.0, 50.0e-6)
+    # hoods = baselines_by_fft(sgram)
+    # for n, h in enumerate(hoods):
+    #     print(f"Peak {n}\nVelocity{n}\tIntensity{n}")
+    #     v, i = h
+    #     for j in range(len(v)):
+    #         print(f"{v[j]:.4f}\t{i[j]:.4f}")
+    #     print("\n")
 
+    peaks, us, _ = baselines_by_squash(sgram)
+    for peak in peaks:
+        velo_index = sgram._velocity_to_index(peak)
+        print(velo_index)
+        print(peak,'\n')
+
+    sgram.plot()
