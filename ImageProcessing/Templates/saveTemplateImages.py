@@ -1,6 +1,7 @@
 
 import tqdm # To get a progress bar.
 import os
+from ImageProcessing.Templates.templates import Templates
 
 
 import scipy
@@ -26,6 +27,5 @@ def getImageDirectory():
 imageSaveDir = getImageDirectory()
 currDir = os.getcwd()
 os.chdir(imageSaveDir)
-from templates import Templates
 saveAllTemplateImages()
 os.chdir(currDir)
