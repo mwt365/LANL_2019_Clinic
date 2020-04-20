@@ -21,7 +21,7 @@ else:
     from scipy.misc import imsave
 from matplotlib import pyplot as plt
 from matplotlib.patches import Rectangle
-# from sklearn_extra.cluster import KMedoids
+from sklearn_extra.cluster import KMedoids
 
 class TemplateMatcher():
     """
@@ -39,7 +39,20 @@ class TemplateMatcher():
 
     """
 
-    def __init__(self, spectrogram, start_point, template, span=80, velo_scale=10, k=10):
+    def __init__(self, spectrogram, 
+                       start_point, 
+                       template, 
+                       span=80, 
+                       velo_scale=10, 
+                       k=10,
+                       methods=['cv2.TM_CCOEFF', 
+                                'cv2.TM_CCOEFF_NORMED', 
+                                'cv2.TM_CCORR', 
+                                'cv2.TM_CCORR_NORMED', 
+                                'cv2.TM_SQDIFF', 
+                                'cv2.TM_SQDIFF_NORMED']
+                        ):
+
         assert isinstance(spectrogram, Spectrogram)
         assert (len(template) > 0)
 
@@ -60,6 +73,9 @@ class TemplateMatcher():
         else:
             assert isinstance(start_point, tuple)
             self.click = start_point
+        
+        self.matching_methods = methods
+        self.num_methods = len(methods)
         
         self.setup()
 
@@ -132,7 +148,7 @@ class TemplateMatcher():
 
 
 
-    def match(self, methods = ['cv2.TM_CCOEFF', 'cv2.TM_CCOEFF_NORMED', 'cv2.TM_CCORR', 'cv2.TM_CCORR_NORMED', 'cv2.TM_SQDIFF', 'cv2.TM_SQDIFF_NORMED']):
+    def match(self):
 
         matrix = self.spectrogram.intensity
         cropped_spectrogram = self.crop_intensities(matrix)
@@ -146,6 +162,9 @@ class TemplateMatcher():
         template = cv2.imread('./im_template.png', 0)
         w, h = template.shape[::-1]
 
+        methods = self.matching_methods
+        num_methods = self.num_methods
+
         # # All 6 available comparison methods in a list
         # methods = ['cv2.TM_CCOEFF', 'cv2.TM_CCOEFF_NORMED', 'cv2.TM_CCORR',
         #             'cv2.TM_CCORR_NORMED', 'cv2.TM_SQDIFF', 'cv2.TM_SQDIFF_NORMED']
@@ -158,9 +177,8 @@ class TemplateMatcher():
         ycoords = []
         scores = []
         methodUsed = []
-        print(methods)
-
-        for meth_i, meth in enumerate(methods):
+        # print(methods)
+        for method_index, meth in enumerate(methods):
             img = img2.copy()
             method = eval(meth)
 
@@ -179,7 +197,7 @@ class TemplateMatcher():
 
             for point in best_k:
 
-                methodUsed.append(meth_i)
+                methodUsed.append(methods[method_index])
 
                 # If the method is TM_SQDIFF or TM_SQDIFF_NORMED, take minimum
                 if method in [cv2.TM_SQDIFF, cv2.TM_SQDIFF_NORMED]:
@@ -297,6 +315,8 @@ class TemplateMatcher():
         
         return outputValues
 
+
+
     def find_kmedoids(self, xcoords, ycoords, clusters=5, random_state=0):
         assert(len(xcoords) == len(ycoords))
         X = np.zeros( (len(xcoords), 2) )
@@ -320,6 +340,79 @@ class TemplateMatcher():
 
 
 
+    def add_to_plot(self, axes, times, velos, scores, methodsUsed,
+                    find_medoids=True, 
+                    verbose=False, 
+                    visualize_opacity=False,
+                    show_bounds=True):
+
+        if show_bounds:
+            dv = spec.velocity[self.velo_scale * self.span]
+            dt = spec.time[self.span] * 1e6
+            patch = Rectangle((0,0), dt, dv, fill=False, color='b', alpha=0.8)
+            axes.add_patch(patch)
+
+        spec.plot(axes)
+
+        method_color_dict = {}
+        method_color_dict['cv2.TM_CCOEFF'] = ('ro', 'red')
+        method_color_dict['cv2.TM_CCOEFF_NORMED'] = ('bo', 'blue')
+        method_color_dict['cv2.TM_CCORR'] = ('go', 'green')
+        method_color_dict['cv2.TM_CCORR_NORMED'] = ('mo','magenta')
+        method_color_dict['cv2.TM_SQDIFF'] = ('ko','black')
+        method_color_dict['cv2.TM_SQDIFF_NORMED'] = ('co','cyan')
+
+        handles = []
+        seen_handles = []
+        for i in range(len(times)):
+
+            if verbose:
+                # added print statements to be read from the command line
+                print("time: ", times[i])
+                print("velocity: ", velos[i])
+                print("score: ", scores[i])
+                print("color: ", method_color_dict[methodsUsed[i]][1])
+                print("method: ", methodsUsed[i],'\n')
+
+            if visualize_opacity:
+                # plot the points in descending order, decreasing their opacity so the brightest points 
+                # can be visualized best. 
+                rank = (i % self.k)
+                if rank == 0:
+                    opacity = (1 / self.k)
+                else:
+                    opacity = ((self.k - rank) / self.k)
+                point_method = methodsUsed[i]
+                point, = plt.plot(times[i], velos[i], method_color_dict[methodsUsed[i]][0], markersize=2.5, alpha=opacity)
+            else:
+                # plot the point found from template matching in order from 'best' to 'worst' match
+                point_method = methodsUsed[i]
+                point, = plt.plot(times[i], velos[i], method_color_dict[methodsUsed[i]][0], markersize=2.5, alpha=.80)
+        
+            # add each method to the plot legend handle
+            if point_method not in seen_handles:
+                seen_handles.append(point_method)
+                point.set_label(point_method)
+                handles.append(point)
+    
+        # cluster coordinates received from template matching, find cluster centers and plot them
+        if find_medoids:
+            centers = self.find_kmedoids(times, velos)
+            for t,v in centers:
+                center, = plt.plot(t, v, 'yo', markersize=4, alpha=.9)
+            center.set_label("cluster center")
+            handles.append(center)
+
+
+        # #update the legend with the current plotting handles
+        plt.legend(handles=handles)
+
+        # display plot
+        plt.show()
+
+
+
+
 if __name__ == "__main__":
     """
     known pattern/file pairs that yield good points
@@ -338,90 +431,22 @@ if __name__ == "__main__":
     CH_4_009/seg01.dig -- opencv_long_start_pattern2 span=200
     CH_4_009/seg02.dig -- opencv_long_start_pattern4 span=200
     """
-    path = "../dig/new/CH_4_009/seg00.dig"
-    spec = Spectrogram(path, 0.0, 60.0e-6, overlap_shift_factor= 7/8, form='db')
+    from ProcessingAlgorithms.preprocess.digfile import DigFile
+
+    path = "../dig/CH_4_009/seg00.dig"
+    df = DigFile(path)
+    spec = Spectrogram(df, 0.0, 60.0e-6, overlap_shift_factor= 7/8, form='db')
 
     span = 200
     # gives user the option to click, by default it searches from (0,0)
-    template_matcher = TemplateMatcher(spec, None, template=Templates.opencv_long_start_pattern5.value, span=span, k=20)
-
-    # masks the baselines to avoid matching with saturated signals and echoes
-    # peaks, _, _ = baselines_by_squash(spec)
-    # for peak in peaks:
-    #     velo_index = spec._velocity_to_index(peak)
-    #     velo_index = velo_index - 10
-    #     for i in range(velo_index, velo_index+20, 1):
-    #         spec.intensity[i][:] = 0
-
+    template_matcher = TemplateMatcher(spec, None, template=Templates.opencv_long_start_pattern5.value, span=span, k=20, methods=['cv2.TM_CCOEFF_NORMED', 'cv2.TM_SQDIFF', 'cv2.TM_SQDIFF_NORMED'])
     
     # # masks the baselines to avoid matching with saturated signals and echoes
     # template_matcher.mask_baselines()
 
-    times, velos, scores, methodUsed = template_matcher.match()
+    times, velos, scores, methodsUsed = template_matcher.match()
 
-    # draw the space to search in, plot times and velos as red dots
-    dv = spec.velocity[template_matcher.velo_scale * span]
-    dt = spec.time[span] * 1e6
-    ax = plt.gca()
-    spec.plot(ax)
+    axes = plt.gca()
 
-    colors = ['ro', 'bo', 'go', 'mo', 'ko', 'co']
-    color_names = ['red', 'blue', 'green', 'magenta', 'black', 'cyan']
+    template_matcher.add_to_plot(axes, times, velos, scores, methodsUsed, find_medoids=False, verbose=False, visualize_opacity=False, show_bounds=False)
 
-    # methods = ['TM_SQDIFF_NORMED', 'CCOEFF_NORMED', 'SQDIFF']
-
-    # methods = ['CCOEFF', 'CCOEFF_NORMED', 'CCORR',
-    #         'CCORR_NORMED', 'SQDIFF', 'SQDIFF_NORMED']
-
-    # methods = ['CCOEFF_NORMED', 'SQDIFF', 'SQDIFF_NORMED']
-
-    methods = ['SQDIFF', 'SQDIFF_NORMED']
-
-    handles = []
-    seen_handles = []
-    for i in range(len(times)):
-        # # added print statements to be read from the command line
-        # print("time: ", times[i])
-        # print("velocity: ", velos[i])
-        # print("score: ", scores[i])
-        # print("color: ", color_names[i%6])
-        # print("color: ", color_names[methodUsed[i]])
-        # print("method: ", methods[methodUsed[i]],'\n')
-
-        # # plot the points in descending order, decreasing their opacity so the brightest points 
-        # # can be visualized best. 
-        # rank = (i % template_matcher.k)
-        # if rank == 0:
-        #     opacity = (1 / template_matcher.k)
-        # else:
-        #     opacity = ((template_matcher.k - rank) / template_matcher.k)
-        # point_method = methods[methodUsed[i]]
-        # point, = plt.plot(times[i], velos[i], colors[methodUsed[i]], markersize=2.5, alpha=opacity)
-
-        # plot the point found from template matching in order from 'best' to 'worst' match
-        point_method = methods[methodUsed[i]]
-        point, = plt.plot(times[i], velos[i], colors[methodUsed[i]], markersize=2.5, alpha=.80)
-        
-        # add each method to the plot legend handle
-        if point_method not in seen_handles:
-            seen_handles.append(point_method)
-            point.set_label(point_method)
-            handles.append(point)
-    
-    # cluster coordinates received from template matching, find cluster centers and plot them
-    centers = template_matcher.find_kmedoids(times, velos)
-    for t,v in centers:
-        center, = plt.plot(t, v, 'ko', markersize=4, alpha=.9)
-    center.set_label("cluster center")
-    handles.append(center)
-
-
-    #update the legend with the current plotting handles
-    plt.legend(handles=handles)
-
-    #add the rectangle bounds where template matching is performed
-    patch = Rectangle((0,0), dt, dv, fill=False, color='b', alpha=0.8)
-    ax.add_patch(patch)
-
-    # display plot
-    plt.show()
