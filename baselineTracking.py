@@ -8,7 +8,7 @@ import os
 import tqdm # For printing a timing information to see how far you have gotten.
 
 
-experimentDataFileName = r"..\NickEstimateOfJumpOffPosition.xlsx"
+experimentDataFileName = r"../NickEstimateOfJumpOffPosition.xlsx"
 
 data = pd.read_excel(experimentDataFileName)
 
@@ -48,11 +48,11 @@ for i in range(len(thresholds)):
     d[f"threshold {thresholds[i]}"] = 0
     d[f"threshold {thresholds[i]} error"] = 0
 
-saveLoc = r"..\baselineIntensityMaps"
+saveLoc = r"../baselineIntensityMaps"
 
 def saveBaselineIntensityImages(files):
     for i in tqdm.trange(len(files)):
-        filename = f"..\dig\{files[i]}"
+        filename = f"../dig/{files[i]}"
         MySpect = Spectrogram(filename)
         peaks, _, heights = baselines.baselines_by_squash(MySpect)
 
@@ -69,7 +69,7 @@ def saveBaselineIntensityImages(files):
         del MySpect
 
 for i in tqdm.trange(len(files)):
-    filename = f"..\dig\{files[i]}"
+    filename = f"../dig/{files[i]}"
     MySpect = Spectrogram(filename)
     peaks, _, heights = baselines.baselines_by_squash(MySpect)
 
