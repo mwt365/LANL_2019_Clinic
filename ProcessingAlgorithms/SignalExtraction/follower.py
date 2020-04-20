@@ -263,19 +263,21 @@ class Follower:
             n = index of the point in the follower
             t_index = t_index of the point
             t = time (in seconds)
+            expand = float (to include a broader range of points)
         """
         if 'n' in kwargs:
             n = kwargs['n']
         elif 't_index' in kwargs:
             t_index = kwargs['t_index']
-            n = self.results['t_index'].find(t_index)
+            n = self.results['t_index'].index(t_index)
         elif 't' in kwargs:
             t = kwargs['t']
             t_index = self.spectrogram._time_to_index(t)
-            n = self.results['t_index'].find(t_index)
+            n = self.results['t_index'].index(t_index)
         else:
             raise Exception("I can't identify the hood")
-        return FollowHood(self, n)
+        expand = kwargs.get('expand')
+        return FollowHood(self, n, expand=expand)
 
     @property
     def neighborhoods(self):
@@ -460,11 +462,12 @@ class FollowHood(object):
       - gaussian   {background, amplitude, center, width}
     """
 
-    def __init__(self, follower: Follower, pt: int):
+    def __init__(self, follower: Follower, pt: int, expand=None):
         """
 
         """
-        from gaussian import Gaussian
+        # from gaussian import Gaussian
+        from fit import Gaussian
         from ProcessingAlgorithms.Fitting.moments import moment
 
         res = follower.results
@@ -476,6 +479,16 @@ class FollowHood(object):
         self.peak_v = res['peak_v'][pt]
         self.vi_span = res['vi_span'][pt]
         self.peak_int = res['peak_int'][pt]
+
+        if isinstance(expand, (int, float)):
+            f, t = res['vi_span'][pt]
+            di = round(0.5 * (t - f) * (expand - 1))
+            self.vi_span = (f - di, t + di)
+        elif isinstance(expand, (list, tuple)) and len(expand) == 2:
+            # two stretch amounts, one below, one above
+            f, t = res['vi_span'][pt]
+            dl, dh = [round(0.5 * (t - f) * (x - 1)) for x in expand]
+            self.vi_span = (f - dl, t + dh)
 
         # Now fetch the raw points from the spectrogram
         sg = follower.spectrogram
@@ -509,7 +522,8 @@ class FollowHood(object):
         self.gaussian = Gaussian(
             self.velocity, self.intensity,
             center=self.peak_v,
-            sigma=follower.noise if follower.noise else self.moment['std_dev']
+            sigma=follower.noise if hasattr(follower,
+                                            'noise') else self.moment['std_dev']
         )
 
     def plot_gaussian(self, ax, **kwargs):

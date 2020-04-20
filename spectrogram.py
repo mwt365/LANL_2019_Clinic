@@ -75,7 +75,7 @@ class Spectrogram:
                  wavelength: float = 1550.0e-9,
                  points_per_spectrum: int = 4096,
                  overlap: float = 0.875,
-                 window_function=None,  # 'hanning',
+                 window_function='hann',  # None,  # 'hanning',
                  form: str = 'db',
                  convert_to_voltage: bool = True,
                  detrend: str = "linear",
@@ -106,6 +106,7 @@ class Spectrogram:
         self.form = form
         self.use_voltage = convert_to_voltage
         self.detrend = detrend
+        self.nfft = kwargs.get('nfft')  # handles zero padding
 
         # the following will be set by _calculate
         self.time = None
@@ -180,7 +181,8 @@ class Spectrogram:
                 noverlap=int(self.overlap * self.points_per_spectrum),
                 detrend=self.detrend,  # could be constant,
                 scaling=scaling,
-                mode=mode
+                mode=mode,
+                nfft=self.nfft
             )
             if mode in ('psd', 'complex', 'magnitude'):
                 # I think the following is an attempt to normalize across
@@ -197,7 +199,8 @@ class Spectrogram:
 
         # Convert to a logarithmic representation and use floor to attempt
         # to suppress some noise.
-        if not hasattr(self, "intensity") or not self.intensity:
+        if not hasattr(self, "intensity") or not \
+           isinstance(self.intensity, np.ndarray):
             self.intensity = self.psd
 
         self.intensity = self.transform(self.intensity)
@@ -315,6 +318,56 @@ class Spectrogram:
         # ovals = self.orig_spec_output[vel0:vel1 + 1, time0:time1 + 1]
         return tvals, vvals, ivals,  # ovals
 
+    def analyze_noise(self, **kwargs):
+        """
+        Analyze the noise by performing a double-exponential fit.
+        Possible kwargs:
+
+            v_min (baseline)
+            v_max (5000)
+            t_min (0)
+            t_max (probe destruction)
+            n_bins (100)
+
+        Returns:
+            DoubleExponential fit object, which includes
+            fields beta, lam1, lam2, amp, mean, stdev, chisq, and
+            prob_greater
+        """
+        from fit import DoubleExponential, Exponential
+        from baselines import baselines_by_squash
+
+        v_min = kwargs.get('v_min')
+        if not v_min:
+            peaks, _, hts = baselines_by_squash(self)
+            v_min = peaks[0]
+
+        v_max = kwargs.get('v_max', 5000)
+        t_min = kwargs.get('t_min', self.t_start)
+        t_max = kwargs.get('t_max', self.vertical_spike())
+        if not t_max:
+            t_max = self.t_end
+        n_bins = kwargs.get('n_bins', 100)
+
+        # extract the region and convert to power
+        my_slice = self.power(self.slice((t_min, t_max), (v_min, v_max))[2])
+        # set the cutoff for the maximum intensity we consider by
+        # looking in histogram_levels
+        cutoff = self.histogram_levels['ones'][1]
+
+        # construct the bins
+        bins = np.linspace(0, cutoff, n_bins)
+        histo, edges = np.histogram(my_slice, bins=bins, density=False)
+        dub = DoubleExponential(edges[2:-1], histo[2:])
+        if dub.error:
+            dub = Exponential(edges[2:-1], histo[2:])
+        dub.v_min = v_min
+        dub.v_max = v_max
+        dub.t_min = t_min
+        dub.t_max = t_max
+        dub.n_bins = n_bins
+        return dub
+
     def noise_level(self, percentile=0.75):
         """
         Estimate the noise level by sorting all intensities and
@@ -336,7 +389,7 @@ class Spectrogram:
         vals = np.sum(self.power(self.intensity), axis=axis)
         vals /= np.max(vals)
         if dB:
-            vals = 20 * np.log10(vals)
+            vals = 10 * np.log10(vals)
         return vals
 
     def vertical_spike(self):
@@ -503,6 +556,8 @@ class Spectrogram:
             - min_vel and max_vel
             - title (string)
             - extension (.jpg)
+            - color_range
+            - cmap
         """
         from plotter import COLORMAPS
 

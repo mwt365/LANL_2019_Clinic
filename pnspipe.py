@@ -56,16 +56,23 @@ def all_post_functions():
     funcs = []
     for name, obj in inspect.getmembers(sys.modules[__name__]):
         if inspect.isfunction(obj):
-            sig = list(inspect.signature(obj).parameters.keys())
-            if sig and sig[0] == 'str' \
-               and sig[1] == 'dict' and len(sig) == 4:
-                funcs.append(obj)
+            params = inspect.signature(obj).parameters
+            keys = list(params.keys())
+            if len(keys) != 4:
+                continue
+            try:
+                if isinstance(params[keys[0]].annotation, type(str)) \
+                   and isinstance(params[keys[1]].annotation, type(dict)):
+                    funcs.append(obj)
+            except:
+                pass
     return funcs
 
 
 def describe_post_functions():
-    return "\n\n".join([f"{x._name__}: {x.__doc__}" for x
-                        in all_post_functions()])
+    pfunc = all_post_functions()
+    return "\n\n".join([f"{x.__name__}: {x.__doc__}" for x
+                        in pfunc])
 
 
 def post_pipe(results, args):
@@ -94,14 +101,15 @@ def post_pipe(results, args):
     # Let's first decode the commands
 
     command_file = args.post
-    assert os.path.isfile(command_file)
-    orders = process_command_file(command_file)
-
-    for fname, source in sources.items():
-        segments = sorted(list(source.keys()))
-        for order in orders:
-            routine, kwargs = order
-            routine(fname, source, segments, **kwargs)
+    if not os.path.exists(command_file):
+        print(f"I could not find a file named {command_file} for post processing")
+    else:
+        orders = process_command_file(command_file)
+        for fname, source in sources.items():
+            segments = sorted(list(source.keys()))
+            for order in orders:
+                routine, kwargs = order
+                routine(fname, source, segments, **kwargs)
 
 
 def stats(filename: str, source: dict, segments: dict, **kwargs):
@@ -113,7 +121,14 @@ def stats(filename: str, source: dict, segments: dict, **kwargs):
     for n, seg in enumerate(segments):
         noises = source[seg]['noise']
         for k in data.keys():
-            data[k].append(noises[k])
+            try:
+                data[k].append(noises[k])
+            except:
+                if k == 'beta':
+                    data[k].append(None)
+                    data['lam1'].append(noises['lamb'])
+                    data['lam2'].append(None)
+                    data['stdev'].append(noises['mean'])
     figures = data.pop('figname')
     df = pd.DataFrame(data)
     print(df.to_string(sparsify=False))
@@ -404,55 +419,7 @@ def find_signal(pipe: PNSPipe, **kwargs):
     pipe.log(f"find_signal guesses signal is at {pipe.signal_guess}")
 
 
-from fit import Fit
-
-
-class DoubleExponential(Fit):
-
-    @staticmethod
-    def olddoubleexpo(x, a1, w1, a2, w2):
-        return a1 * np.exp(-x / w1) + a2 * np.exp(-x / w2)
-
-    @staticmethod
-    def doubleexpo(x, beta, lam1, lam2, amp):
-        return amp * 0.5 * ((1 + beta) * lam1 * np.exp(-lam1 * x) +
-                            (1 - beta) * lam2 * np.exp(-lam2 * x))
-
-    def __init__(self, xvals, yvals):
-        """
-        Guess initial parameters by giving each exponential half the
-        amplitude and the two widths 0.2 and 0.5 the range of xvals
-        """
-        lamb = np.log(yvals[0] / yvals[-1]) / (xvals[-1] - xvals[0])
-        lam1 = 1.5 * lamb
-        lam2 = 0.5 * lamb
-        A = yvals[0] * 2 / (lam1 + lam2)
-        p0 = (0.1, lam1, lam2, A)
-
-        labels = r'\beta;\lambda_1;\lambda_2;A'
-        super().__init__(
-            self.doubleexpo, xvals, yvals, p0, sigma=np.sqrt(yvals),
-            tex=["$" + x + "$"for x in labels.split(';')])
-        self.stats()
-
-    def stats(self):
-        beta, lam1, lam2, amp = self.params  # a1, w1, a2, w2
-        self.mean = 0.5 * ((1 + beta) / lam1 + (1 - beta) / lam2)
-        self.variance = (1 + beta) * (3 - beta) / (4 * lam1 * lam1) + \
-            (1 - beta) * (3 + beta) / (4 * lam2 * lam2) + \
-            (1 - beta * beta) / (2 * lam1 * lam2)
-        # m0, m1, m2 = [a1 * w1 ** (n + 1) + a2 * w2 ** (n + 1)
-        #              for n in range(3)]
-        # self.mean = m1 / m0
-        # self.variance = m2 / m0 - self.mean * self.mean
-        self.stdev = np.sqrt(self.variance)
-
-
-DoubleExponential.doubleexpo.tex = "".join(
-    [
-        r'$P(x) =\left(\frac{1+\beta}{2}\right) \lambda_{1} e^{-\lambda_{1}x}',
-        r'+ \left(\frac{1-\beta}{2} \right) \lambda_{2} e^{-\lambda_{2} x}$',
-    ])
+from fit import Exponential, DoubleExponential
 
 
 def analyze_noise(pipe: PNSPipe, **kwargs):
@@ -460,34 +427,21 @@ def analyze_noise(pipe: PNSPipe, **kwargs):
     Attempt to analyze the noise statistics in the spectrogram.
 
     Possible kwargs:
-        v_max:    defaults to 80% of full scale
-        t_range:  defaults to the range through probe destruction
+        v_min:    defaults to bottom baseline
+        v_max:    defaults to 5000
+        t_min:    defaults to t_start
+        t_max:    defaults to probe destruction
         n_bins:   defaults to 100
     """
 
-    v_max = kwargs.get('v_max', 0.8 * pipe.spectrogram.v_max)
-    t_range = kwargs.get('t_range', (0, pipe.probe_destruction))
-    n_bins = kwargs.get('n_bins', 100)
+    f = pipe.spectrogram.analyze_noise(**kwargs)
 
-    my_slice = pipe.spectrogram.slice(t_range, (50, v_max))
-    # make sure we're using untransformed intensities
-    my_slice = pipe.spectrogram.power(my_slice[2])
-    # Use the histogram_levels field of the spectrogram to
-    # decide how to bin the data
-    # We'll use the bottom 70% of the data
-    cutoff = pipe.spectrogram.histogram_levels['ones'][1]
-
-    pipe.log(f" + v_max = {v_max} = {100*v_max/pipe.spectrogram.v_max}%")
-    pipe.log(f" + t_range = {t_range[0]*1e6:0.1f} - {t_range[1]*1e6:0.1f} µs")
-    pipe.log(f" + n_bins = {n_bins}")
-    pipe.log(f" + cutoff = {cutoff:.2f}")
-
-    bins = np.linspace(0, cutoff, n_bins)
-    hist, edges = np.histogram(my_slice, bins=bins, density=False)
-    dub = DoubleExponential(edges[:-1], hist)
-    pipe.log(f"mean = {dub.mean:0.3f}, sigma = {dub.stdev:0.3f}", True)
+    pipe.log(f" + v_max = {f.v_max} = {100*f.v_max/pipe.spectrogram.v_max:.1f}%")
+    pipe.log(f" + t_range = {f.t_min*1e6:0.1f} - {f.t_max*1e6:0.1f} µs")
+    pipe.log(f" + n_bins = {f.n_bins}")
+    pipe.log(f"mean = {f.mean:0.3f}, sigma = {f.stdev:0.3f}", True)
     try:
-        dub.plot(
+        f.plot(
             logy=True,
             legend=(0, 0),
             figsize=(8, 8),
@@ -496,20 +450,30 @@ def analyze_noise(pipe: PNSPipe, **kwargs):
             title=pipe.segment_name
         )
         figname = os.path.join(pipe.segment_parent, f'Noise_{pipe.segment_name}.pdf')
-        dub.fig.savefig(figname)
-        plt.close(dub.fig)
-        del dub.fig
-        pipe.results['noise'] = dict(
-            figname=figname,
-            beta=dub.params[0],
-            lam1=dub.params[1],
-            lam2=dub.params[2],
-            amp=dub.params[3],
-            mean=dub.mean,
-            stdev=dub.stdev,
-            chisq=dub.chisq,
-            prob=dub.prob_greater
-        )
+        f.fig.savefig(figname)
+        plt.close(f.fig)
+        del f.fig
+        if isinstance(f, DoubleExponential):
+            pipe.results['noise'] = dict(
+                figname=figname,
+                beta=f.params[0],
+                lam1=f.params[1],
+                lam2=f.params[2],
+                amp=f.params[3],
+                mean=f.mean,
+                stdev=f.stdev,
+                chisq=f.chisq,
+                prob=f.prob_greater
+            )
+        elif isinstance(f, Exponential):
+            pipe.results['noise'] = dict(
+                figname=figname,
+                lamb=f.params[0],
+                amp=f.params[1],
+                mean=f.mean,
+                chisq=f.chisq,
+                prob=f.prob_greater
+            )
     except Exception as eeps:
         print(eeps)
         pass
@@ -563,7 +527,7 @@ def follow_signal(pipe: PNSPipe, **kwargs):
       plot = extension of the plot file type to save, or None;
              default is 'pdf'
       image = (boolean) produce a spectrogram image with superimposed follower
-
+      gaussian = 'start:stop:step' in microseconds to plot gaussian fits
     """
     from ProcessingAlgorithms.SignalExtraction.peak_follower import PeakFollower
     if not pipe.signal_guess:
@@ -572,9 +536,11 @@ def follow_signal(pipe: PNSPipe, **kwargs):
 
     plot = kwargs.get('plot', 'pdf')
     image = kwargs.get('image', False)
+    gaussian = kwargs.get('gaussian')
+    sg = pipe.spectrogram
 
     follower = PeakFollower(
-        pipe.spectrogram,
+        sg,
         pipe.signal_guess,
         direction=-1)
     pipe.followers.append(follower)
@@ -622,14 +588,13 @@ def follow_signal(pipe: PNSPipe, **kwargs):
         maxy = np.ceil(np.log10(np.max(signal['peak_int'])))
         intensity.set_ylim(10**miny, 10**maxy)
         intensity.set_title(pipe.df.title, usetex=False)
-        plt.savefig(os.path.join(pipe.segment_parent, f'fol-{pipe.segment_name}.{plot}'))
+        fig.savefig(os.path.join(pipe.segment_parent, f'fol-{pipe.segment_name}.{plot}'))
+        plt.close(fig)
 
     if image:
         # Produce a plot that superimposes the follower on the
         # spectrogram, which should be clipped below by the baseline
         # and to the right by probe_destruction, if it exists
-        plt.clf()  # clear current figure
-        sg = pipe.spectrogram
         t_range = (
             sg.time[0], pipe.probe_destruction if pipe.probe_destruction else sg.time[-1])
         r = follower.results
@@ -650,16 +615,52 @@ def follow_signal(pipe: PNSPipe, **kwargs):
         time, velocity, intensity = sg.slice(t_range, v_range)
         max_intensity = np.max(intensity)
         image = plt.pcolormesh(time * 1e6, velocity,
-                               np.log10(intensity + 0.0001 * max_intensity) * 20)
+                               np.log10(intensity + 0.0001 * max_intensity) * 10)
         image.set_cmap(COLORMAPS[DEFMAP])
+        fig = plt.gcf()
+        # attempt to set the lower boundary of the colormap
+        try:
+            noise = pipe.results['noise']['mean']
+            image.set_clim(vmin=2 * noise)
+        except:
+            pass
         ax = plt.gca()
         ax.plot(signal['time'] * 1e6,
-                signal['peak_v'], 'r.', alpha=0.05)
+                signal['peak_v'], 'o', color="#FF8888", alpha=0.05, markersize=1)
         plt.colorbar(image, ax=ax, fraction=0.08)
         plt.xlabel(r'$t$ ($\mu$s)')
         plt.ylabel('$v$ (m/s)')
         plt.title(pipe.df.title, usetex=False)
-        plt.savefig(os.path.join(pipe.segment_parent, f"sg-{pipe.segment_name}.jpg"))
+        fig.savefig(os.path.join(pipe.segment_parent, f"sg-{pipe.segment_name}.jpg"))
+        plt.close(fig)
+
+    if gaussian:
+        start, end, step = [1e-6 * float(x) for x in gaussian.split(':')]
+        times = np.arange(start, end + 0.99 * step, step)
+        for t in times:
+            pretitle = [
+                pipe.title,
+                "$N=%d$" % (sg.points_per_spectrum),
+            ]
+            if sg.nfft:
+                pretitle.append(f"padding = {int(sg.nfft/sg.points_per_spectrum)}")
+            try:
+                hood = follower.hood(t=t, expand=(2, 1))
+                ut = 1e6 * hood.time
+                timing = f", {ut:.3f}" + r" $\mu$s"
+                hood.gaussian.plot(
+                    xlabel="$v$ (m/s)",
+                    ylabel="Intensity",
+                    legend=(0, 1),
+                    title=", ".join(pretitle) + timing
+                )
+                fig = plt.gcf()
+                fig.set_size_inches(6, 4.5)
+                fname = f"gauss_{int(ut*1000)}.pdf"
+                fig.savefig(os.path.join(pipe.output_dir, fname))
+                plt.close(fig)
+            except Exception as eeps:
+                print(f"Error {eeps} making gaussian for time {1e6*t:.2} µs")
 
 
 def show_discrepancies(pipe: PNSPipe, **kwargs):
@@ -726,90 +727,90 @@ def show_discrepancies(pipe: PNSPipe, **kwargs):
                 fig.close()
 
 
-def gaussian_fit(pipe: PNSPipe, **kwargs):
-    """
-    oops
-    """
-    for signal in pipe.signals:
+# def gaussian_fit(pipe: PNSPipe, **kwargs):
+    # """
+    # oops
+    # """
+    # for signal in pipe.signals:
         # First add the requisite columns
-        blanks = np.zeros(len(signal)) + np.nan
-        signal['center'] = blanks
-        signal['width'] = blanks
-        signal['amplitude'] = blanks
-        signal['dcenter'] = blanks
-        signal['mean'] = blanks
-        signal['sigma'] = blanks
+        # blanks = np.zeros(len(signal)) + np.nan
+        # signal['center'] = blanks
+        # signal['width'] = blanks
+        # signal['amplitude'] = blanks
+        # signal['dcenter'] = blanks
+        # signal['mean'] = blanks
+        # signal['sigma'] = blanks
 
-        for n in range(len(signal)):
-            row = signal.iloc[n]
-            t_index = row['t_index']
-            vpeak = sg._velocity_to_index(row['velocity'])
+        # for n in range(len(signal)):
+            # row = signal.iloc[n]
+            # t_index = row['t_index']
+            # vpeak = sg._velocity_to_index(row['velocity'])
             # vfrom, vto = row['vi_span']
-            vfrom, vto = vpeak - neighborhood, vpeak + neighborhood
-            powers = sg.intensity[vfrom:vto, t_index]
-            speeds = sg.velocity[vfrom:vto]
-            mom = moment(speeds, powers)
-            signal.loc[n, 'mean'] = mom['center']
-            signal.loc[n, 'sigma'] = mom['std_dev']
-            gus = Gaussian(
-                speeds, powers,
-                center=row['velocity'],
-                width=sg.velocity[2] - sg.velocity[0]
-            )
-            if gus.valid:
-                signal.loc[n, 'center'] = gus.center
-                signal.loc[n, 'width'] = gus.width
-                signal.loc[n, 'amplitude'] = gus.amplitude
-                diff = gus.center - signal.loc[n, 'velocity']
-                signal.loc[n, 'dcenter'] = diff
-                discrepancy = abs(diff / gus.width)
-                if discrepancy > sigmas:
-                    # The difference between the peak follower and the gaussian
-                    # fit was more than 1 value of the width.
-                    # Let's print out a plot to show what's going on
-                    plt.clf()
-                    vmin, vmax = sg.velocity[vfrom], sg.velocity[vto]
-                    # make sure we have all the freshest values
-                    row = signal.iloc[n]
+            # vfrom, vto = vpeak - neighborhood, vpeak + neighborhood
+            # powers = sg.intensity[vfrom:vto, t_index]
+            # speeds = sg.velocity[vfrom:vto]
+            # mom = moment(speeds, powers)
+            # signal.loc[n, 'mean'] = mom['center']
+            # signal.loc[n, 'sigma'] = mom['std_dev']
+            # gus = Gaussian(
+                # speeds, powers,
+                # center=row['velocity'],
+                # width=sg.velocity[2] - sg.velocity[0]
+            # )
+            # if gus.valid:
+                # signal.loc[n, 'center'] = gus.center
+                # signal.loc[n, 'width'] = gus.width
+                # signal.loc[n, 'amplitude'] = gus.amplitude
+                # diff = gus.center - signal.loc[n, 'velocity']
+                # signal.loc[n, 'dcenter'] = diff
+                # discrepancy = abs(diff / gus.width)
+                # if discrepancy > sigmas:
+                # The difference between the peak follower and the gaussian
+                # fit was more than 1 value of the width.
+                # Let's print out a plot to show what's going on
+                # plt.clf()
+                # vmin, vmax = sg.velocity[vfrom], sg.velocity[vto]
+                # make sure we have all the freshest values
+                # row = signal.iloc[n]
 
-                    plt.plot([row['velocity'], ],
-                             [row['intensity'], ], 'k*')
-                    plt.plot([row['mean'] + n * row['sigma'] for n in (-1, 0, 1)],
-                             [row['intensity'] for x in (-1, 0, 1)],
-                             'gs')
-                    plt.plot(speeds, powers, 'r.')
-                    vels = np.linspace(gus.center - 6 * gus.width,
-                                       gus.center + 6 * gus.width, 100)
-                    plt.plot(vels, gus(vels), 'b-', alpha=0.5)
-                    tval = f"${pipe.spectrogram.time[t_index]*1e6:.2f}"
-                    plt.title(tval + "$~ µs")
-                    plt.xlabel("Velocity (m/s)")
-                    plt.ylabel(r"Intensity")
-                    plt.xlim(vmin, vmax)
-                    plt.savefig(os.path.join(pipe.output_dir, f'bad{t_index}.pdf'))
-                    plt.close()
-                    with open(os.path.join(pipe.output_dir, f'bad{t_index}.txt'), 'w') as f:
-                        f.write(pd.DataFrame(
-                            {'power': powers, }, index=speeds).to_csv())
+                # plt.plot([row['velocity'], ],
+                # [row['intensity'], ], 'k*')
+                # plt.plot([row['mean'] + n * row['sigma'] for n in (-1, 0, 1)],
+                # [row['intensity'] for x in (-1, 0, 1)],
+                # 'gs')
+                # plt.plot(speeds, powers, 'r.')
+                # vels = np.linspace(gus.center - 6 * gus.width,
+                # gus.center + 6 * gus.width, 100)
+                # plt.plot(vels, gus(vels), 'b-', alpha=0.5)
+                # tval = f"${pipe.spectrogram.time[t_index]*1e6:.2f}"
+                # plt.title(tval + "$~ µs")
+                # plt.xlabel("Velocity (m/s)")
+                # plt.ylabel(r"Intensity")
+                # plt.xlim(vmin, vmax)
+                # plt.savefig(os.path.join(pipe.output_dir, f'bad{t_index}.pdf'))
+                # plt.close()
+                # with open(os.path.join(pipe.output_dir, f'bad{t_index}.txt'), 'w') as f:
+                # f.write(pd.DataFrame(
+                # {'power': powers, }, index=speeds).to_csv())
 
-    for signal in pipe.signals:
-        pipe.log(signal.to_string(
-            formatters=pipe.pandas_format, sparsify=False))
-        pipe.log("\n\n")
-        plt.clf()
-        fig, axes = plt.subplots(3, 1, sharex=True, figsize=(6, 6))
-        top, middle, bottom = axes
-        top.semilogy(signal.time * 1e6, signal.intensity)
-        top.set_ylabel('Intensity')
-        top.set_title(pipe.df.basename)
-        middle.plot(signal.time * 1e6, signal.velocity)
-        middle.set_ylabel(r'$v~(\mathrm{m/s})$')
-        bottom.errorbar(signal['time'] * 1e6,
-                        signal.dcenter, yerr=signal.width, fmt='b.',
-                        markersize=1.0, lw=0.5)
-        bottom.set_xlabel(r'$t~(\mu \mathrm{s})$')
-        bottom.set_ylabel(r'$\delta v~(\mathrm{m/s})$')
-        plt.savefig(os.path.join(pipe.output_dir, 'gauss.pdf'))
+    # for signal in pipe.signals:
+        # pipe.log(signal.to_string(
+            # formatters=pipe.pandas_format, sparsify=False))
+        # pipe.log("\n\n")
+        # plt.clf()
+        # fig, axes = plt.subplots(3, 1, sharex=True, figsize=(6, 6))
+        # top, middle, bottom = axes
+        # top.semilogy(signal.time * 1e6, signal.intensity)
+        # top.set_ylabel('Intensity')
+        # top.set_title(pipe.df.basename)
+        # middle.plot(signal.time * 1e6, signal.velocity)
+        # middle.set_ylabel(r'$v~(\mathrm{m/s})$')
+        # bottom.errorbar(signal['time'] * 1e6,
+                # signal.dcenter, yerr=signal.width, fmt='b.',
+                # markersize=1.0, lw=0.5)
+        # bottom.set_xlabel(r'$t~(\mu \mathrm{s})$')
+        # bottom.set_ylabel(r'$\delta v~(\mathrm{m/s})$')
+        # plt.savefig(os.path.join(pipe.output_dir, 'gauss.pdf'))
 
 
 def decode_arg(x):
@@ -881,7 +882,7 @@ if __name__ == '__main__':
                         help="Delete existing files before the run")
     parser.add_argument('--dry', action='store_true',
                         help='List the files that would be handled and where the output would be written')
-    parser.add_argument('-p', '--post', default=None,
+    parser.add_argument('-p', '--post', default='postscript.txt',
                         help="File with post processing scripts")
     parser.add_argument('-t', '--threads', default=1,
                         help='Run this many threads in parallel')
