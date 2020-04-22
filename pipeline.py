@@ -27,8 +27,8 @@ args = parser.parse_args()
 
 
 #Just set directory here, I can't be bothered
-directory = '/home/lanl/Documents/dig/new/002/'
-saveTo = '/home/lanl/Documents/dig/digImages/'
+directory = '/home/max/clinic/dig/pipe/'
+saveTo = '/home/max/clinic/dig/digImages/'
 
 a = datetime.datetime.now()
 time = ('%02d.%02d %02d:%02d'%(a.month,a.day,a.hour,a.minute))

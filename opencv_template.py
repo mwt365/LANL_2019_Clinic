@@ -3,9 +3,10 @@
 import cv2
 import spectrogram as sp
 import numpy as np
-from scipy.misc import imsave
+
 from matplotlib import pyplot as plt
 from ImageProcessing.Templates.templates import *
+import imageio
 
 
 
@@ -16,7 +17,7 @@ from ImageProcessing.Templates.templates import *
 
 def main():
 
-    path = "/Users/trevorwalker/Desktop/Clinic/For_Candace/newdigs/CH_2_009.dig"
+    path = '/home/max/clinic/dig/GEN1_CHAN1TEK001.dig'
     spec = sp.Spectrogram(path, 0.0, 60.0e-6, overlap_shift_factor= 1/8, form='db')
 
     matrix = spec.intensity
@@ -37,11 +38,11 @@ def main():
     template1 = bigger_start_pattern
 
 
-    imsave("./template1.png", template1[:])
-    imsave("./photo.png", spec[:])
+    imageio.imwrite("./template1.png", template1[:])
+    imageio.imwrite("./photo.png", spec[:])
 
 
-    # imread(path, 0) signifies reading in the image in grayscale mode
+    # imread(pa th, 0) signifies reading in the image in grayscale mode
     img = cv2.imread('./photo.png',0)
 
     img2 = img.copy()

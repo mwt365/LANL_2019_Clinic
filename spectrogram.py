@@ -98,6 +98,9 @@ class Spectrogram:
         self.t_end = self.t_start + self.data.dt * (p_end - p_start + 1)
 
         self.wavelength = wavelength
+        """
+        The wavelength of the spectrogram
+        """
         self.points_per_spectrum = points_per_spectrum
         self.overlap = overlap
         self.window_function = window_function
@@ -106,7 +109,7 @@ class Spectrogram:
         self.detrend = detrend
 
         # the following will be set by _calculate
-        self.time = None
+        self.time = None 
         self.frequency = None
         self.velocity = None
         self.intensity = None
@@ -214,6 +217,9 @@ class Spectrogram:
 
     def histo_levels(self, array: np.ndarray):
         """
+        Input: self
+        array
+        Output: vector
         Sort a one-dimensional version of the array and report a vector of
         the values at 0%, 1%, ..., 100%
         """
@@ -443,7 +449,7 @@ if __name__ == '__main__':
     import template_matching as tm
     import baselines
 
-    path = "/Users/trevorwalker/Desktop/Clinic/For_Candace/newdigs/CH_2_009.dig"
+    path = '/home/max/clinic/dig/GEN1_CHAN1TEK001.dig'
 
     sp = Spectrogram(path, 0.0, 60.0e-6, overlap_shift_factor= 1/8, form='power')
     sgram = Spectrogram(path, 0.0, 60.0e-6, overlap_shift_factor= 1/8, form='db')
