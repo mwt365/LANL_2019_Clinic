@@ -478,6 +478,7 @@ class Spectrogram:
         # Our prediction for the probe destruction time. Just to make it easier to plot. 
 
         cmapUsed = COLORMAPS[DEFMAP]
+        print(COLORMAPS.keys())
         if 'cmap' in kwargs:
             # To use the sciviscolor colormaps that we have downloaded.
             attempt = kwargs['cmap']
@@ -532,16 +533,16 @@ class Spectrogram:
 
             # Plot the start time estimate.
             axes.plot([self.estimatedStartTime_]*len(self.velocity), self.velocity, "k-", label = "Estimated Start Time", alpha = 0.75)
-            plt.legend()
+            # plt.legend()
             
             print(f"The current maximum of the colorbar is {np.max(zData[:,:endTime])} for the dataset {data}")
             plt.gcf().colorbar(pcm, ax=axes)
-            axes.set_ylabel('Velocity (m/s)', fontsize = 18)
-            axes.set_xlabel('Time ($\mu$s)', fontsize = 18)
-            axes.xaxis.set_tick_params(labelsize=14)
-            axes.yaxis.set_tick_params(labelsize=14)        
-            title = self.data.filename.split('/')[-1]
-            axes.set_title(title.replace("_", "-") + f" {data} spectrogram", fontsize = 24)
+            axes.set_ylabel('Velocity (m/s)', fontsize = 14)
+            axes.set_xlabel('Time ($\mu$s)', fontsize = 14)
+            axes.xaxis.set_tick_params(labelsize=12)
+            axes.yaxis.set_tick_params(labelsize=12)        
+            # title = self.data.filename.split('/')[-1]
+            # axes.set_title(title.replace("_", "-") + f" {data} spectrogram", fontsize = 24)
 
             axes.set_xlim(left, right)
             axes.set_ylim(bot, top) # The None value is the default value and does not update the axes limits.            
@@ -552,7 +553,7 @@ class Spectrogram:
             self.availableData.remove("real")
             self.availableData.remove("imaginary")
         
-        return pcms
+        return pcms, axes
 
 
 if __name__ == '__main__':

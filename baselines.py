@@ -12,6 +12,7 @@ import numpy as np
 from spectrogram import Spectrogram
 from scipy.signal import find_peaks
 from scipy.fftpack import fft
+import matplotlib.pyplot as plt
 
 
 def baselines_by_squash(spectrogram: Spectrogram):
@@ -54,7 +55,7 @@ def baselines_by_squash(spectrogram: Spectrogram):
     tallest = combined_spectrum.max()
     peaks, properties = find_peaks(
         combined_spectrum,
-        height=0.05 * tallest,  # peaks must be this tall to count
+        height=0.1 * tallest,  # peaks must be this tall to count
         distance=100,  # peaks must be separated by this much at minimum
     )
     heights = properties['peak_heights']
@@ -142,11 +143,16 @@ if __name__ == '__main__':
     #     for j in range(len(v)):
     #         print(f"{v[j]:.4f}\t{i[j]:.4f}")
     #     print("\n")
+    # axes = plt.gca()
 
     peaks, us, _ = baselines_by_squash(sgram)
+    velos = []
+    times = [x for x in range(0,30)]
+
+    pcms, axes = sgram.plot(min_time=0, min_vel=100, max_vel=8000, cmap='3wave-yellow-grey-blue')
+
     for peak in peaks:
         velo_index = sgram._velocity_to_index(peak)
-        print(velo_index)
-        print(peak,'\n')
+        axes.plot(times, [peak for x in range(0,30)], color='red', linewidth=3, markersize=15)
 
-    sgram.plot()
+    plt.show()

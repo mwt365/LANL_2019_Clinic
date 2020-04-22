@@ -342,6 +342,7 @@ class TemplateMatcher():
 
     def add_to_plot(self, axes, times, velos, scores, methodsUsed,
                     find_medoids=True, 
+                    medoids_only=False,
                     verbose=False, 
                     visualize_opacity=False,
                     show_bounds=True):
@@ -351,8 +352,6 @@ class TemplateMatcher():
             dt = spec.time[self.span] * 1e6
             patch = Rectangle((0,0), dt, dv, fill=False, color='b', alpha=0.8)
             axes.add_patch(patch)
-
-        spec.plot(axes)
 
         method_color_dict = {}
         method_color_dict['cv2.TM_CCOEFF'] = ('ro', 'red')
@@ -383,29 +382,31 @@ class TemplateMatcher():
                 else:
                     opacity = ((self.k - rank) / self.k)
                 point_method = methodsUsed[i]
-                point, = plt.plot(times[i], velos[i], method_color_dict[methodsUsed[i]][0], markersize=2.5, alpha=opacity)
+                point, = axes.plot(times[i], velos[i], method_color_dict[methodsUsed[i]][0], markersize=2.5, alpha=opacity)
             else:
-                # plot the point found from template matching in order from 'best' to 'worst' match
-                point_method = methodsUsed[i]
-                point, = plt.plot(times[i], velos[i], method_color_dict[methodsUsed[i]][0], markersize=2.5, alpha=.80)
+                if find_medoids and (medoids_only==False):
+                    point_method = methodsUsed[i]
+                    # plot the point found from template matching in order from 'best' to 'worst' match
+                    point, = axes.plot(times[i], velos[i], method_color_dict[methodsUsed[i]][0], markersize=2.5, alpha=.80)
         
             # add each method to the plot legend handle
-            if point_method not in seen_handles:
-                seen_handles.append(point_method)
-                point.set_label(point_method)
-                handles.append(point)
+            if (medoids_only==False):
+                if point_method not in seen_handles:
+                    seen_handles.append(point_method)
+                    point.set_label(point_method)
+                    handles.append(point)
     
         # cluster coordinates received from template matching, find cluster centers and plot them
         if find_medoids:
             centers = self.find_kmedoids(times, velos)
             for t,v in centers:
-                center, = plt.plot(t, v, 'yo', markersize=4, alpha=.9)
+                center, = axes.plot(t, v, 'ro', markersize=4, alpha=.9)
             center.set_label("cluster center")
             handles.append(center)
 
 
         # #update the legend with the current plotting handles
-        plt.legend(handles=handles)
+        axes.legend(handles=handles)
 
         # display plot
         plt.show()
@@ -440,13 +441,14 @@ if __name__ == "__main__":
     span = 200
     # gives user the option to click, by default it searches from (0,0)
     template_matcher = TemplateMatcher(spec, None, template=Templates.opencv_long_start_pattern5.value, span=span, k=20, methods=['cv2.TM_CCOEFF_NORMED', 'cv2.TM_SQDIFF', 'cv2.TM_SQDIFF_NORMED'])
-    
+    # template_matcher = TemplateMatcher(spec, None, template=Templates.opencv_long_start_pattern5.value, span=span, k=20)
+
     # # masks the baselines to avoid matching with saturated signals and echoes
     # template_matcher.mask_baselines()
 
     times, velos, scores, methodsUsed = template_matcher.match()
 
-    axes = plt.gca()
+    pcms, axes = spec.plot(min_time=0, min_vel=100, max_vel=8000, cmap='3wave-yellow-grey-blue')
 
-    template_matcher.add_to_plot(axes, times, velos, scores, methodsUsed, find_medoids=False, verbose=False, visualize_opacity=False, show_bounds=False)
+    template_matcher.add_to_plot(axes, times, velos, scores, methodsUsed, find_medoids=True, medoids_only=True,verbose=False, visualize_opacity=False, show_bounds=False)
 
