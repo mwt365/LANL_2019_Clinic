@@ -7,7 +7,7 @@
   Purpose: Attempt to match templates in a user specified area.
   Created: 2/16/20
 """
-import cv2
+import cv2 # The general computer vision library for python.
 import numpy as np
 from baselines import baselines_by_squash
 from spectrogram import Spectrogram
@@ -15,10 +15,10 @@ import ImageProcessing.Templates.saveTemplateImages as templateHelper
 import os
 from ImageProcessing.Templates.templates import Templates
 import scipy
-# if scipy.__version__ > "1.2.1":
-#     from imageio import imsave
-# else:
-from scipy.misc import imsave
+if scipy.__version__ > "1.2.1":
+    from imageio import imsave
+else:
+    from scipy.misc import imsave
 from matplotlib import pyplot as plt
 from matplotlib.patches import Rectangle
 from sklearn_extra.cluster import KMedoids
@@ -64,6 +64,10 @@ class TemplateMatcher():
         self.template_time_offset_index = int(template[1])
         self.template_velo_offset_index = int(template[2])
         self.k = int(k)
+
+        # To get the intensity matrix the way it was when we trained it.
+        epsilon = 1e-10
+        self.matrixToMatch = 20 * np.log10(2*self.spectrogram.psd/(self.spectrogram.points_per_spectrum*self.spectrogram.data.dt) + epsilon)
 
         self.zero_time_index = spectrogram._time_to_index(0)
         self.zero_velo_index = spectrogram._velocity_to_index(0)
@@ -156,8 +160,7 @@ class TemplateMatcher():
 
     def match(self):
 
-        matrix = self.spectrogram.intensity
-        cropped_spectrogram = self.crop_intensities(matrix)
+        cropped_spectrogram = self.crop_intensities(self.matrixToMatch)
 
         imsave("./im_template.png", self.template[:])
         imsave("./im_cropped_bg.png", cropped_spectrogram[:])
@@ -245,8 +248,7 @@ class TemplateMatcher():
         else:
             # Load all the templates once. Then call all the matches from there.
 
-            matrix = self.spectrogram.intensity
-            cropped_spectrogram = self.crop_intensities(matrix)
+            cropped_spectrogram = self.crop_intensities(self.matrixToMatch)
 
             imsave("./im_cropped_bg.png", cropped_spectrogram[:])
 
@@ -440,7 +442,7 @@ if __name__ == "__main__":
     """
     from ProcessingAlgorithms.preprocess.digfile import DigFile
 
-    path = "../dig/CH_4_009/seg00.dig"
+    path = "../dig/GEN3CH_4_009/seg00.dig"
     df = DigFile(path)
     spec = Spectrogram(df, 0.0, 60.0e-6, overlap_shift_factor= 7/8, form='db')
 

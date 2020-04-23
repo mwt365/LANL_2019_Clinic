@@ -214,8 +214,7 @@ class Spectrogram:
         # Now compute the probe destruction time.
         self.probeDestructionTime()
         
-        # self.estimateStartTime()
-        # self.estimatedStartTime_ = 0
+        self.estimateStartTime()
 
     def transform(self, vals):
         """
