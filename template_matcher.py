@@ -449,13 +449,13 @@ if __name__ == "__main__":
     # template_matcher = TemplateMatcher(spec, None, template=Templates.opencv_long_start_pattern5.value, span=span, k=20)
 
     # masks the baselines to avoid matching with saturated signals and echoes
-    template_matcher.mask_baselines()
+    # template_matcher.mask_baselines()
 
     times, velos, scores, methodsUsed = template_matcher.match()
 
-    pcms, axes = spec.plot(min_time=0, min_vel=100, max_vel=8000, cmap='3w_gby')
-    pcm = pcms['intensity raw']
-    # pcm.set_clim(-30, -60)
+    pcms, axes = template_matcher.spectrogram.plot(min_time=0, min_vel=100, max_vel=8000, cmap='3w_gby')
+    # pcm = pcms['intensity raw']
+    # pcm.set_clim(100, 0)
 
 
     template_matcher.add_to_plot(axes, times, velos, scores, methodsUsed, find_medoids=True, medoids_only=False,verbose=False, visualize_opacity=False, show_bounds=False)
