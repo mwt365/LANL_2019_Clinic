@@ -868,7 +868,7 @@ if __name__ == '__main__':
     )
 
     parser.add_argument('-q', '--quiet', help="Don't report progress")
-    parser.add_argument('-s', '--segments', default=True,
+    parser.add_argument('-s', '--segments', action='store_false',
                         help="Only process segments")
     parser.add_argument('-r', '--regex', default=r'.*',
                         help="Regular expression to select files; defaults to '.*'")

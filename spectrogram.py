@@ -353,7 +353,7 @@ class Spectrogram:
         my_slice = self.power(self.slice((t_min, t_max), (v_min, v_max))[2])
         # set the cutoff for the maximum intensity we consider by
         # looking in histogram_levels
-        cutoff = self.histogram_levels['ones'][1]
+        cutoff = self.power(self.histogram_levels['ones'][1])
 
         # construct the bins
         bins = np.linspace(0, cutoff, n_bins)
