@@ -151,7 +151,7 @@ if __name__ == '__main__':
 
     pcms, axes = sgram.plot(min_time=0, min_vel=100, max_vel=5000, cmap='3w_gby')
     pcm = pcms['intensity raw']
-    pcm.set_clim(-40, -55)
+    pcm.set_clim(-40, -65)
 
     for peak in peaks:
         velo_index = sgram._velocity_to_index(peak)

@@ -338,11 +338,12 @@ class TemplateMatcher():
 
     def mask_baselines(self):
         peaks, _, _ = baselines_by_squash(self.spectrogram)
+        minimum = np.min(self.spectrogram.intensity)
         for peak in peaks:
             velo_index = self.spectrogram._velocity_to_index(peak)
-            velo_index = velo_index - 10
-            for i in range(velo_index, velo_index+20, 1):
-                self.spectrogram.intensity[i][:] = 0
+            velo_index = velo_index - 20
+            for i in range(velo_index, velo_index+40, 1):
+                self.spectrogram.intensity[i][:] = minimum
 
 
 
@@ -422,8 +423,6 @@ class TemplateMatcher():
 
 if __name__ == "__main__":
     """
-    known pattern/file pairs that yield good points
-
     WHITE_CH1_SHOT/seg00.dig -- opencv_long_start_pattern4 span=200 
     WHITE_CH2_SHOT/seg00.dig -- opencv_long_start_pattern4 span=200 
     WHITE_CH3_SHOT/seg00.dig -- opencv_long_start_pattern4 span=200 
@@ -440,7 +439,7 @@ if __name__ == "__main__":
     """
     from ProcessingAlgorithms.preprocess.digfile import DigFile
 
-    path = "../dig/CH_4_009/seg00.dig"
+    path = "../dig/WHITE_CH1_SHOT/seg00.dig"
     df = DigFile(path)
     spec = Spectrogram(df, 0.0, 60.0e-6, overlap_shift_factor= 7/8, form='db')
 
@@ -449,12 +448,15 @@ if __name__ == "__main__":
     template_matcher = TemplateMatcher(spec, None, template=Templates.opencv_long_start_pattern5.value, span=span, k=20, methods=['cv2.TM_CCOEFF_NORMED', 'cv2.TM_SQDIFF', 'cv2.TM_SQDIFF_NORMED'])
     # template_matcher = TemplateMatcher(spec, None, template=Templates.opencv_long_start_pattern5.value, span=span, k=20)
 
-    # # masks the baselines to avoid matching with saturated signals and echoes
-    # template_matcher.mask_baselines()
+    # masks the baselines to avoid matching with saturated signals and echoes
+    template_matcher.mask_baselines()
 
     times, velos, scores, methodsUsed = template_matcher.match()
 
-    pcms, axes = spec.plot(min_time=0, min_vel=100, max_vel=8000, cmap='3wave-yellow-grey-blue')
+    pcms, axes = spec.plot(min_time=0, min_vel=100, max_vel=8000, cmap='3w_gby')
+    pcm = pcms['intensity raw']
+    # pcm.set_clim(-30, -60)
+
 
     template_matcher.add_to_plot(axes, times, velos, scores, methodsUsed, find_medoids=True, medoids_only=False,verbose=False, visualize_opacity=False, show_bounds=False)
 
