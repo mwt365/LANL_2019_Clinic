@@ -15,10 +15,10 @@ import ImageProcessing.Templates.saveTemplateImages as templateHelper
 import os
 from ImageProcessing.Templates.templates import Templates
 import scipy
-if scipy.__version__ > "1.2.1":
-    from imageio import imsave
-else:
-    from scipy.misc import imsave
+# if scipy.__version__ > "1.2.1":
+#     from imageio import imsave
+# else:
+from scipy.misc import imsave
 from matplotlib import pyplot as plt
 from matplotlib.patches import Rectangle
 from sklearn_extra.cluster import KMedoids
@@ -117,7 +117,7 @@ class TemplateMatcher():
 
     def crop_intensities(self, matrix):
 
-        percentile_value = 90
+        percentile_value = 98
 
         time_bounds = self.time_bounds
         velo_bounds = self.velo_bounds
@@ -132,14 +132,20 @@ class TemplateMatcher():
 
         self.flipped_velo_bounds = flipped_velo_bounds
 
-        sorted_matrix = sorted(matrix.flatten(), reverse=True)
-        threshold_percentile = np.percentile(sorted_matrix, percentile_value)
-
-        cleaned_matrix = np.where(matrix > threshold_percentile, matrix+threshold_percentile, threshold_percentile)
         # imsave("./original.png", cleaned_matrix[:])
 
-        cleaned_matrix = np.flip(np.flip(cleaned_matrix), axis=1)
-        # imsave("./flipped_original.png", cleaned_matrix[:])
+        cleaned_matrix = np.flip(np.flip(matrix), axis=1)
+        cleaned_matrix = cleaned_matrix - np.min(cleaned_matrix)
+
+        sorted_matrix = sorted(cleaned_matrix.flatten(), reverse=True)
+        threshold_percentile = np.percentile(sorted_matrix, percentile_value)
+
+        cleaned_matrix = np.where(cleaned_matrix > threshold_percentile, cleaned_matrix+threshold_percentile, threshold_percentile)
+
+        imsave("./flipped_original.png", cleaned_matrix[:])
+
+        
+
 
         spec = cleaned_matrix[ flipped_velo_bounds[0]:flipped_velo_bounds[1], time_bounds[0]:time_bounds[1]]
         # imsave("./debug.png", spec[:])
@@ -450,5 +456,5 @@ if __name__ == "__main__":
 
     pcms, axes = spec.plot(min_time=0, min_vel=100, max_vel=8000, cmap='3wave-yellow-grey-blue')
 
-    template_matcher.add_to_plot(axes, times, velos, scores, methodsUsed, find_medoids=True, medoids_only=True,verbose=False, visualize_opacity=False, show_bounds=False)
+    template_matcher.add_to_plot(axes, times, velos, scores, methodsUsed, find_medoids=True, medoids_only=False,verbose=False, visualize_opacity=False, show_bounds=False)
 

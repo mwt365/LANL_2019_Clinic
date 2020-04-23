@@ -149,7 +149,9 @@ if __name__ == '__main__':
     velos = []
     times = [x for x in range(0,30)]
 
-    pcms, axes = sgram.plot(min_time=0, min_vel=100, max_vel=8000, cmap='3wave-yellow-grey-blue')
+    pcms, axes = sgram.plot(min_time=0, min_vel=100, max_vel=5000, cmap='3w_gby')
+    pcm = pcms['intensity raw']
+    pcm.set_clim(-40, -55)
 
     for peak in peaks:
         velo_index = sgram._velocity_to_index(peak)

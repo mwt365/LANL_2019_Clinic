@@ -215,7 +215,7 @@ class Spectrogram:
         self.probeDestructionTime()
         
         # self.estimateStartTime()
-        self.estimatedStartTime_ = 0
+        # self.estimatedStartTime_ = 0
 
     def transform(self, vals):
         """
@@ -442,7 +442,6 @@ class Spectrogram:
         the baseline intensity.
         """
         import baselineTracking
-        print(self.data)
         peaks, _, _ = baselineTracking.baselines.baselines_by_squash(self)
         self.estimatedStartTime_ = baselineTracking.baselineTracking(self, peaks[0], 0.024761904761904763)
 
@@ -532,7 +531,7 @@ class Spectrogram:
                     **kwargs)
 
             # Plot the start time estimate.
-            axes.plot([self.estimatedStartTime_]*len(self.velocity), self.velocity, "k-", label = "Estimated Start Time", alpha = 0.75)
+            # axes.plot([self.estimatedStartTime_]*len(self.velocity), self.velocity, "k-", label = "Estimated Start Time", alpha = 0.75)
             # plt.legend()
             
             print(f"The current maximum of the colorbar is {np.max(zData[:,:endTime])} for the dataset {data}")
