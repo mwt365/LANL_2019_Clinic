@@ -149,9 +149,10 @@ if __name__ == '__main__':
     velos = []
     times = [x for x in range(0,30)]
 
-    pcms, axes = sgram.plot(min_time=0, min_vel=100, max_vel=5000, cmap='3w_gby')
-    pcm = pcms['intensity raw']
-    pcm.set_clim(-40, -55)
+    pcms, axes = sgram.plot(min_time=0, min_vel=100, max_vel=5000, cmap='3w_gby') #plot the spectrogram
+
+    pcm = pcms['intensity raw'] #get color map
+    pcm.set_clim(-30, -65) #set range of color map
 
     for peak in peaks:
         velo_index = sgram._velocity_to_index(peak)
