@@ -49,10 +49,17 @@ class PeakFollower(Follower):
         """
         Repeatedly call step until it fails.
         """
-        while self.step():
+        intensities = []
+        counter = 0
+        
+        while self.step(intensities) and counter < 10:
+            counter+=1
             pass
+        
+        return np.sum(intensities)
+        
 
-    def step(self):
+    def step(self, mylist):
         """
         Attempt to fit a gaussian starting from the coeffients
         in the input parameter to intensities vs velocities.
@@ -83,6 +90,8 @@ class PeakFollower(Follower):
 
         top = low_to_high[n]  # index of the tallest intensity peak
         v_high = velocities[top]
+        mylist.append(intensities[top])
+
 
         # add this to our results
         self.results['velocity_index_spans'].append((p_start, p_end))

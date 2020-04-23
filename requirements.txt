@@ -10,3 +10,4 @@ jupyter
 pandas
 pep8
 lxml
+opencv-python

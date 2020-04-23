@@ -2,7 +2,6 @@
 
 """
 ::
-
    Author:  LANL Clinic 2019 --<lanl19@cs.hmc.edu>
    Purpose: Compute a spectrogram from a DigFile
    Created: 9/20/19
@@ -16,7 +15,7 @@ from scipy import signal
 from ProcessingAlgorithms.preprocess.digfile import DigFile
 from plotter import COLORMAPS
 
-DEFMAP = 'blue-orange-div'
+DEFMAP = '3w_gby'
 
 class Spectrogram:
     """
@@ -94,6 +93,10 @@ class Spectrogram:
         if isinstance(digfile, DigFile):
             self.data = digfile
         else:
+            print(isinstance(digfile, DigFile))
+            print(type(digfile))
+            print(digfile)
+
             raise TypeError("Unknown file type")
 
         self.t_start = t_start if t_start != None else self.data.t0
@@ -179,7 +182,6 @@ class Spectrogram:
                 scaling=scaling,
                 mode=mode
             )
-            spec *= 2.0 / (self.points_per_spectrum * self.data.dt)
             setattr(self, mode, spec)
             self.orig_spec_output = spec
 
@@ -193,8 +195,6 @@ class Spectrogram:
         # to suppress some noise.
         # I think the following is an attempt to normalize across
         # different numbers of points per spectrum.
-        # if True:
-        #     spec *= 2.0 / (self.points_per_spectrum * self.data.dt)
 
         if mode == 'complex':
             self.complex = spec
@@ -213,6 +213,8 @@ class Spectrogram:
 
         # Now compute the probe destruction time.
         self.probeDestructionTime()
+        
+        self.estimateStartTime()
 
     def transform(self, vals):
         """
@@ -433,6 +435,15 @@ class Spectrogram:
 
         self.probe_destruction_time_max = self.time[self.probe_destruction_index_max]
 
+    def estimateStartTime(self):
+        """
+        Compute an approximate value for the jump off time based upon the change in 
+        the baseline intensity.
+        """
+        import baselineTracking
+        peaks, _, _ = baselineTracking.baselines.baselines_by_squash(self)
+        self.estimatedStartTime_ = baselineTracking.baselineTracking(self, peaks[0], 0.024761904761904763)
+
     def plotHist(self, fig = None, minFrac=0.0, maxFrac = 1.0, numBins = 1001, **kwargs):
         if fig == None:
             fig = plt.figure()
@@ -453,7 +464,7 @@ class Spectrogram:
 
     def plot(self, transformData = False, **kwargs):
         # max_vel=6000, vmin=-200, vmax=100):
-        pcms = {data: 0 for data in self.availableData}
+        pcms = {}
         if "psd" in self.availableData:
             self.availableData.append("intensity")
         if "complex" in self.availableData:
@@ -465,6 +476,7 @@ class Spectrogram:
         # Our prediction for the probe destruction time. Just to make it easier to plot. 
 
         cmapUsed = COLORMAPS[DEFMAP]
+        print(COLORMAPS.keys())
         if 'cmap' in kwargs:
             # To use the sciviscolor colormaps that we have downloaded.
             attempt = kwargs['cmap']
@@ -517,14 +529,18 @@ class Spectrogram:
                     self.transform(zData[:,:endTime]) if (data != "intensity" and transformData) else zData[:,:endTime],
                     **kwargs)
 
+            # Plot the start time estimate.
+            # axes.plot([self.estimatedStartTime_]*len(self.velocity), self.velocity, "k-", label = "Estimated Start Time", alpha = 0.75)
+            # plt.legend()
+            
             print(f"The current maximum of the colorbar is {np.max(zData[:,:endTime])} for the dataset {data}")
             plt.gcf().colorbar(pcm, ax=axes)
-            axes.set_ylabel('Velocity (m/s)', fontsize = 18)
-            axes.set_xlabel('Time ($\mu$s)', fontsize = 18)
-            axes.xaxis.set_tick_params(labelsize=14)
-            axes.yaxis.set_tick_params(labelsize=14)        
-            title = self.data.filename.split('/')[-1]
-            axes.set_title(title.replace("_", "-") + f" {data} spectrogram", fontsize = 24)
+            axes.set_ylabel('Velocity (m/s)', fontsize = 14)
+            axes.set_xlabel('Time ($\mu$s)', fontsize = 14)
+            axes.xaxis.set_tick_params(labelsize=12)
+            axes.yaxis.set_tick_params(labelsize=12)        
+            # title = self.data.filename.split('/')[-1]
+            # axes.set_title(title.replace("_", "-") + f" {data} spectrogram", fontsize = 24)
 
             axes.set_xlim(left, right)
             axes.set_ylim(bot, top) # The None value is the default value and does not update the axes limits.            
@@ -535,7 +551,7 @@ class Spectrogram:
             self.availableData.remove("real")
             self.availableData.remove("imaginary")
         
-        return pcms
+        return pcms, axes
 
 
 if __name__ == '__main__':
@@ -554,7 +570,3 @@ if __name__ == '__main__':
     # Set the default window size for matplotlib to be the fullscreen - 0.5 inches on the side and the top.
 
     plt.rcParams["figure.figsize"] = [width_in-0.5, height_in-0.5]
-
-    # sp = Spectrogram('../dig/GEN3CH_4_009.dig', None,
-    #                  None, overlap_shift_factor=1 / 4)
-    # print(sp)

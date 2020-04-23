@@ -12,6 +12,7 @@ import numpy as np
 from spectrogram import Spectrogram
 from scipy.signal import find_peaks
 from scipy.fftpack import fft
+import matplotlib.pyplot as plt
 
 
 def baselines_by_squash(spectrogram: Spectrogram):
@@ -33,7 +34,7 @@ def baselines_by_squash(spectrogram: Spectrogram):
         isolated time. It might be better to chop the range into several
         intervals and insist on a significant peak in each.
     """
-    assert isinstance(spectrogram, Spectrogram)
+    # assert isinstance(spectrogram, Spectrogram)
     # Collapse along the time axis, making sure to use power,
     # not dB
     powers = spectrogram.power(spectrogram.intensity)
@@ -54,7 +55,7 @@ def baselines_by_squash(spectrogram: Spectrogram):
     tallest = combined_spectrum.max()
     peaks, properties = find_peaks(
         combined_spectrum,
-        height=0.01 * tallest,  # peaks must be this tall to count
+        height=0.1 * tallest,  # peaks must be this tall to count
         distance=100,  # peaks must be separated by this much at minimum
     )
     heights = properties['peak_heights']
@@ -134,12 +135,26 @@ def baselines_by_fft(spectrogram):
 if __name__ == '__main__':
     import os
     os.chdir('../dig')
-    sgram = Spectrogram('GEN3CH_4_009.dig', 0.0, 50.0e-6)
-    hoods = baselines_by_fft(sgram)
-    for n, h in enumerate(hoods):
-        print(f"Peak {n}\nVelocity{n}\tIntensity{n}")
-        v, i = h
-        for j in range(len(v)):
-            print(f"{v[j]:.4f}\t{i[j]:.4f}")
-        print("\n")
+    sgram = Spectrogram('./CH_4_009/seg00.dig', 0.0, 50.0e-6)
+    # hoods = baselines_by_fft(sgram)
+    # for n, h in enumerate(hoods):
+    #     print(f"Peak {n}\nVelocity{n}\tIntensity{n}")
+    #     v, i = h
+    #     for j in range(len(v)):
+    #         print(f"{v[j]:.4f}\t{i[j]:.4f}")
+    #     print("\n")
+    # axes = plt.gca()
 
+    peaks, us, _ = baselines_by_squash(sgram)
+    velos = []
+    times = [x for x in range(0,30)]
+
+    pcms, axes = sgram.plot(min_time=0, min_vel=100, max_vel=5000, cmap='3w_gby')
+    pcm = pcms['intensity raw']
+    pcm.set_clim(-40, -55)
+
+    for peak in peaks:
+        velo_index = sgram._velocity_to_index(peak)
+        axes.plot(times, [peak for x in range(0,30)], color='red', linewidth=3, markersize=15)
+
+    plt.show()

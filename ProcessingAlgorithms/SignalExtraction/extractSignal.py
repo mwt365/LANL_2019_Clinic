@@ -202,7 +202,7 @@ def documentationMain():
 
 def setupForDocumentation():
     # Set up
-    filename = "../See_if_this_is_enough_to_get_started/GEN3CH_4_009.dig"
+    filename = "../See_if_this_is_enough_to_get_started/CH_4_009.dig"
     t1 = 14.2389/1e6
     t2 = 31.796/1e6
     MySpect = Spectrogram(filename)
