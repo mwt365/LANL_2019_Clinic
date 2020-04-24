@@ -382,14 +382,12 @@ class TemplateMatcher():
                 print("color: ", method_color_dict[methodsUsed[i]][1])
                 print("method: ", methodsUsed[i],'\n')
 
-            if visualize_opacity:
-                # plot the points in descending order, decreasing their opacity so the brightest points 
+            if visualize_opacity and show_points: #not quite working
+                # plot the points in descending order, decreasing their opacity so the 'best' points 
                 # can be visualized best. 
                 rank = (i % self.k)
-                if rank == 0:
-                    opacity = (1 / self.k)
-                else:
-                    opacity = ((self.k - rank) / self.k)
+                maxscore = np.max(scores)
+                opacity = (1 / (maxscore / scores[i]))
                 point_method = methodsUsed[i]
                 point, = axes.plot(times[i], velos[i], method_color_dict[methodsUsed[i]][0], markersize=2.5, alpha=opacity)
             else:
@@ -415,7 +413,7 @@ class TemplateMatcher():
 
 
         # #update the legend with the current plotting handles
-        axes.legend(handles=handles)
+        axes.legend(handles=handles, loc='upper right')
 
         # display plot
         plt.show()
@@ -451,16 +449,21 @@ if __name__ == "__main__":
                                             span=200,
                                             k=20,
                                             methods=['cv2.TM_CCOEFF_NORMED', 'cv2.TM_SQDIFF', 'cv2.TM_SQDIFF_NORMED'])
-    # template_matcher = TemplateMatcher(spec, None, template=Templates.opencv_long_start_pattern5.value, span=span, k=20)
 
-    # masks the baselines to avoid matching with saturated signals and echoes
+
+    # masks the baselines to try and avoid matching with baselines or echoed signals
     template_matcher.mask_baselines()
 
+    # get the times and velocities from matching
     times, velos, scores, methodsUsed = template_matcher.match()
 
     pcms, axes = template_matcher.spectrogram.plot(min_time=0, min_vel=100, max_vel=8000, cmap='3w_gby')
     pcm = pcms['intensity raw']
-    pcm.set_clim(-10, -60)
+    pcm.set_clim(-20, -62)
 
-    template_matcher.add_to_plot(axes, times, velos, scores, methodsUsed, show_points=False, show_medoids=False, verbose=False, visualize_opacity=False, show_bounds=False)
-
+    template_matcher.add_to_plot(axes, times, velos, scores, methodsUsed, 
+                                show_points=True, 
+                                show_medoids=False, 
+                                verbose=False, 
+                                visualize_opacity=False, 
+                                show_bounds=True)
