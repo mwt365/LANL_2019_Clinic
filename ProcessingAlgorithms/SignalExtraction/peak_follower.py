@@ -37,7 +37,7 @@ class PeakFollower(Follower):
     def __init__(self,
                  spectrogram: Spectrogram,
                  start_point,  # either a tuple or a list of tuples
-                 max_acceleration=1000,
+                 max_acceleration=10000,
                  smoothing=4,  # average this many points on each side
                  max_hop=500,  # require peaks at successive time steps
                                # to be within this many m/s

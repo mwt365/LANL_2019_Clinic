@@ -49,6 +49,7 @@ def save_as_dig(filename, vvals, datatype, dt=20e-12, initialTime=0,
             raise ValueError(
                 "datatype corresponds to an unsupported data type.")
     elif datatype == np.dtype("u1"):
+    elif datatype == np.dtype("ubyte"):
         dataformat = '8'
     elif datatype == np.dtype("<u2"):
         dataformat = '16'

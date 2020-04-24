@@ -35,12 +35,12 @@ class Spectrogram:
              representing the number of points to use; if None, the final
              point in the digfile is used.
     wavelength: (1550.0e-9) the wavelength in meters
-    points_per_spectrum: (8192) the number of values used to generate
+    points_per_spectrum: (4096) the number of values used to generate
         each spectrum. Should be a power of 2.
-    overlap: (1/4) the fraction of points_per_spectrum to overlap in
+    overlap: (7/8) the fraction of points_per_spectrum to overlap in
         successive spectra. An overlap of 0 means that each sample is used
         in only one spectrum. The default value means that successive
-        spectra share 1/4 of their source samples.
+        spectra share 7/8 of their source samples.
     window_function: (None) the window function used by signal.spectrogram.
         The default value implies a ('tukey', 0.25) window.
     form: ('db') whether to use power values ('power'), decibels ('db'),
@@ -74,9 +74,9 @@ class Spectrogram:
                  t_start=None,
                  ending=None,
                  wavelength: float = 1550.0e-9,
-                 points_per_spectrum: int = 8192,
-                 overlap: float = 0.25,
-                 window_function=None,  # 'hanning',
+                 points_per_spectrum: int = 4096,
+                 overlap: float = 0.875,
+                 window_function='hann',  # None,  # 'hanning',
                  form: str = 'db',
                  convert_to_voltage: bool = True,
                  detrend: str = "linear",
@@ -108,6 +108,7 @@ class Spectrogram:
         self.form = form
         self.use_voltage = convert_to_voltage
         self.detrend = detrend
+        self.nfft = kwargs.get('nfft')  # handles zero padding
 
         # the following will be set by _calculate
         self.time = None
@@ -170,7 +171,8 @@ class Spectrogram:
                 noverlap=int(self.overlap * self.points_per_spectrum),
                 detrend=self.detrend,  # could be constant,
                 scaling=scaling,
-                mode=mode
+                mode=mode,
+                nfft=self.nfft
             )
             setattr(self, mode, spec)
 
@@ -191,10 +193,6 @@ class Spectrogram:
 
         # Convert to a logarithmic representation and use floor to attempt
         # to suppress some noise.
-        # I think the following is an attempt to normalize across
-        # different numbers of points per spectrum.
-
-
         self.histogram_levels = self.histo_levels(self.intensity)
 
         # the first index is frequency, the second time
@@ -324,6 +322,57 @@ class Spectrogram:
             return tvals, vvals, ivals, self.phase[vel0:vel1+1, time0:time1+1]
 
         return tvals, vvals, ivals
+        
+    def analyze_noise(self, **kwargs):
+        """
+        Analyze the noise by performing a double-exponential fit.
+        Possible kwargs:
+
+            v_min (baseline)
+            v_max (5000)
+            t_min (0)
+            t_max (probe destruction)
+            n_bins (100)
+
+        Returns:
+            DoubleExponential fit object, which includes
+            fields beta, lam1, lam2, amp, mean, stdev, chisq, and
+            prob_greater
+        """
+        from fit import DoubleExponential, Exponential
+        from baselines import baselines_by_squash
+
+        v_min = kwargs.get('v_min')
+        if not v_min:
+            peaks, _, hts = baselines_by_squash(self)
+            v_min = peaks[0]
+
+        v_max = kwargs.get('v_max', 5000)
+        t_min = kwargs.get('t_min', self.t_start)
+        t_max = kwargs.get('t_max', self.vertical_spike())
+        if not t_max:
+            t_max = self.t_end
+        n_bins = kwargs.get('n_bins', 100)
+
+        # extract the region and convert to power
+        my_slice = self.power(self.slice((t_min, t_max), (v_min, v_max))[2])
+        # set the cutoff for the maximum intensity we consider by
+        # looking in histogram_levels
+        cutoff = self.power(self.histogram_levels['ones'][1])
+
+        # construct the bins
+        bins = np.linspace(0, cutoff, n_bins)
+        histo, edges = np.histogram(my_slice, bins=bins, density=False)
+        dub = DoubleExponential(edges[2:-1], histo[2:])
+        if dub.error:
+            dub = Exponential(edges[2:-1], histo[2:])
+        dub.v_min = v_min
+        dub.v_max = v_max
+        dub.t_min = t_min
+        dub.t_max = t_max
+        dub.n_bins = n_bins
+        return dub
+
     def noise_level(self, percentile=0.75):
         """
         Estimate the noise level by sorting all intensities and
@@ -345,7 +394,7 @@ class Spectrogram:
         vals = np.sum(self.power(self.intensity), axis=axis)
         vals /= np.max(vals)
         if dB:
-            vals = 20 * np.log10(vals)
+            vals = 10 * np.log10(vals)
         return vals
 
     def vertical_spike(self):
@@ -455,7 +504,7 @@ class Spectrogram:
         if necessary).
         """
         if self.form == 'db':
-            return np.power(10.0, 0.05 * values)
+            return np.power(10.0, 0.1 * values)
         if self.form == 'log':
             return np.power(10.0, values)
         return values
@@ -554,6 +603,10 @@ class Spectrogram:
             del kwargs['max_vel']
         if bot != None:
             del kwargs['min_vel']
+        if 'title' in kwargs:
+            title = kwargs.pop('title')
+        else:
+            title = self.data.title
         if left != None:
             del kwargs["min_time"]
         if right != None:
@@ -586,10 +639,12 @@ class Spectrogram:
             dataToLookAt = self.transform(zData[:,:endTime]) if (data != "intensity" and transformData) else zData[:,:endTime]
 
             print(f"The current maximum of the colorbar is {np.max(dataToLookAt) } for the dataset {data}")
+            
             # Plot the start time estimate.
             axes.plot([self.estimatedStartTime_]*len(self.velocity), self.velocity, "k-", label = "Estimated Start Time", alpha = 0.75)
             # plt.legend()
             
+            print(f"The current maximum of the colorbar is {np.max(zData[:,:endTime])} for the dataset {data}")
             plt.gcf().colorbar(pcm, ax=axes)
             axes.set_ylabel('Velocity (m/s)', fontsize = 14)
             axes.set_xlabel('Time ($\mu$s)', fontsize = 14)
@@ -605,20 +660,73 @@ class Spectrogram:
         
         return pcms, axes
 
+    def save_fig(self, **kwargs):
+        """
+        Prepare a plot and save the figure in appropriate
+        size.
+
+        Interesting possible keyword arguments:
+
+            - filename (default is data.title)
+            - folder (default is dig/../figs)
+            - min_vel and max_vel
+            - title (string)
+            - extension (.jpg)
+            - color_range
+            - cmap
+        """
+        from plotter import COLORMAPS
+
+        if 'folder' in kwargs:
+            folder = kwargs.pop('folder')
+        else:
+            folder = os.path.join(os.path.split(
+                DigFile.dig_dir())[0], 'figs')
+
+        filename = kwargs.pop(
+            'filename') if 'filename' in kwargs else self.data.title
+        filename = filename.replace('/', '-')
+        extension = kwargs.pop(
+            'extension') if 'extension' in kwargs else '.jpg'
+        cmap = COLORMAPS[kwargs.pop(
+            'cmap') if 'cmap' in kwargs else '3w_gby']
+
+        # Attempt to set the color_range
+        if 'color_range' in kwargs:
+            color_range = kwargs.pop('color_range')
+        else:
+            # use the 90th percentile to set the floor
+            bottom = self.transform(self.histogram_levels['ones'][0])
+            top = bottom + 40
+            color_range = (bottom, top)
+
+        fig, axes = plt.subplots(figsize=(6, 4.5))
+        image = self.plot(axes, cmap=cmap, **kwargs)
+        image.set_clim(color_range)
+        where = os.path.join(folder, filename + extension)
+        fig.savefig(where)
+        print(f"Saved {where}")
+
 
 if __name__ == '__main__':
-    # Then I am calling this from the command line and not jupyter. This is an assumption!
+    os.chdir(DigFile.dig_dir())
+    df = DigFile('GEN3CH_4_009/seg00')
+    sp = Spectrogram(df, ending=35.0e-6)
+    sp.save_fig(max_vel=6000, color_range=(10, 50))
     if False:
-        import tkinter as tk
-        root = tk.Tk()
-        width_px = root.winfo_screenwidth()
-        height_px = root.winfo_screenheight()
-        width_mm = root.winfo_screenmmwidth()
-        height_mm = root.winfo_screenmmheight()
-        # 2.54 cm = in
-        width_in = width_mm / 25.4
-        height_in = height_mm / 25.4
-
-        # Set the default window size for matplotlib to be the fullscreen - 0.5 inches on the side and the top.
-
-        plt.rcParams["figure.figsize"] = [width_in-0.5, height_in-0.5]
+        sp = Spectrogram(
+            '../dig/GEN3CH_4_009/seg10',
+            None,
+            None,
+            mode=('psd', 'phase', 'angle'))
+        print(sp)
+        fig, ax = plt.subplots()
+        pcm = ax.pcolormesh(
+            sp.time * 1e6,
+            sp.velocity,
+            sp.angle
+        )
+        fig.colorbar(pcm, ax=ax)
+        ax.set_ylabel('Velocity (m/s)')
+        ax.set_xlabel('Time ($\mu$s)')
+        plt.show()

@@ -257,25 +257,27 @@ class Follower:
 
     def hood(self, **kwargs):
         """
-        Return a FollowerHood describing the data and results at
+        Return a FollowHood describing the data and results at
         point n of the follower.
         To indicate which hood to return, the possible kwargs are
             n = index of the point in the follower
             t_index = t_index of the point
             t = time (in seconds)
+            expand = float (to include a broader range of points)
         """
         if 'n' in kwargs:
             n = kwargs['n']
         elif 't_index' in kwargs:
             t_index = kwargs['t_index']
-            n = self.results['t_index'].find(t_index)
+            n = self.results['t_index'].index(t_index)
         elif 't' in kwargs:
             t = kwargs['t']
             t_index = self.spectrogram._time_to_index(t)
-            n = self.results['t_index'].find(t_index)
+            n = self.results['t_index'].index(t_index)
         else:
             raise Exception("I can't identify the hood")
-        return FollowHood(self, n)
+        expand = kwargs.get('expand')
+        return FollowHood(self, n, expand=expand)
 
     @property
     def neighborhoods(self):
@@ -295,8 +297,7 @@ class Follower:
         microseconds = np.array(self.results['time']) * 1e6
         return pd.DataFrame(self.results, index=microseconds)
 
-    @property
-    def full_frame(self):
+    def full_frame(self, noise=0):
         """
         Return a pandas DataFrame holding the results of this
         following expedition, with an index of the times
@@ -304,17 +305,20 @@ class Follower:
         information obtained from calling hood on each point.
         """
         df = pd.DataFrame(self.results)
+        self.noise = noise
         hoods = self.neighborhoods
 
         # add columns obtained from the hoods
         df['v_index'] = [h.v_index for h in hoods]
         df['m_center'] = [h.moment['center'] for h in hoods]
-        df['m_width'] = [h.moment['std_dev'] for h in hoods]
+        df['m_width'] = [h.moment['std_err'] for h in hoods]
         df['m_bgnd'] = [h.moment['background'] for h in hoods]
         df['g_center'] = [h.gaussian.center for h in hoods]
         df['g_width'] = [h.gaussian.width for h in hoods]
         df['g_bgnd'] = [h.gaussian.background for h in hoods]
         df['g_int'] = [h.gaussian.amplitude for h in hoods]
+        df['g_chisq'] = [h.gaussian.chisq for h in hoods]
+        df['g_prob'] = [h.gaussian.prob_greater for h in hoods]
         # return the frame with the index set to time in microseconds
         df.index = df['time'] * 1e6
         # Now we need to set the formatting with
@@ -446,23 +450,24 @@ class FollowHood(object):
     All information about the neighborhood around a point
     identified on a curve by a follower:
 
-      - time                   in seconds
-      - t_index             column of the spectrogram
-      - peak_v          in m/s
-      - v_index         row of the spectrogram
-      - peak_int         intensity at the peak
+      - time       in seconds
+      - t_index    column of the spectrogram
+      - peak_v     in m/s
+      - v_index    row of the spectrogram
+      - peak_int   intensity at the peak
       - vi_span    rows used to look for peak
-      - velocity               velocity values of above
-      - intensity              intensity values of above
-      - moment                 {'center', 'variance', 'std_dev', 'background}
-      - gaussian               {background, amplitude, center, width}
+      - velocity   velocity values of above
+      - intensity  intensity values of above
+      - moment     {'center', 'variance', 'std_dev', 'std_err', 'background'}
+      - gaussian   {background, amplitude, center, width}
     """
 
-    def __init__(self, follower: Follower, pt: int):
+    def __init__(self, follower: Follower, pt: int, expand=None):
         """
 
         """
-        from ProcessingAlgorithms.Fitting.gaussian import Gaussian
+        # from gaussian import Gaussian
+        from fit import Gaussian
         from ProcessingAlgorithms.Fitting.moments import moment
 
         res = follower.results
@@ -474,6 +479,16 @@ class FollowHood(object):
         self.peak_v = res['peak_v'][pt]
         self.vi_span = res['vi_span'][pt]
         self.peak_int = res['peak_int'][pt]
+
+        if isinstance(expand, (int, float)):
+            f, t = res['vi_span'][pt]
+            di = round(0.5 * (t - f) * (expand - 1))
+            self.vi_span = (f - di, t + di)
+        elif isinstance(expand, (list, tuple)) and len(expand) == 2:
+            # two stretch amounts, one below, one above
+            f, t = res['vi_span'][pt]
+            dl, dh = [round(0.5 * (t - f) * (x - 1)) for x in expand]
+            self.vi_span = (f - dl, t + dh)
 
         # Now fetch the raw points from the spectrogram
         sg = follower.spectrogram
@@ -492,20 +507,23 @@ class FollowHood(object):
             x = max(x, 0)
             return min(x, len(self.velocity) - 1)
 
-        hood = 6
+        maxhood = len(self.velocity) // 2
+        hood = min(6, maxhood)
         m = dict(std_dev=np.nan)
-        while np.isnan(m['std_dev']):
+        while np.isnan(m['std_dev']) and hood <= maxhood:
             pfrom, pto = [bound(x + self.v_index - vfrom)
                           for x in (-hood, hood)]
             m = moment(self.velocity[pfrom:pto], self.intensity[pfrom:pto])
             hood += 4
+
         self.moment = m
 
         # Fit a gaussian
         self.gaussian = Gaussian(
             self.velocity, self.intensity,
             center=self.peak_v,
-            width=self.moment['std_dev']
+            sigma=follower.noise if hasattr(follower,
+                                            'noise') else self.moment['std_dev']
         )
 
     def plot_gaussian(self, ax, **kwargs):
@@ -538,11 +556,11 @@ class FollowHood(object):
                 [bg, bg], 'r-', label='bgnd')
         # show the center and widths from the moment calculation
         tallest = np.max(self.intensity)
-        ax.plot([self.moment['center'] + x * self.moment['std_dev'] for x in
+        ax.plot([self.moment['center'] + x * self.moment['std_err'] for x in
                  (-1, 0, 1)], 0.5 * tallest * np.ones(3), 'r.', label='moments')
         # show the gaussian
         self.plot_gaussian(ax)
-        vcenter, width = self.peak_v, self.moment['std_dev']
+        vcenter, width = self.peak_v, self.moment['std_err']
         ax.set_xlim(vcenter - 12 * width, vcenter + 12 * width)
 
         xlabel = kwargs.get('xlabel')

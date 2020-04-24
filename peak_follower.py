@@ -50,7 +50,6 @@ class PeakFollower(Follower):
         self.results["velocity_index_spans"].append((self.spectrogram._velocity_to_index(self.v_start)-span, self.spectrogram._velocity_to_index(self.v_start) + span))
 
         self.time_index += 1
-
     def run(self, maxIter = 0):
         """
         Repeatedly call step until it fails.

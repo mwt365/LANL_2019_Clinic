@@ -8,7 +8,7 @@
    Created: 3/11/20
 """
 import numpy as np
-from scipy.optimize import curve_fit, OptimizeWarning
+from scipy.optimize import curve_fit  # , OptimizeWarning
 import matplotlib.pyplot as plt
 
 
@@ -18,17 +18,17 @@ class Fitter:
     """
 
     def __init__(self, function, xvalues, yvalues, sigma, param_dictionary: dict):
-        from scipy.optimize import curve_fit, OptimizeWarning
         self.f = function
         self.x = xvalues
         self.y = yvalues
-        self.notnan = np.logical_not(np.isnan(self.y))
+        self.notnan = np.logical_not(np.logical_or(
+            np.isnan(self.y), np.isnan(sigma)))
         self.numpts = np.sum(self.notnan)
         self.sigma = sigma
         self.p0 = param_dictionary
         self.p, self.pcov = curve_fit(
             self.f, self.x[self.notnan], self.y[self.notnan],
-            list(self.p0.values()), sigma,
+            list(self.p0.values()), sigma[self.notnan],
             absolute_sigma=True)
         self.residuals = self.y - self.f(self.x, *self.p)
         self.normalized_residuals = self.residuals / self.sigma
@@ -44,13 +44,16 @@ class Fitter:
             digits = 1 - np.floor(np.log10(err))
         else:
             digits = 1 + np.floor(np.log10(np.abs(x / err)))
-
+        if np.isnan(digits):
+            digits = 2
         fmt = "{0:." + f"{int(digits)}" + "}"
         val = fmt.format(x)
         return f"{val} ± {err:.2g}"
 
     def __str__(self):
-        report = [f"Fit to {self.f.__name__} using {len(self.x)} points.", ]
+        nans = len(self.notnan) - self.numpts
+        nanmsg = "." if nans == 0 else f", with {nans} NaNs."
+        report = [f"Fit to {self.f.__name__} using {self.numpts} points{nanmsg}", ]
         for par0, param, err in zip(self.p0.keys(), self.p, self.errors):
             report.append(f"{par0} = {self.format_value(param, err)}")
         report.append(f"χ2 = {self.chisq:.2g} = {self.reduced_chisq:.2f}/DoF")
@@ -77,6 +80,7 @@ class Fitter:
             main.set_xlabel(kwargs['xlabel'])
         if 'ylabel' in kwargs:
             main.set_ylabel(kwargs['ylabel'])
+
         # Now the residual panel
         res.errorbar(self.x, self.residuals, yerr=self.sigma, fmt='.')
         res.set_ylabel('Res')
@@ -84,6 +88,6 @@ class Fitter:
         # and the normalized residuals
         normres.plot(self.x, self.normalized_residuals, '.')
         normres.set_ylabel('Norm res')
-        
+
         if 'title' in kwargs:
             res.set_title(kwargs['title'])

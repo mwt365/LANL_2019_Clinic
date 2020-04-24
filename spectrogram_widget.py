@@ -8,9 +8,9 @@
   with convenient controls
   Created: 09/26/19
 """
-import cv2
 
 import os
+import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.colors
@@ -132,9 +132,11 @@ class SpectrogramWidget:
         self.baselines = []
 
         # Compute the base spectrogram (do we really need this?)
+        self.spectrogram = None
         if self.dig:
             self.spectrogram = Spectrogram(
                 self.digfile, None, None, **kwargs)
+            self.spectrogram_fresh = True  # flag for the first pass
 
             self.spectrogram.overlap = .125
 
@@ -207,7 +209,8 @@ class SpectrogramWidget:
 
             # FFT size  ###########################################
             # Set the size of each spectrum
-            pps = kwargs.get('points_per_spectrum', 8192)
+            pps = self.spectrogram.points_per_spectrum
+            # pps = kwargs.get('points_per_spectrum', 8192)
             val = int(np.log2(pps))
             cd['spectrum_size'] = slide = widgets.IntSlider(
                 value=val, min=8, max=18, step=1,
@@ -444,7 +447,10 @@ class SpectrogramWidget:
         we need to recompute everything.
         """
         if self.dig:
-            self.spectrogram.set(**kwargs)
+            if self.spectrogram_fresh:
+                self.spectrogram_fresh = False
+            else:
+                self.spectrogram.set(**kwargs)
         self.update_spectrogram()
 
     def update_spectrogram(self):
@@ -741,7 +747,7 @@ class SpectrogramWidget:
             pk = hood.peak_int
             tallest = np.max(hood.intensity)
             max_peak = max(tallest, max_peak)
-            ax.plot([hood.moment['center'] + x * hood.moment['std_dev'] for x in
+            ax.plot([hood.moment['center'] + x * hood.moment['std_err'] for x in
                      (-1, 0, 1)], 0.5 * tallest * np.ones(3), 'r.')
             # show the gaussian
             hood.plot_gaussian(ax)
@@ -751,7 +757,7 @@ class SpectrogramWidget:
             # ax.set_xlim(vcenter - 12 * width, vcenter + 12 * width)
             ax.set_xlabel(f"$v$ (m/s)")
             ax.set_title(f"{hood.time*1e6:.2f}" + " $\\mu$s")
-            txt = f"m = {hood.moment['center']:.1f} ± {hood.moment['std_dev']:.1f}"
+            txt = f"m = {hood.moment['center']:.1f} ± {hood.moment['std_err']:.1f}"
             txt = f"{txt}\ng = {hood.gaussian.center:.1f} ± {hood.gaussian.width:.1f}"
             ax.annotate(txt, xy=(0.05, 0.95), xycoords='axes fraction',
                         horizontalalignment='left', verticalalignment='top')
@@ -875,6 +881,15 @@ class SpectrogramWidget:
         ax.set_xlabel(r"$t$ ($\mu$ s)")
         ax.set_ylabel(r"Power")
 
+    def Spectrum(self, the_time: float):
+        """
+        Return the column from the spectrogram in power form
+        """
+        sg = self.spectrogram
+        t_index = sg._time_to_index(the_time)
+        vals = sg.intensity[:, t_index]
+        return sg.power(vals)
+
     def spectrum(self, the_time: float, form: str):
         """
         Display a spectrum in the left axes corresponding to the
@@ -887,27 +902,31 @@ class SpectrogramWidget:
             self.axSpectrum.grid(axis='x', which='both',
                                  color='b', alpha=0.4)
         else:
-            delta_t = self.spectrogram.points_per_spectrum / 2 * \
-                self.digfile.dt
-            the_spectrum = Spectrum(
-                self.digfile.values(the_time - delta_t,
-                                    the_time + delta_t),
-                self.digfile.dt,
-                remove_dc=True)
-            # compute the level of the 90th percentile
-            spec = dict(spectrum=the_spectrum)
-            vals = the_spectrum.db
-            ordering = np.argsort(vals)
-            if self.baselines:
-                blines = [x['v'] for x in self.baselines]
-                n = -1
-                while the_spectrum.velocities[ordering[n]] in blines:
-                    n -= 1
+            if True:
+                delta_t = self.spectrogram.points_per_spectrum / 2 * \
+                    self.digfile.dt
+                the_spectrum = Spectrum(
+                    self.digfile.values(the_time - delta_t,
+                                        the_time + delta_t),
+                    self.digfile.dt,
+                    remove_dc=True)
+                # compute the level of the 90th percentile
+                spec = dict(spectrum=the_spectrum)
+                vals = the_spectrum.db
+                ordering = np.argsort(vals)
+                if self.baselines:
+                    blines = [x['v'] for x in self.baselines]
+                    n = -1
+                    while the_spectrum.velocities[ordering[n]] in blines:
+                        n -= 1
+                else:
+                    n = -1
+                spec['max'] = vals[ordering[n]]
+                noise_floor = int(n - 0.1 * len(vals))
+                spec['90'] = vals[ordering[noise_floor]]
             else:
-                n = -1
-            spec['max'] = vals[ordering[n]]
-            noise_floor = int(n - 0.1 * len(vals))
-            spec['90'] = vals[ordering[noise_floor]]
+                t_index = self.spectrogram._time_to_index(the_time)
+                vals = self.spectrogram.intensity[:, t_index]
 
             # We need to worry about the format of the spectrum
             db = ('dB' in form)

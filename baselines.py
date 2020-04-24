@@ -191,5 +191,4 @@ if __name__ == '__main__':
         velo_index = sgram._velocity_to_index(peak)
         axes.plot(times, [peak for x in range(0,30)], color='red', linewidth=3, markersize=15)
 
-
     plt.show()
