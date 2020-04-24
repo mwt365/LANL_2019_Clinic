@@ -1,9 +1,6 @@
 #!/usr/bin/env python3
 # coding:utf-8
-<<<<<<< HEAD
-=======
 
->>>>>>> peter
 """
   Author:  LANL Clinic 2019 --<lanl19@cs.hmc.edu>
   Purpose: Process a set of .dig files
