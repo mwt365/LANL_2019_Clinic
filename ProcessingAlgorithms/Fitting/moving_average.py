@@ -48,6 +48,14 @@ def compress(num_pnts: int, *args):
         res.append(x)
     return res
 
+def normalize(b):
+    """
+    Produce a verions of the matrix b that has 0 mean and 1 sample standard deviation.
+    """
+    avg = np.mean(b)
+    std = np.std(b, ddof= 1)
+    return (b-avg)/std
+
 
 if __name__ == "__main__":
     import matplotlib.pyplot as plt

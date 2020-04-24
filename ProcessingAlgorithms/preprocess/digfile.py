@@ -2,7 +2,6 @@
 
 """
 ::
-
   Author:  LANL Clinic 2019 --<lanl19@cs.hmc.edu>
   Purpose: Load a .dig file
   Created: 9/18/19
@@ -22,7 +21,6 @@ class DigFile:
     Information from the second 512-byte segment is decoded to infer
     the number of data points, the number of bytes per point, the
     start time and sampling interval, and the voltage scaling.
-
     The actual data remain on disk and are loaded only as required either
     to generate a spectrogram for a range in time or a spectrum from a
     shorter segment. The values are loaded from disk and decoded using
@@ -30,7 +28,6 @@ class DigFile:
     or an integer number of points to include. Alternatively, the raw values
     may be returned with the **raw_values** method. For either, the
     corresponding sample times are available from **time_values**.
-
     We assume that the first 1024 bytes of the file contain ascii text
     describing the data in the file. The first 512 bytes may vary, but
     the second 512-byte chunk should include (in order) the following:
@@ -40,7 +37,6 @@ class DigFile:
     - the start time
     - the voltage step
     - offset voltage
-
     It strongly seems that despite the documentation we received, the
     integers stored in the binary portion of the file are unsigned
     whether 8 or 16 bits. We have no 32-bit examples.
@@ -117,7 +113,6 @@ class DigFile:
         head, file = os.path.split(self.path)
         file_or_seg = os.path.splitext(file)[0]  # discard the extension
         if self.is_segment:
-            # parent/segNN
             file_or_seg = os.path.join(os.path.split(head)[1], file_or_seg)
         return file_or_seg.replace("_", "-")
 

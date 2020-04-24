@@ -8,35 +8,134 @@
   with convenient controls
   Created: 09/26/19
 """
-
-import os
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.colors
 import matplotlib.gridspec as gridspec
 import ipywidgets as widgets
-
 from matplotlib import widgets as mwidgets
 from IPython.display import display
 
-from ProcessingAlgorithms.preprocess.digfile import DigFile
+from digfile import DigFile
 from spectrogram import Spectrogram
-from ProcessingAlgorithms.spectrum import Spectrum
+from spectrum import Spectrum
 from plotter import COLORMAPS
-from ProcessingAlgorithms.Fitting.gaussian import Gaussian
+from gaussian import Gaussian
 from gaussian_follow import GaussianFitter
 from peak_follower import PeakFollower
-from template_matcher import TemplateMatcher
+from template_matcherFMP import TemplateMatcher
 from ImageProcessing.Templates.templates import *
 from matplotlib.patches import Rectangle
 import time as Time
 
 
-from UI_Elements.value_sliders import ValueSlider
-from UI_Elements.percent_slider import PercentSlider # Note that this class is not actually used yet. 02/07/20
-
 DEFMAP = '3w_gby'  # should really be in an .ini file
+
+
+class ValueSlider(widgets.FloatRangeSlider):
+    """
+    A Slider to represent the range that we
+    wish to display. The slider maps linearly over the range
+    specified by yrange = (ymin, ymax). If a multiplier different
+    from 1 is given, then values displayed by the widget
+    will be divided by the multiplier to yield "real" values.
+    So, for example, if "real" time values are in seconds, but
+    we wish to display microseconds, the multiplier is 1e6 and
+    values used internally get divided by 1e6 to yield true
+    values for this parameter.
+    Getters and setters
+    are defined for ymin, ymax, and range.
+    """
+
+    def __init__(self, description,
+                 initial_value,  # express as percentages (0, 50)
+                 yrange,        # in true (not scaled) values
+                 multiplier=1,
+                 **kwargs):
+        super().__init__(
+            description=description,
+            min=yrange[0] * multiplier,
+            max=yrange[1] * multiplier,
+            readout=True,
+            value=[multiplier * (yrange[0] + 0.01 * x * (
+                yrange[1] - yrange[0])) for x in initial_value],
+            layout=widgets.Layout(width='400px'),
+            **kwargs)
+        self.multiplier = multiplier
+        self._ymin = yrange[0] * multiplier
+        self._ymax = yrange[1] * multiplier
+
+    @property
+    def ymin(self):
+        return self._ymin
+
+    @ymin.setter
+    def ymin(self, v):
+        self._ymin = v
+
+    @property
+    def ymax(self):
+        return self._ymax
+
+    @ymax.setter
+    def ymax(self, v):
+        self._ymax = v
+
+    @property
+    def range(self):
+        return [v / self.multiplier for v in self.value]
+
+    @range.setter
+    def range(self, val):  # fix?
+        assert isinstance(val, (list, tuple)) and len(val) == 2
+        self._ymin, self._ymax = val
+
+
+class PercentSlider(widgets.IntRangeSlider):
+    """
+    A Slider to represent the percentage of a range that we
+    wish to display. The slider maps linearly over the range
+    specified by yrange = (ymin, ymax). Getters and setters
+    are defined for ymin, ymax, and range.
+    """
+
+    def __init__(self, description, initial_value, yrange):
+        super().__init__(
+            description=description,
+            min=0, max=100, readout=True,
+            value=initial_value,
+            layout=widgets.Layout(width='400px')
+        )
+        self._ymin = yrange[0]
+        self._ymax = yrange[1]
+
+    @property
+    def ymin(self):
+        return self._ymin
+
+    @ymin.setter
+    def ymin(self, v):
+        self._ymin = v
+
+    @property
+    def ymax(self):
+        return self._ymax
+
+    @ymax.setter
+    def ymax(self, v):
+        self._ymax = v
+
+    @property
+    def range(self):
+        dy = 0.01 * (self.ymax - self.ymin)
+        return [v * dy + self.ymin for v in self.value]
+
+    @range.setter
+    def range(self, val):
+        assert isinstance(val, (list, tuple)) and len(val) == 2
+        self._ymin, self._ymax = val
+
 
 class SpectrogramWidget:
     """
@@ -91,7 +190,7 @@ class SpectrogramWidget:
     def __init__(self, *args, **kwargs):
         """
         If one passes in a single unnamed arg, it can either be a digfile,
-        a string pointing to a digfile, or a two-dimensional ndarray.
+        a string pointing to a digfile, or a two-dimensional ndarray. 
         If we are founded on a dig file, it is possible to recompute
         things. Only a subset of operations are possible when we're
         based on a two-dimensional array, but perhaps that is sometimes
@@ -132,11 +231,9 @@ class SpectrogramWidget:
         self.baselines = []
 
         # Compute the base spectrogram (do we really need this?)
-        self.spectrogram = None
         if self.dig:
             self.spectrogram = Spectrogram(
                 self.digfile, None, None, **kwargs)
-            self.spectrogram_fresh = True  # flag for the first pass
 
             self.spectrogram.overlap = .125
 
@@ -209,8 +306,7 @@ class SpectrogramWidget:
 
             # FFT size  ###########################################
             # Set the size of each spectrum
-            pps = self.spectrogram.points_per_spectrum
-            # pps = kwargs.get('points_per_spectrum', 8192)
+            pps = kwargs.get('points_per_spectrum', 8192)
             val = int(np.log2(pps))
             cd['spectrum_size'] = slide = widgets.IntSlider(
                 value=val, min=8, max=18, step=1,
@@ -321,7 +417,7 @@ class SpectrogramWidget:
         the_maps.append('Computed')
         cd['color_map'] = widgets.Dropdown(
             options=the_maps,
-            value=DEFMAP,
+            value='3w_gby',
             description='Color Map',
             disabled=False,
         )
@@ -371,18 +467,13 @@ class SpectrogramWidget:
             lambda x: self.update_baselines(x["new"]),
             names="value")
 
-        cd['squash'] = widgets.Button(
-            description="Squash in Vertical"
-        )
-        cd['squash'].on_click(lambda b: self.squash_vertical())
-
         columns = [
             'color_map;t_range;velocity_range;intensity_range;threshold',
             'clicker;clear_spectra;clear_followers',
         ]
         if self.dig:
             columns.append(
-                'spectrum_size;overlap;raw_signal;baselines;squash')
+                'spectrum_size;overlap;raw_signal;baselines')
 
         vboxes = []
         for col in columns:
@@ -447,10 +538,7 @@ class SpectrogramWidget:
         we need to recompute everything.
         """
         if self.dig:
-            if self.spectrogram_fresh:
-                self.spectrogram_fresh = False
-            else:
-                self.spectrogram.set(**kwargs)
+            self.spectrogram.set(**kwargs)
         self.update_spectrogram()
 
     def update_spectrogram(self):
@@ -509,6 +597,7 @@ class SpectrogramWidget:
         self.update_cmap()
 
     def update_threshold(self, x):
+        n = x
         sg = self.spectrogram
         if int(x) == 0:
             self.threshold = None
@@ -562,14 +651,12 @@ class SpectrogramWidget:
             return 0
         # Look up what we should do with the click
         action = self.controls['clicker'].value
-        print(f"The action I am attempting to do is {action}")
         try:
             if 'Spectrum' in action:
                 self.spectrum(t, action)
             elif 'Template_Matching' in action:
                 self.match_templates(t, v)
             else:
-                print("I am handling a click that should be a peak follower")
                 self.follow(t, v, action)
 
         except Exception as eeps:
@@ -585,15 +672,6 @@ class SpectrogramWidget:
         if char == 'x':
             # remove the all spectra
             self.clear_spectra()
-        if char in ('f', 'b', 'F', 'B'):
-            # We'd like to go exploring
-            if not hasattr(self, 'explorer_mark'):
-                self.explorer_mark = 2
-            else:
-                shifts = dict(f=4, F=20, b=-4, B=-40)
-                self.explorer_mark += shifts[char]
-
-            self.gaussian_explorer(self.explorer_mark)
         if char in ('m', 'M'):
             self.selecting = not self.selecting
             self.controls['marquee'].set_active(self.selecting)
@@ -626,7 +704,7 @@ class SpectrogramWidget:
     def follow(self, t, v, action):
         """Attempt to follow the path starting with the clicked
         point."""
-        print(f"Let's follow something starting at {t, v} using action {action}.")
+
         if action == "Gauss":
             fitter = GaussianFitter(self.spectrogram, (t, v))
             self.gauss = fitter
@@ -637,21 +715,16 @@ class SpectrogramWidget:
             follower.run()
             tsec, v = follower.v_of_t
             follower.line = self.axSpectrogram.plot(
-                tsec * 1e6, v, 'r.', alpha=0.4, markersize=2)[0]
+                tsec * 1e6, v, 'r-', alpha=0.4)[0]
         # print("Create a figure and axes, then call self.gauss.show_fit(axes)")
 
     def gauss_out(self, n: int):
-        """
-        Show center velocity, width, and amplitude for gaussian
-        fits to the data in follower n.
-        """
         if n >= len(self.peak_followers):
             return 0
-        WRITEOUT, fnum = False, 0
         pf = self.peak_followers[n]
         times, centers, widths, amps = [], [], [], []
-        vind = pf.frame['vi_span'].to_numpy()
-        tind = pf.frame['t_index'].to_numpy()
+        vind = pf.frame['velocity_index_spans'].to_numpy()
+        tind = pf.frame['time_index'].to_numpy()
         sp = self.spectrogram
         for j in range(len(tind)):
             t = sp.time[tind[j]] * 1e6
@@ -665,16 +738,6 @@ class SpectrogramWidget:
                 centers.append(gus.center)
                 widths.append(gus.width)
                 amps.append(gus.amplitude)
-                if WRITEOUT:
-                    fname = f"{os.path.splitext(self.digfile.filename)[0]}_{fnum:04d}.csv"
-                    gus.write_csv(fname)
-                    fnum += 1
-        if WRITEOUT:
-            # write out the times, too
-            fname = f"{os.path.splitext(self.digfile.filename)[0]}_t.csv"
-            v = np.asarray(times)
-            np.savetxt(v, fname)
-
         fig, axes = plt.subplots(nrows=1, ncols=3, squeeze=True)
         ax1, ax2, ax3 = axes
         ax1.errorbar(times, centers, fmt='b-', yerr=widths)
@@ -702,74 +765,6 @@ class SpectrogramWidget:
             amplitude=np.array(amps)
         )
 
-    def gaussian_explorer(self, follower_pt: int):
-        """
-        Show center velocity, width, and amplitude for gaussian
-        fits to the data in follower n.
-        """
-        if len(self.peak_followers) == 0:
-            return 0
-        pf = self.peak_followers[0]
-        res = pf.results
-        points = len(res['t_index'])
-
-        def bound(x): return x % points
-        follower_pt = bound(follower_pt)
-
-        # We'd like to show data for this index, the previous one,
-        #  and the next one, along with the gaussian fit
-        hoods = [pf.hood(n=bound(x + follower_pt))
-                 for x in (-2, -1, 0, 1, 2)]
-
-        # Check that we have the requisite figure, and make it if we don't
-        if not hasattr(self, 'explorer_fig'):
-            self.explorer_fig, self.explorer_axes = plt.subplots(
-                1, 5, sharey=True)
-            # also add a marker to the follower's representation on the
-            # spectrogram to make it easier to see where we are
-            self.explorer_marker = self.axSpectrogram.plot([], [], 'k*')[0]
-
-        # show where we are
-        tsec, v = pf.v_of_t
-        self.explorer_marker.set_data(
-            [tsec[follower_pt] * 1e6, ], [v[follower_pt], ])
-
-        min_v, max_v, max_peak = 1e10, 0, 0
-        for ax, hood in zip(self.explorer_axes, hoods):
-            ax.clear()
-            # plot the data
-            ax.plot(hood.velocity, hood.intensity, 'ko', alpha=0.5)
-
-            # plot the background level used for the moment calculation
-            bg = hood.moment['background']
-            ax.plot([hood.velocity[0], hood.velocity[-1]], [bg, bg], 'r-')
-            # show the center and widths from the moment calculation
-            pk = hood.peak_int
-            tallest = np.max(hood.intensity)
-            max_peak = max(tallest, max_peak)
-            ax.plot([hood.moment['center'] + x * hood.moment['std_err'] for x in
-                     (-1, 0, 1)], 0.5 * tallest * np.ones(3), 'r.')
-            # show the gaussian
-            hood.plot_gaussian(ax)
-            vcenter, width = hood.peak_v, hood.moment['std_dev']
-            min_v = min(min_v, vcenter - 12 * width)
-            max_v = max(max_v, vcenter + 12 * width)
-            # ax.set_xlim(vcenter - 12 * width, vcenter + 12 * width)
-            ax.set_xlabel(f"$v$ (m/s)")
-            ax.set_title(f"{hood.time*1e6:.2f}" + " $\\mu$s")
-            txt = f"m = {hood.moment['center']:.1f} ± {hood.moment['std_err']:.1f}"
-            txt = f"{txt}\ng = {hood.gaussian.center:.1f} ± {hood.gaussian.width:.1f}"
-            ax.annotate(txt, xy=(0.05, 0.95), xycoords='axes fraction',
-                        horizontalalignment='left', verticalalignment='top')
-
-        for ax in self.explorer_axes:
-            ax.set_xlim(min_v, max_v)
-
-        # label the common velocity axis
-        ax = self.explorer_axes[0]
-        ax.set_ylim(-0.05 * max_peak, 1.2 * max_peak)
-        ax.set_ylabel("Intensity")
-
     def analyze_roi(self):
         """
         Extract the region(s) of interest and process them
@@ -784,8 +779,8 @@ class SpectrogramWidget:
         if n >= len(self.peak_followers):
             return 0
         pf = self.peak_followers[n]
-        vind = pf.frame['vi_span'].to_numpy()
-        tind = pf.frame['t_index'].to_numpy()
+        vind = pf.frame['velocity_index_spans'].to_numpy()
+        tind = pf.frame['time_index'].to_numpy()
         self.subfig, axes = plt.subplots(
             nrows=1, ncols=2, sharey=True,
             squeeze=True, gridspec_kw=self._gspec)
@@ -828,11 +823,6 @@ class SpectrogramWidget:
             )
         self.axTrack.set_ylabel('$v$')
 
-    def squash_vertical(self):
-        normy = self.spectrogram.squash(dB=False) * 2000
-        self.axSpectrogram.plot(self.spectrogram.time * 1e6, normy,
-                                'b-', alpha=0.75)
-
     def update_baselines(self, method):
         """
         Handle the baselines popup menu
@@ -842,11 +832,9 @@ class SpectrogramWidget:
         self.baselines = []  # remove any existing baselines
         if method == "Squash":
             peaks, sigs, heights = baselines_by_squash(self.spectrogram)
-            blines.extend(peaks)
-
-            # for n in range(len(heights)):
-            # if heights[n] > 0.1:
-            # blines.append(peaks[n])
+            for n in range(len(heights)):
+                if heights[n] > 0.1:
+                    blines.append(peaks[n])
 
         # Now show the baselines in blines or remove any
         # if blines is empty
@@ -881,15 +869,6 @@ class SpectrogramWidget:
         ax.set_xlabel(r"$t$ ($\mu$ s)")
         ax.set_ylabel(r"Power")
 
-    def Spectrum(self, the_time: float):
-        """
-        Return the column from the spectrogram in power form
-        """
-        sg = self.spectrogram
-        t_index = sg._time_to_index(the_time)
-        vals = sg.intensity[:, t_index]
-        return sg.power(vals)
-
     def spectrum(self, the_time: float, form: str):
         """
         Display a spectrum in the left axes corresponding to the
@@ -902,31 +881,27 @@ class SpectrogramWidget:
             self.axSpectrum.grid(axis='x', which='both',
                                  color='b', alpha=0.4)
         else:
-            if True:
-                delta_t = self.spectrogram.points_per_spectrum / 2 * \
-                    self.digfile.dt
-                the_spectrum = Spectrum(
-                    self.digfile.values(the_time - delta_t,
-                                        the_time + delta_t),
-                    self.digfile.dt,
-                    remove_dc=True)
-                # compute the level of the 90th percentile
-                spec = dict(spectrum=the_spectrum)
-                vals = the_spectrum.db
-                ordering = np.argsort(vals)
-                if self.baselines:
-                    blines = [x['v'] for x in self.baselines]
-                    n = -1
-                    while the_spectrum.velocities[ordering[n]] in blines:
-                        n -= 1
-                else:
-                    n = -1
-                spec['max'] = vals[ordering[n]]
-                noise_floor = int(n - 0.1 * len(vals))
-                spec['90'] = vals[ordering[noise_floor]]
+            delta_t = self.spectrogram.points_per_spectrum / 2 * \
+                self.digfile.dt
+            the_spectrum = Spectrum(
+                self.digfile.values(the_time - delta_t,
+                                    the_time + delta_t),
+                self.digfile.dt,
+                remove_dc=True)
+            # compute the level of the 90th percentile
+            spec = dict(spectrum=the_spectrum)
+            vals = the_spectrum.db
+            ordering = np.argsort(vals)
+            if self.baselines:
+                blines = [x['v'] for x in self.baselines]
+                n = -1
+                while the_spectrum.velocities[ordering[n]] in blines:
+                    n -= 1
             else:
-                t_index = self.spectrogram._time_to_index(the_time)
-                vals = self.spectrogram.intensity[:, t_index]
+                n = -1
+            spec['max'] = vals[ordering[n]]
+            noise_floor = int(n - 0.1 * len(vals))
+            spec['90'] = vals[ordering[noise_floor]]
 
             # We need to worry about the format of the spectrum
             db = ('dB' in form)
@@ -1005,10 +980,10 @@ class SpectrogramWidget:
 
         colors = ['ro', 'bo', 'go', 'mo', 'ko', 'co']
         color_names = ['red', 'blue', 'green', 'magenta', 'black', 'cyan']
-        # methods = ['cv2.TM_CCOEFF', 'cv2.TM_CCOEFF_NORMED', 'cv2.TM_CCORR',
-        #     'cv2.TM_CCORR_NORMED', 'cv2.TM_SQDIFF', 'cv2.TM_SQDIFF_NORMED']
+        methods = ['cv2.TM_CCOEFF', 'cv2.TM_CCOEFF_NORMED', 'cv2.TM_CCORR',
+            'cv2.TM_CCORR_NORMED', 'cv2.TM_SQDIFF', 'cv2.TM_SQDIFF_NORMED']
 
-        methods = ['cv2.TM_SQDIFF_NORMED', 'cv2.TM_CCOEFF_NORMED', 'cv2.TM_SQDIFF'] # the 'best' method for matching
+        # methods = ['cv2.TM_SQDIFF_NORMED', 'cv2.TM_CCOEFF_NORMED', 'cv2.TM_SQDIFF'] # the 'best' method for matching
 
 
         for i in range(len(times)):
