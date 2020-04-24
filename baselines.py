@@ -47,7 +47,7 @@ def baselines_by_squash(
       -  heights: corresponding peak heights, normalized to
             the greatest height
     """
-    assert isinstance(spectrogram, Spectrogram)
+
     # Collapse along the time axis, making sure to use power,
     # not dB
     dv = spectrogram.velocity[1] - spectrogram.velocity[0]
