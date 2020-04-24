@@ -98,18 +98,18 @@ def runExperiment(trainingFilePath, thresholds:list, skipUntilTimes:list = []):
 
     # Compute summary statistics
     summaryStatistics = np.zeros((len(thresholds), len(skipUntilTimes), 5))
-    stats = ["Avg", "Std", "Median", "Max", "Min"]
+    stats = ["Avg", "Std", "PercentNeg", "Max", "Min"]
 
     print(f"Computing the summary statistics: [{stats}]")
 
     for i in tqdm.trange(len(thresholds)):
         for j in range(len(skipUntilTimes)):
-            q = np.power(d[f"threshold {thresholds[i]} error"][j],2)
+            q = np.sort(d[f"threshold {thresholds[i]} error"][j])
             summaryStatistics[i][j][0] = np.mean(q)
             summaryStatistics[i][j][1] = np.std(q)
-            summaryStatistics[i][j][2] = np.median(q)
-            summaryStatistics[i][j][3] = np.max(q)
-            summaryStatistics[i][j][4] = np.min(q)
+            summaryStatistics[i][j][2] = q[np.min(np.where(q > 0)[0])]/len(q)
+            summaryStatistics[i][j][3] = q[-1]
+            summaryStatistics[i][j][4] = q[0]
 
 
 
@@ -118,7 +118,7 @@ def runExperiment(trainingFilePath, thresholds:list, skipUntilTimes:list = []):
         ax = plt.gca()
 
         pcm = ax.pcolormesh(np.array(skipUntilTimes)*1e6, thresholds, summaryStatistics[:,:,i])
-        plt.title(f"{stats[i]} L2 error over the files")
+        plt.title(f"{stats[i]} L1 error over the files")
         plt.ylabel("Thresholds")
         plt.xlabel("Time that you skip at the beginning")
         plt.gcf().colorbar(pcm, ax=ax)
@@ -131,7 +131,7 @@ def runExperiment(trainingFilePath, thresholds:list, skipUntilTimes:list = []):
 
 
     for i in range(len(thresholds)):
-        q = pd.DataFrame(summaryStatistics[i])
+        q = pd.DataFrame(summaryStatistics[i], columns = stats, index=skipUntilTimes)
         internal_a = str(thresholds[i]).replace(".", "_")
         saveSummaryFilename = f"summaryThresh{internal_a}.csv"
         q.to_csv(os.path.join(summaryFolder, saveSummaryFilename))
@@ -140,19 +140,20 @@ def runExperiment(trainingFilePath, thresholds:list, skipUntilTimes:list = []):
     return summaryStatistics, d
 
 if __name__ == "__main__":
-    thresholds = np.linspace(0.3, 1)
-    skipUntilTimes = [12e-6]
-    saveLoc = r"../baselineIntensityMaps"
-    experimentFileName = r"../Labels/EstimateOfJumpOffPositionTrain.xlsx"
-
-    data = pd.read_excel(experimentFileName)
-
-    data = data.dropna() # Ignore the samples that we do not have the full data for.
-    data.reset_index() # Reset so that it can be easily indexed.
-
-    files = data["Filename"].to_list()
-
     if False:
-        saveBaselineIntensityImages(files, imageExt = "jpeg")
+        thresholds = np.linspace(0.3, 1)
+        skipUntilTimes = [12e-6]
+        saveLoc = r"../baselineIntensityMaps"
+        experimentFileName = r"../Labels/EstimateOfJumpOffPositionTrain.xlsx"
 
-    runExperiment(experimentFileName, thresholds, skipUntilTimes)
+        data = pd.read_excel(experimentFileName)
+
+        data = data.dropna() # Ignore the samples that we do not have the full data for.
+        data.reset_index() # Reset so that it can be easily indexed.
+
+        files = data["Filename"].to_list()
+
+        if False:
+            saveBaselineIntensityImages(files, imageExt = "jpeg")
+
+        runExperiment(experimentFileName, thresholds, skipUntilTimes)

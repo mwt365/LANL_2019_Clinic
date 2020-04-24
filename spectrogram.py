@@ -214,7 +214,8 @@ class Spectrogram:
         # Now compute the probe destruction time.
         self.probeDestructionTime()
         
-        self.estimateStartTime()
+        self.estimatedStartTime_ = None
+        # self.estimateStartTime()
 
     def transform(self, vals):
         """
@@ -435,6 +436,10 @@ class Spectrogram:
 
         self.probe_destruction_time_max = self.time[self.probe_destruction_index_max]
 
+        import baselineTracking
+        peaks, _, _ = baselineTracking.baselines.baselines_by_squash(self)
+        self.probe_destruction_time_withBaselineTracking = baselineTracking.baselineTracking(self, peaks[0], 0.1, 20e-6)*1e-6
+
     def estimateStartTime(self):
         """
         Compute an approximate value for the jump off time based upon the change in 
@@ -462,7 +467,7 @@ class Spectrogram:
         
         return fig
 
-    def plot(self, transformData = False, **kwargs):
+    def plot(self, transformData = False, showBool:bool = True, **kwargs):
         # max_vel=6000, vmin=-200, vmax=100):
         pcms = {}
         if "psd" in self.availableData:
@@ -529,9 +534,10 @@ class Spectrogram:
                     self.transform(zData[:,:endTime]) if (data != "intensity" and transformData) else zData[:,:endTime],
                     **kwargs)
 
-            # Plot the start time estimate.
-            axes.plot([self.estimatedStartTime_]*len(self.velocity), self.velocity, "k-", label = "Estimated Start Time", alpha = 0.75)
-            # plt.legend()
+            if self.estimatedStartTime_ != None:
+                # Plot the start time estimate.
+                axes.plot([self.estimatedStartTime_]*len(self.velocity), self.velocity, "k-", label = "Estimated Start Time", alpha = 0.75)
+                plt.legend()
             
             print(f"The current maximum of the colorbar is {np.max(zData[:,:endTime])} for the dataset {data}")
             plt.gcf().colorbar(pcm, ax=axes)
@@ -551,6 +557,9 @@ class Spectrogram:
             self.availableData.remove("real")
             self.availableData.remove("imaginary")
         
+        if showBool:
+            plt.show() # Needed for Mac computers it seems.
+
         return pcms, axes
 
 
