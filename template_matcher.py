@@ -184,9 +184,9 @@ class TemplateMatcher():
         scores = []
         methodUsed = []
         # print(methods)
-        for method_index, meth in enumerate(methods):
+        for method_index, method_name in enumerate(methods):
             img = img2.copy()
-            method = eval(meth)
+            method = eval(method_name)
 
             # Apply template Matching
             res = cv2.matchTemplate(img, template, method)
@@ -213,6 +213,8 @@ class TemplateMatcher():
                     top_left = point
                     scores.append(max_val)
 
+
+                # correct for template offset to get actual point
                 bottom_right = (top_left[0] + w, top_left[1] + h)
 
                 velo_offset_index = self.template_velo_offset_index
@@ -342,14 +344,14 @@ class TemplateMatcher():
         for peak in peaks:
             velo_index = self.spectrogram._velocity_to_index(peak)
             velo_index = velo_index - 20
-            for i in range(velo_index, velo_index+40, 1):
+            for i in range(velo_index, velo_index + 40, 1):
                 self.spectrogram.intensity[i][:] = minimum
 
 
 
     def add_to_plot(self, axes, times, velos, scores, methodsUsed,
-                    find_medoids=True, 
-                    medoids_only=False,
+                    show_points=True,
+                    show_medoids=True, 
                     verbose=False, 
                     visualize_opacity=False,
                     show_bounds=True):
@@ -391,20 +393,20 @@ class TemplateMatcher():
                 point_method = methodsUsed[i]
                 point, = axes.plot(times[i], velos[i], method_color_dict[methodsUsed[i]][0], markersize=2.5, alpha=opacity)
             else:
-                if find_medoids and (medoids_only==False):
+                if show_points:
                     point_method = methodsUsed[i]
                     # plot the point found from template matching in order from 'best' to 'worst' match
                     point, = axes.plot(times[i], velos[i], method_color_dict[methodsUsed[i]][0], markersize=2.5, alpha=.80)
         
             # add each method to the plot legend handle
-            if (medoids_only==False):
+            if show_points:
                 if point_method not in seen_handles:
                     seen_handles.append(point_method)
                     point.set_label(point_method)
                     handles.append(point)
     
         # cluster coordinates received from template matching, find cluster centers and plot them
-        if find_medoids:
+        if show_medoids:
             centers = self.find_kmedoids(times, velos)
             for t,v in centers:
                 center, = axes.plot(t, v, 'ro', markersize=4, alpha=.9)
@@ -443,20 +445,22 @@ if __name__ == "__main__":
     df = DigFile(path)
     spec = Spectrogram(df, 0.0, 60.0e-6, overlap_shift_factor= 7/8, form='db')
 
-    span = 200
     # gives user the option to click, by default it searches from (0,0)
-    template_matcher = TemplateMatcher(spec, None, template=Templates.opencv_long_start_pattern5.value, span=span, k=20, methods=['cv2.TM_CCOEFF_NORMED', 'cv2.TM_SQDIFF', 'cv2.TM_SQDIFF_NORMED'])
+    template_matcher = TemplateMatcher(spec, None,
+                                            template=Templates.opencv_long_start_pattern5.value,
+                                            span=200,
+                                            k=20,
+                                            methods=['cv2.TM_CCOEFF_NORMED', 'cv2.TM_SQDIFF', 'cv2.TM_SQDIFF_NORMED'])
     # template_matcher = TemplateMatcher(spec, None, template=Templates.opencv_long_start_pattern5.value, span=span, k=20)
 
     # masks the baselines to avoid matching with saturated signals and echoes
-    # template_matcher.mask_baselines()
+    template_matcher.mask_baselines()
 
     times, velos, scores, methodsUsed = template_matcher.match()
 
     pcms, axes = template_matcher.spectrogram.plot(min_time=0, min_vel=100, max_vel=8000, cmap='3w_gby')
-    # pcm = pcms['intensity raw']
-    # pcm.set_clim(100, 0)
+    pcm = pcms['intensity raw']
+    pcm.set_clim(-10, -60)
 
-
-    template_matcher.add_to_plot(axes, times, velos, scores, methodsUsed, find_medoids=True, medoids_only=False,verbose=False, visualize_opacity=False, show_bounds=False)
+    template_matcher.add_to_plot(axes, times, velos, scores, methodsUsed, show_points=False, show_medoids=False, verbose=False, visualize_opacity=False, show_bounds=False)
 

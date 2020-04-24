@@ -184,7 +184,7 @@ if __name__ == '__main__':
     #     print("\n")
     # axes = plt.gca()
 
-    peaks, us, _ = baselines_by_squash(sgram)
+    peaks, uncertainties, peak_heights = baselines_by_squash(sgram)
     velos = []
     times = [x for x in range(0,30)]
 
