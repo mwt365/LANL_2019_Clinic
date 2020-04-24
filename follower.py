@@ -36,7 +36,7 @@ class Follower:
 
     """
 
-    def __init__(self, spectrogram:Spectrogram, start_point:tuple, span:int=80, rotate:bool=True):
+    def __init__(self, spectrogram:Spectrogram, start_point:tuple, span:int=80, rotate:bool=False):
         """
             Input:
                 spectrogram: The object that we would like to trace a signal in.
@@ -44,13 +44,14 @@ class Follower:
                 span: The number of velocity values up and down that you will check at the next time step.
                 rotate: whether or not you want to use linear extrapolation and rotation at each time step.
         """
-        assert isinstance(spectrogram, Spectrogram)
-        assert isinstance(span, int)
+        print("Made it to the follower.py init")
         self.spectrogram = spectrogram
         self.t_start = start_point[0]
         self.v_start = start_point[1]
         self.span = span
         self.rotate = rotate
+        if self.rotate:
+            raise NotImplementedError("The rotate capacity for peak follower is not implemented.")
 
 
         # Now establish storage for intermediate results and

@@ -530,7 +530,7 @@ class Spectrogram:
                     **kwargs)
 
             # Plot the start time estimate.
-            # axes.plot([self.estimatedStartTime_]*len(self.velocity), self.velocity, "k-", label = "Estimated Start Time", alpha = 0.75)
+            axes.plot([self.estimatedStartTime_]*len(self.velocity), self.velocity, "k-", label = "Estimated Start Time", alpha = 0.75)
             # plt.legend()
             
             print(f"The current maximum of the colorbar is {np.max(zData[:,:endTime])} for the dataset {data}")
@@ -539,8 +539,8 @@ class Spectrogram:
             axes.set_xlabel('Time ($\mu$s)', fontsize = 14)
             axes.xaxis.set_tick_params(labelsize=12)
             axes.yaxis.set_tick_params(labelsize=12)        
-            # title = self.data.filename.split('/')[-1]
-            # axes.set_title(title.replace("_", "-") + f" {data} spectrogram", fontsize = 24)
+            title = self.data.filename.split('/')[-1]
+            axes.set_title(title.replace("_", "-") + f" {data} spectrogram", fontsize = 24)
 
             axes.set_xlim(left, right)
             axes.set_ylim(bot, top) # The None value is the default value and does not update the axes limits.            
@@ -556,17 +556,17 @@ class Spectrogram:
 
 if __name__ == '__main__':
     # Then I am calling this from the command line and not jupyter. This is an assumption!
+    if False:
+        import tkinter as tk
+        root = tk.Tk()
+        width_px = root.winfo_screenwidth()
+        height_px = root.winfo_screenheight()
+        width_mm = root.winfo_screenmmwidth()
+        height_mm = root.winfo_screenmmheight()
+        # 2.54 cm = in
+        width_in = width_mm / 25.4
+        height_in = height_mm / 25.4
 
-    import tkinter as tk
-    root = tk.Tk()
-    width_px = root.winfo_screenwidth()
-    height_px = root.winfo_screenheight()
-    width_mm = root.winfo_screenmmwidth()
-    height_mm = root.winfo_screenmmheight()
-    # 2.54 cm = in
-    width_in = width_mm / 25.4
-    height_in = height_mm / 25.4
+        # Set the default window size for matplotlib to be the fullscreen - 0.5 inches on the side and the top.
 
-    # Set the default window size for matplotlib to be the fullscreen - 0.5 inches on the side and the top.
-
-    plt.rcParams["figure.figsize"] = [width_in-0.5, height_in-0.5]
+        plt.rcParams["figure.figsize"] = [width_in-0.5, height_in-0.5]

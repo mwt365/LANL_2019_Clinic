@@ -6,7 +6,7 @@ from datetime import datetime
 
 def save_as_dig(filename, vvals, datatype, dt=20e-12, initialTime=0,
                 voltageMultiplier=6.103516e-5, voltageOffset=0,
-                top_header=""):
+                top_header="", **kwargs):
     """
         Inputs:
             filename: string/path object pointing to where the file is.
@@ -34,6 +34,7 @@ def save_as_dig(filename, vvals, datatype, dt=20e-12, initialTime=0,
     """
     dataformat = ""
     print(datatype)
+    date = kwargs.get("date", "")
     if isinstance(datatype, type(str("example"))
                   ) or isinstance(datatype, type('8')):
         if datatype == '8':
@@ -59,6 +60,14 @@ def save_as_dig(filename, vvals, datatype, dt=20e-12, initialTime=0,
 
     nsamples = len(vvals)
 
+    # If the top_header argument is a dictionary, prepare a string
+    # representation.
+    if isinstance(top_header, dict):
+        keys = top_header.keys()
+        head = "\r\n".join([f"{k} = {top_header[k]}" for k in keys])
+        top_header = head
+
+
     # Now write the header, the important parts of which are
     # nsamples, bits, dt, t0, dv, v0
     # This will fail if the file is not already created.
@@ -70,7 +79,7 @@ def save_as_dig(filename, vvals, datatype, dt=20e-12, initialTime=0,
             # todays date Day Mon NumDay HH:MM:SS: YEAR
             # This is achieved using ctime() in the datetime library. 
             # Reference https://docs.python.org/3/library/datetime.html
-            datetime.now().ctime(),
+            date,
             # the number of samples used.
             str(nsamples),
             # format for the data to be read as.

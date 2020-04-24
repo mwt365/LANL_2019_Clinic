@@ -39,27 +39,26 @@ class PeakFollower(Follower):
                  max_hop=70   # require peaks at successive time steps
                  # to be within this many velocity indices
                  ):
+        print("passed the callback.")
         super().__init__(spectrogram, start_point, span)
         self.smoothing = smoothing
         self.max_hop = max_hop
         peaks, dv, heights = bline(spectrogram)
         self.baselines = np.array(peaks)
 
-    def run(self):
+    def run(self, maxIter = 0):
         """
         Repeatedly call step until it fails.
+        Returns the total intensity observed along the trajectory up to the number of iterations allowed by maxIter.
+        If maxIter <= 0 then it will run until completion. 
         """
-        intensities = []
-        counter = 0
-        
-        while self.step(intensities) and counter < 10:
-            counter+=1
+        while self.step(maxIter):
             pass
-        
-        return np.sum(intensities)
+        eIter = len(self.results['intensities']) if maxIter <= 0 else maxIter
+        return np.sum(self.results['intensities'][:eIter])
         
 
-    def step(self, mylist):
+    def step(self, maxIter=0):
         """
         Attempt to fit a gaussian starting from the coeffients
         in the input parameter to intensities vs velocities.
@@ -71,14 +70,17 @@ class PeakFollower(Follower):
 
         print("The list of my times",self.results['times'])
         print("The list of my velocities", self.results['velocities'])
-
+        if maxIter > 0:
+            print("Max iter is breaking it.")
+            if len(self.results['time_index']) >= maxIter:
+                return False # We have done the maximum number of iterations.
 
         if self.smoothing:
             intensities = moving_average(intensities, n=self.smoothing)
 
         # generate an index array to sort the intensities (low to high)
         low_to_high = np.argsort(intensities)
-
+        print("Check the new intensities")
         # remove any peaks that are too close to the baseline
         n = -1
         while True:
@@ -90,8 +92,6 @@ class PeakFollower(Follower):
 
         top = low_to_high[n]  # index of the tallest intensity peak
         v_high = velocities[top]
-        mylist.append(intensities[top])
-
 
         # add this to our results
         self.results['velocity_index_spans'].append((p_start, p_end))
