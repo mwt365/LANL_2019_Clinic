@@ -549,12 +549,14 @@ class SpectrogramWidget:
             return 0
         # Look up what we should do with the click
         action = self.controls['clicker'].value
+        print(f"The action I am attempting to do is {action}")
         try:
             if 'Spectrum' in action:
                 self.spectrum(t, action)
             elif 'Template_Matching' in action:
                 self.match_templates(t, v)
             else:
+                print("I am handling a click that should be a peak follower")
                 self.follow(t, v, action)
 
         except Exception as eeps:
@@ -602,7 +604,7 @@ class SpectrogramWidget:
     def follow(self, t, v, action):
         """Attempt to follow the path starting with the clicked
         point."""
-
+        print(f"Let's follow something starting at {t, v} using action {action}.")
         if action == "Gauss":
             fitter = GaussianFitter(self.spectrogram, (t, v))
             self.gauss = fitter

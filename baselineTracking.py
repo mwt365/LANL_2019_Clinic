@@ -38,26 +38,27 @@ def saveBaselineIntensityImages(files, saveLoc:str = None, imageExt:str = "png")
         plt.clf()
         del MySpect
 
-def baselineTracking(spectrogram, baselineVel, changeThreshold):
+def baselineTracking(spectrogram, baselineVel, changeThreshold, skipUntilTime:float=12e-6):
     """
         Return the first time in microseconds that baseline's intensity value changes outside the changeThreshold.
         Use the average baseline value as the estimate
     """
 
     baselineInd = spectrogram._velocity_to_index(baselineVel)
-    runningAverage = spectrogram.intensity[baselineInd][0]
+    runningAverage = spectrogram.intensity[baselineInd][spectrogram._time_to_index(spectrogram.t_start + skipUntilTime)]
     
-    jumpOffTime = spectrogram.probe_destruction_time_max
-
-    for ind in range(spectrogram.intensity.shape[-1]):
+    startInd = spectrogram._time_to_index(spectrogram.t_start + skipUntilTime)
+    for ind in range(startInd, spectrogram.intensity.shape[-1]):
         currentIntensity = spectrogram.intensity[baselineInd][ind]
         if (np.abs(currentIntensity) >= np.abs((1+changeThreshold) * runningAverage)) or (np.abs(currentIntensity) <= np.abs((1-changeThreshold) * runningAverage)):
+            # print(f"{changeThreshold}: {spectrogram.time[ind]*1e6}")
             return spectrogram.time[ind]*1e6
-        runningAverage += 1/(ind + 1)*(currentIntensity - runningAverage)
-    return jumpOffTime
+        runningAverage += 1/(ind+1-startInd) * (currentIntensity - runningAverage)
+    
+    return spectrogram.time[ind]*1e6
 
 
-def runExperiment(thresholds, trainingFilePath):
+def runExperiment(trainingFilePath, thresholds:list, skipUntilTimes:list = []):
 
     data = pd.read_excel(trainingFilePath)
 
@@ -65,59 +66,84 @@ def runExperiment(thresholds, trainingFilePath):
     data.reset_index() # Reset so that it can be easily indexed.
 
     files = data["Filename"].to_list()
-    bestGuessTimes = (data["starting time (bottom signal if frequency multiplexed)"]*1e6).to_list()
-    bestGuessVels = data["starting velocity (bottom signal if frequency multiplexed)"].to_list()
+    bestGuessTimes = (data[data.columns[1]]*1e6).to_list()
+    bestGuessVels = data[data.columns[-1]].to_list() # This will be the same times for the probe destruction dataset. It is generally ignored currently.
 
 
     d = {"Filename": files}
 
+    if skipUntilTimes == []:
+        skipUntilTimes = [12e-6]
+
     for i in range(len(thresholds)):
-        d[f"threshold {thresholds[i]}"] = 0
-        d[f"threshold {thresholds[i]} error"] = 0
+        d[f"threshold {thresholds[i]}"] = np.zeros((len(skipUntilTimes), len(files)))
+        d[f"threshold {thresholds[i]} error"] = np.zeros((len(skipUntilTimes), len(files)))
 
-
+    print("Running the experiment")
 
     for i in tqdm.trange(len(files)):
-        filename = f"../dig/{files[i]}"
+        filename = os.path.join(os.path.join("..", "dig") , f"{files[i]}")
         MySpect = Spectrogram(filename)
         peaks, _, heights = baselines.baselines_by_squash(MySpect)
 
 
         for thres in thresholds:
             
-            timeEstimate = baselineTracking(MySpect, peaks[0], thres)
+            for skipTimeInd in range(len(skipUntilTimes)):
+                skipTime = skipUntilTimes[skipTimeInd]
+                timeEstimate = baselineTracking(MySpect, peaks[0], thres, skipTime)
 
-            d[f"threshold {thres}"] = timeEstimate
-            d[f"threshold {thres} error"] = bestGuessTimes[i] - timeEstimate
+                d[f"threshold {thres}"][skipTimeInd][i] = timeEstimate
+                d[f"threshold {thres} error"][skipTimeInd][i] = bestGuessTimes[i] - timeEstimate
 
     # Compute summary statistics
-    summaryStatistics = np.zeros((len(thresholds), 5))
+    summaryStatistics = np.zeros((len(thresholds), len(skipUntilTimes), 5))
+    stats = ["Avg", "Std", "Median", "Max", "Min"]
+
+    print(f"Computing the summary statistics: [{stats}]")
 
     for i in tqdm.trange(len(thresholds)):
-        summaryStatistics[i][0] = np.mean(d[f"threshold {thresholds[i]} error"]**2)
-        summaryStatistics[i][1] = np.std(d[f"threshold {thresholds[i]} error"]**2)
-        summaryStatistics[i][2] = np.median(d[f"threshold {thresholds[i]} error"]**2)
-        summaryStatistics[i][3] = np.max(d[f"threshold {thresholds[i]} error"]**2)
-        summaryStatistics[i][4] = np.min(d[f"threshold {thresholds[i]} error"]**2)
+        for j in range(len(skipUntilTimes)):
+            q = np.power(d[f"threshold {thresholds[i]} error"][j],2)
+            summaryStatistics[i][j][0] = np.mean(q)
+            summaryStatistics[i][j][1] = np.std(q)
+            summaryStatistics[i][j][2] = np.median(q)
+            summaryStatistics[i][j][3] = np.max(q)
+            summaryStatistics[i][j][4] = np.min(q)
 
-    print(f"The minimum avg L2 error is {np.min(summaryStatistics[:, 0])} which occurs at {np.argmin(summaryStatistics[:, 0])} i.e. threshold of {thresholds[np.argmin(summaryStatistics[:, 0])]}")
-    print(f"The statistics for that the threshold is {summaryStatistics[np.argmin(summaryStatistics[:, 0])]}")
 
-    print(f"Saving the raw data to baselineTracking.csv")
 
-    d = pd.DataFrame(d, index=d["Filename"])
-    d.to_csv("baselineTracking.csv")
+    for i in tqdm.trange(len(stats)):
+        fig = plt.figure()
+        ax = plt.gca()
 
-    myMin = str(min(thresholds)).replace(".", "_")
-    myMax = str(max(thresholds)).replace(".", "_")
-    print(f"Saving the summary statistics to baselineTracking_thres_{myMin}-{myMax}.csv")
+        pcm = ax.pcolormesh(np.array(skipUntilTimes)*1e6, thresholds, summaryStatistics[:,:,i])
+        plt.title(f"{stats[i]} L2 error over the files")
+        plt.ylabel("Thresholds")
+        plt.xlabel("Time that you skip at the beginning")
+        plt.gcf().colorbar(pcm, ax=ax)
+    
+        plt.show() # Need this for Macs.
+        
+    summaryFolder = r"../ProbeDestructionEstimates"
+    if not os.path.exists(summaryFolder):
+        os.makedirs(summaryFolder)
 
-    np.to_csv(f"baselineTracking_thres_{myMin}-{myMax}.csv")
+
+    for i in range(len(thresholds)):
+        q = pd.DataFrame(summaryStatistics[i])
+        internal_a = str(thresholds[i]).replace(".", "_")
+        saveSummaryFilename = f"summaryThresh{internal_a}.csv"
+        q.to_csv(os.path.join(summaryFolder, saveSummaryFilename))
+
+
+    return summaryStatistics, d
 
 if __name__ == "__main__":
     thresholds = np.linspace(0.3, 1)
+    skipUntilTimes = [12e-6]
     saveLoc = r"../baselineIntensityMaps"
-    experimentFileName = r"../NickEstimateOfJumpOffPosition.xlsx"
+    experimentFileName = r"../Labels/EstimateOfJumpOffPositionTrain.xlsx"
 
     data = pd.read_excel(experimentFileName)
 
@@ -129,4 +155,4 @@ if __name__ == "__main__":
     if False:
         saveBaselineIntensityImages(files, imageExt = "jpeg")
 
-    runExperiment(thresholds, experimentFileName)
+    runExperiment(experimentFileName, thresholds, skipUntilTimes)
