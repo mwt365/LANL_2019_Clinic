@@ -332,16 +332,12 @@ class TemplateMatcher():
 
 
 
-    def find_kmedoids(self, xcoords, ycoords, clusters=5, random_state=0):
+    def find_kmedoids(self, xcoords, ycoords, clusters=5, random_state=None):
         assert(len(xcoords) == len(ycoords))
-        X = np.zeros( (len(xcoords), 2) )
-        for i in range(len(xcoords)):
-            X[i] = [xcoords[i], ycoords[i]]
+        X = np.stack((xcoords, ycoords), axis = 1) # Give me an array of with columns xcoords and ycoords.
+
         kmedoids = KMedoids(n_clusters=clusters, random_state=random_state).fit(X)
-        cluster_centers = []
-        for t,v in kmedoids.cluster_centers_:
-            cluster_centers.append((t,v))
-        return cluster_centers
+        return kmedoids.cluster_centers_ # return a np array of shape (clusters, 2). The columns are xcoords and ycoords.
 
 
 
