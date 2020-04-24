@@ -83,9 +83,6 @@ class Spectrogram:
                  ):
         """
         Keyword arguments we handle:
-
-        mode: if 'complex', compute the complex spectrogram, which gets
-              stored in self.complex
         scaling: 'spectrum' or 'density'
         """
         if isinstance(digfile, str):
@@ -120,22 +117,8 @@ class Spectrogram:
         # Otherwise it will contain the phase or angle information.
         # Containment determined by the value of computeMode.
 
-        # This will only get set if self.complex_value is True
-        self.orig_spec_output = None
-
         # deal with kwargs
 
-        self.computeMode = "psd"  # This stands for power spectrum density.
-        if "mode" in kwargs:
-            available = ["psd", "complex", "magnitude", "angle", "phase"]
-            desired = kwargs["mode"]
-            if desired in available:
-                self.computeMode = desired
-            else:
-                # Default to "all", but display error to the user. 
-                # If the user specifies a mode that does not exist.
-                kwargs["mode"] = "all"
-                self.computeMode = "all"
 
         try:
             if False:
@@ -159,18 +142,24 @@ class Spectrogram:
 
         # possible modes are 'psd', 'complex', 'magnitude',
         # 'angle', and 'phase'
-        mode = kwargs.get('mode', 'psd')
+
         scaling = kwargs.get('scaling', 'spectrum')
-        if mode in ('angle', 'phase'):
-            modes = [mode, 'psd']
-        elif mode == "all":
-            modes = ["complex", "magnitude", "angle", "phase", "psd"]
-        else:
-            modes = [mode]
-        
+
+
+        modes = ["complex", "phase", "psd"]
+                
         self.availableData = modes
+        self.complex = []
+        self.phase = []
 
         for mode in modes:
+            # ["complex", "magnitude", "angle", "phase", "psd"]
+            # The available modes for signal.spectrogram 
+            # Only need to compute complex, phase, and psd and then we can derive the rest.
+
+            # You can probably compute the psd from the complex spectrum
+            # but we do not havve the time to investigate.
+
             freqs, times, spec = signal.spectrogram(
                 vals,
                 1.0 / self.data.dt,  # the sample frequency
@@ -183,25 +172,28 @@ class Spectrogram:
                 mode=mode
             )
             setattr(self, mode, spec)
-            self.orig_spec_output = spec
 
 
         times += self.t_start
 
-        # Attempt to deduce baselines
-        # baselines = np.sum(spec, axis=1)
+        self.magnitude = np.abs(getattr(self, "complex"))
+        self.angle = np.angle(getattr(self, "complex"))
+        self.real = np.real(getattr(self, "complex"))
+        self.imaginary = np.imag(getattr(self, "complex"))
+
+        self.availableData.extend(["magnitude", "angle", "real", "imaginary"])
+        self.availableData.remove("complex")
+
+        self.availableData.append("intensity")
+        self.availableData.remove("psd")
+        self.intensity = self.transform(getattr(self, "psd"))
 
         # Convert to a logarithmic representation and use floor to attempt
         # to suppress some noise.
         # I think the following is an attempt to normalize across
         # different numbers of points per spectrum.
 
-        if mode == 'complex':
-            self.complex = spec
-            self.intensity = np.abs(spec)
-            self.intensity *= self.intensity
-        else:
-            self.intensity = self.transform(spec)
+
         self.histogram_levels = self.histo_levels(self.intensity)
 
         # the first index is frequency, the second time
@@ -287,13 +279,17 @@ class Spectrogram:
             return 0
         return min(p, -1 + len(self.velocity))
 
-    def slice(self, time_range, velocity_range):
+    def slice(self, time_range, velocity_range, complexData:bool = False, phaseData:bool = False):
         """
         Input:
             time_range: Array/Tuple/List of times (t0, t1)
                 t1 should be greater than t0 but we will handle the other case
             velocity_range: Array/Tuple/List of velocities (v0, v1)
                 v1 should be greater than v0 but we will handle the other case
+            complexData (False):
+                Do you want the complex data as well?
+            phaseData (False):
+                Do you want the phase data as well?
         Output:
             4 arrays time, velocity, intensity, original_spec
             time: the time values used in the measurement from t0 to t1 inclusive.
@@ -318,9 +314,14 @@ class Spectrogram:
         tvals = self.time[time0:time1 + 1]
         vvals = self.velocity[vel0:vel1 + 1]
         ivals = self.intensity[vel0:vel1 + 1, time0:time1 + 1]
-        if self.computeMode != "psd":
-            ovals = self.orig_spec_output[vel0:vel1 + 1, time0:time1 + 1]
-            return tvals, vvals, ivals, ovals
+
+        if complexData and phaseData:
+            return tvals, vvals, ivals, self.complex[vel0:vel1+1, time0:time1+1], self.phase[vel0:vel1+1, time0:time1+1]
+        elif complexData:
+            return tvals, vvals, ivals, self.complex[vel0:vel1+1, time0:time1+1]
+        elif phaseData:
+            return tvals, vvals, ivals, self.phase[vel0:vel1+1, time0:time1+1]
+
         return tvals, vvals, ivals
     # Routines to archive the computed spectrogram and reload from disk
 
@@ -502,13 +503,7 @@ class Spectrogram:
 
 
         for data in self.availableData:
-            zData = getattr(self, data, "psd") # getattr(object, itemname, default)
-            if data == "complex":
-                continue
-            elif data == "real":
-                zData = np.real(self.complex)
-            elif data == "imaginary":
-                zData = np.imag(self.complex)
+            zData = getattr(self, data, "intensity") # getattr(object, itemname, default)
             
             key = f"{data}" + (f" transformed to {self.form}" if transformData else " raw")
             fig = plt.figure(num=key)
@@ -529,6 +524,10 @@ class Spectrogram:
                     self.transform(zData[:,:endTime]) if (data != "intensity" and transformData) else zData[:,:endTime],
                     **kwargs)
 
+            dataToLookAt = self.transform(zData[:,:endTime]) if (data != "intensity" and transformData) else zData[:,:endTime]
+
+            print(f"The current maximum of the colorbar is {np.max(dataToLookAt) } for the dataset {data}")
+            
             # Plot the start time estimate.
             axes.plot([self.estimatedStartTime_]*len(self.velocity), self.velocity, "k-", label = "Estimated Start Time", alpha = 0.75)
             # plt.legend()
@@ -546,10 +545,6 @@ class Spectrogram:
             axes.set_ylim(bot, top) # The None value is the default value and does not update the axes limits.            
 
             pcms[key] = pcm
-
-        if "complex" in self.availableData:
-            self.availableData.remove("real")
-            self.availableData.remove("imaginary")
         
         return pcms, axes
 

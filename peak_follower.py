@@ -23,6 +23,7 @@ class PeakFollower(Follower):
 
     - spectrogram: an instance of Spectrogram
     - start_point: (t, v), the coordinates at which to begin the search
+                The time is in seconds. The velocity is in m/s.
     - span: (60) the number of pixels on either side of the starting value of v
       at which to search for a peak at the next time step.
     - smoothing: (4) the number of points on either side of a given velocity
@@ -36,16 +37,24 @@ class PeakFollower(Follower):
 
     def __init__(self, spectrogram, start_point, span=80,
                  smoothing=4,  # average this many points on each side
-                 max_hop=70   # require peaks at successive time steps
+                 max_hop=80,   # require peaks at successive time steps
                  # to be within this many velocity indices
+                 debug = False # Do you want to print out debugging statements each loop?
                  ):
-        print("passed the callback.")
-        super().__init__(spectrogram, start_point, span)
+        super().__init__(spectrogram, start_point, span, debug=debug)
         self.smoothing = smoothing
         self.max_hop = max_hop
         peaks, dv, heights = bline(spectrogram)
         self.baselines = np.array(peaks)
 
+        # It was passed in so we will assume that it is correct!
+        self.results["velocities"].append(self.v_start)
+        self.results["times"].append(self.t_start)
+        self.results["time_index"].append(self.time_index)
+        self.results['intensities'].append(self.spectrogram.intensity[self.spectrogram._velocity_to_index(self.v_start), self.time_index])
+        self.results["velocity_index_spans"].append((self.spectrogram._velocity_to_index(self.v_start)-span, self.spectrogram._velocity_to_index(self.v_start) + span))
+
+        self.time_index += 1
     def run(self, maxIter = 0):
         """
         Repeatedly call step until it fails.
@@ -68,8 +77,13 @@ class PeakFollower(Follower):
         """
         velocities, intensities, p_start, p_end = self.data()
 
-        print("The list of my times",self.results['times'])
-        print("The list of my velocities", self.results['velocities'])
+        if self.debug:
+            print("The list of my times",self.results['times'])
+            print("The list of my velocities", self.results['velocities'])
+        
+        if self.time_index >= self.spectrogram._time_to_index(self.spectrogram.probe_destruction_time):
+            return False
+
         if maxIter > 0:
             print("Max iter is breaking it.")
             if len(self.results['time_index']) >= maxIter:
