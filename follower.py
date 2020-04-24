@@ -12,6 +12,7 @@ import numpy as np
 import pandas as pd
 from spectrogram import Spectrogram
 from scipy.optimize import curve_fit
+from ProcessingAlgorithms.Fitting.moving_average import normalize
 
 import imageRot
 
@@ -36,19 +37,26 @@ class Follower:
 
     """
 
-    def __init__(self, spectrogram:Spectrogram, start_point:tuple, span:int=80, rotate:bool=False):
+    def __init__(self, spectrogram:Spectrogram, start_point:tuple, span:int=80, rotate:bool=False, weightingVector:dict={}, debug = False):
         """
             Input:
                 spectrogram: The object that we would like to trace a signal in.
                 start_point: (t, v) The actual time and velocity values (not the indices)
                 span: The number of velocity values up and down that you will check at the next time step.
                 rotate: whether or not you want to use linear extrapolation and rotation at each time step.
+                weightingVector: the weighting vector dictionary used to combine the available data into one matrix.
+                    Values must sum to one. The default is {intensity: 1} meaning to use only the intensity data. 
+                    It will be in the same order as the availableData.
+                    If all the modes have been computed availableData will be
+                        ['magnitude', 'angle', 'phase', 'real', 'imaginary', 'intensity']
+                debug: Do you want to print debugging statements?
         """
         self.spectrogram = spectrogram
-        self.t_start = start_point[0]
-        self.v_start = start_point[1]
+        self.t_start , self.v_start = start_point
         self.span = span
         self.rotate = rotate
+        self.weightingVector = weightingVector if (weightingVector != {}) else {"intensity": 1}
+        self.debug = debug
         if self.rotate:
             raise NotImplementedError("The rotate capacity for peak follower is not implemented.")
 
@@ -112,6 +120,10 @@ class Follower:
         return (start_index, end_index)
 
     def data(self, n=-1):
+        if self.debug:
+            print(self.spectrogram.availableData)
+
+
         if self.rotate and len(self.results['velocities']) > 1:
 
             start_index, end_index, coefficents = self.data_range(n)
@@ -127,14 +139,19 @@ class Follower:
 
             rotatedIndices =  imageRot.computeIndices((np.array(intensities.shape[::-1])-1)/2, (np.array(rotatedIndices.shape[::-1])-1)/2, newIndices, -1*angle, (startT, start_index))
 
+        
             
-
-            
-
         start_index, end_index = self.data_range(n)
+        output = np.zeros((end_index-start_index))
+        for name in self.weightingVector.keys():
+            data = getattr(self.spectrogram, name)
+            dataForOutput = normalize(data) # Force every feature to have a zero mean and 1 sample standard deviation.
+            output += dataForOutput[start_index:end_index, self.time_index]* self.weightingVector[name]    
+            
+
         velocities = self.velocity[start_index:end_index]
-        intensities = self.intensity[start_index:end_index, self.time_index]
-        return velocities, self.spectrogram.power(intensities), start_index, end_index
+        # intensities = self.intensity[start_index:end_index, self.time_index]
+        return velocities, self.spectrogram.power(output), start_index, end_index
 
     @property
     def frame(self):
