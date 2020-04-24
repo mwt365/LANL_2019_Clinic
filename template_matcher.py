@@ -50,7 +50,8 @@ class TemplateMatcher():
                                 'cv2.TM_CCORR', 
                                 'cv2.TM_CCORR_NORMED', 
                                 'cv2.TM_SQDIFF', 
-                                'cv2.TM_SQDIFF_NORMED']
+                                'cv2.TM_SQDIFF_NORMED'],
+                        useCorrectionFactor:bool = False
                         ):
 
         assert isinstance(spectrogram, Spectrogram)
@@ -66,8 +67,12 @@ class TemplateMatcher():
         self.k = int(k)
 
         # To get the intensity matrix the way it was when we trained it.
-        epsilon = 1e-10
-        self.matrixToMatch = 20 * np.log10(2*self.spectrogram.psd/(self.spectrogram.points_per_spectrum*self.spectrogram.data.dt) + epsilon)
+        if useCorrectionFactor:
+            epsilon = 1e-10
+            self.matrixToMatch = 20 * np.log10(2*self.spectrogram.psd/(self.spectrogram.points_per_spectrum*self.spectrogram.data.dt) + epsilon)
+        else:
+            # This will increase the memory usage but it will make it so that we do not overwrite the data in spectrogram.intensity that might be needed later.
+            self.matrixToMatch = np.copy(self.spectrogram.intensity) 
 
         self.zero_time_index = spectrogram._time_to_index(0)
         self.zero_velo_index = spectrogram._velocity_to_index(0)
@@ -347,7 +352,7 @@ class TemplateMatcher():
             velo_index = self.spectrogram._velocity_to_index(peak)
             velo_index = velo_index - 20
             for i in range(velo_index, velo_index + 40, 1):
-                self.spectrogram.intensity[i][:] = minimum
+                self.matrixToMatch[i][:] = minimum
 
 
 
