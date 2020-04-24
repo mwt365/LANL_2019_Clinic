@@ -54,7 +54,7 @@ class TemplateMatcher():
                         ):
 
         assert isinstance(spectrogram, Spectrogram)
-        assert (len(template) > 0)
+        assert (len(template[0]) > 0)
 
         self.spectrogram = spectrogram
         self.template = template[0]
