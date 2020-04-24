@@ -417,7 +417,7 @@ class DigFile:
         return sorted(digfiles)
 
     @staticmethod
-    def inventory(segments=False):
+    def inventory(segments=False, justSegments = False):
         """Produce a pandas DataFrame showing all the .dig files in
         the /dig/ directory. If segments is True, show each segment file
         that was created by Fiducials.split(). By default, segments is False.
@@ -429,8 +429,12 @@ class DigFile:
 
         for filename in DigFile.all_dig_files():
             df = DigFile(filename)
-            if not segments and df.is_segment:
-                continue
+            if not justSegments:
+                if not segments and df.is_segment:
+                    continue
+            else:
+                if not df.is_segment:
+                    continue
             rows.append(dict(
                 file=filename,
                 date=df.date,
@@ -438,7 +442,8 @@ class DigFile:
                 dt=df.dt * 1e12,
                 duration=df.dt * df.num_samples * 1e6
             ))
-        os.chdir(curdir)
+            
+        os.chdir(curdir) # Reset the current directory.
         return pd.DataFrame(rows)
 
     @property

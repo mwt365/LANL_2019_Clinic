@@ -205,7 +205,8 @@ class Spectrogram:
         # Now compute the probe destruction time.
         self.probeDestructionTime()
         
-        self.estimateStartTime()
+        self.estimatedStartTime_ = None
+        # self.estimateStartTime()
 
     def transform(self, vals):
         """
@@ -640,9 +641,10 @@ class Spectrogram:
 
             print(f"The current maximum of the colorbar is {np.max(dataToLookAt) } for the dataset {data}")
             
-            # Plot the start time estimate.
-            axes.plot([self.estimatedStartTime_]*len(self.velocity), self.velocity, "k-", label = "Estimated Start Time", alpha = 0.75)
-            # plt.legend()
+            if self.estimatedStartTime_ != None:
+                # Plot the start time estimate.
+                axes.plot([self.estimatedStartTime_]*len(self.velocity), self.velocity, "k-", label = "Estimated Start Time", alpha = 0.75)
+                # plt.legend()
             
             print(f"The current maximum of the colorbar is {np.max(zData[:,:endTime])} for the dataset {data}")
             plt.gcf().colorbar(pcm, ax=axes)
