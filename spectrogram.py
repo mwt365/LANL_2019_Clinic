@@ -2,7 +2,6 @@
 
 """
 ::
-
    Author:  LANL Clinic 2019 --<lanl19@cs.hmc.edu>
    Purpose: Compute a spectrogram from a DigFile
    Created: 9/20/19
@@ -91,6 +90,10 @@ class Spectrogram:
         if isinstance(digfile, DigFile):
             self.data = digfile
         else:
+            print(isinstance(digfile, DigFile))
+            print(type(digfile))
+            print(digfile)
+
             raise TypeError("Unknown file type")
 
         self.t_start = t_start if t_start != None else self.data.t0
@@ -202,6 +205,8 @@ class Spectrogram:
 
         # Now compute the probe destruction time.
         self.probeDestructionTime()
+        
+        self.estimateStartTime()
 
     def transform(self, vals):
         """
@@ -431,6 +436,15 @@ class Spectrogram:
 
         self.probe_destruction_time_max = self.time[self.probe_destruction_index_max]
 
+    def estimateStartTime(self):
+        """
+        Compute an approximate value for the jump off time based upon the change in 
+        the baseline intensity.
+        """
+        import baselineTracking
+        peaks, _, _ = baselineTracking.baselines.baselines_by_squash(self)
+        self.estimatedStartTime_ = baselineTracking.baselineTracking(self, peaks[0], 0.024761904761904763)
+
     def plotHist(self, fig = None, minFrac=0.0, maxFrac = 1.0, numBins = 1001, **kwargs):
         if fig == None:
             fig = plt.figure()
@@ -452,11 +466,18 @@ class Spectrogram:
     def plot(self, transformData = False, **kwargs):
         # max_vel=6000, vmin=-200, vmax=100):
         pcms = {}
+        if "psd" in self.availableData:
+            self.availableData.append("intensity")
+        if "complex" in self.availableData:
+            self.availableData.append("real")
+            self.availableData.append("imaginary")
+
 
         endTime = self._time_to_index((self.probe_destruction_time + self.probe_destruction_time_max)/2)
         # Our prediction for the probe destruction time. Just to make it easier to plot. 
 
         cmapUsed = COLORMAPS[DEFMAP]
+        # print(COLORMAPS.keys())
         if 'cmap' in kwargs:
             # To use the sciviscolor colormaps that we have downloaded.
             attempt = kwargs['cmap']
@@ -506,11 +527,15 @@ class Spectrogram:
             dataToLookAt = self.transform(zData[:,:endTime]) if (data != "intensity" and transformData) else zData[:,:endTime]
 
             print(f"The current maximum of the colorbar is {np.max(dataToLookAt) } for the dataset {data}")
+            # Plot the start time estimate.
+            axes.plot([self.estimatedStartTime_]*len(self.velocity), self.velocity, "k-", label = "Estimated Start Time", alpha = 0.75)
+            # plt.legend()
+            
             plt.gcf().colorbar(pcm, ax=axes)
-            axes.set_ylabel('Velocity (m/s)', fontsize = 18)
-            axes.set_xlabel('Time ($\mu$s)', fontsize = 18)
-            axes.xaxis.set_tick_params(labelsize=14)
-            axes.yaxis.set_tick_params(labelsize=14)        
+            axes.set_ylabel('Velocity (m/s)', fontsize = 14)
+            axes.set_xlabel('Time ($\mu$s)', fontsize = 14)
+            axes.xaxis.set_tick_params(labelsize=12)
+            axes.yaxis.set_tick_params(labelsize=12)        
             title = self.data.filename.split('/')[-1]
             axes.set_title(title.replace("_", "-") + f" {data} spectrogram", fontsize = 24)
 
@@ -519,26 +544,22 @@ class Spectrogram:
 
             pcms[key] = pcm
         
-        return pcms
+        return pcms, axes
 
 
 if __name__ == '__main__':
     # Then I am calling this from the command line and not jupyter. This is an assumption!
+    if False:
+        import tkinter as tk
+        root = tk.Tk()
+        width_px = root.winfo_screenwidth()
+        height_px = root.winfo_screenheight()
+        width_mm = root.winfo_screenmmwidth()
+        height_mm = root.winfo_screenmmheight()
+        # 2.54 cm = in
+        width_in = width_mm / 25.4
+        height_in = height_mm / 25.4
 
-    import tkinter as tk
-    root = tk.Tk()
-    width_px = root.winfo_screenwidth()
-    height_px = root.winfo_screenheight()
-    width_mm = root.winfo_screenmmwidth()
-    height_mm = root.winfo_screenmmheight()
-    # 2.54 cm = in
-    width_in = width_mm / 25.4
-    height_in = height_mm / 25.4
+        # Set the default window size for matplotlib to be the fullscreen - 0.5 inches on the side and the top.
 
-    # Set the default window size for matplotlib to be the fullscreen - 0.5 inches on the side and the top.
-
-    plt.rcParams["figure.figsize"] = [width_in-0.5, height_in-0.5]
-
-    # sp = Spectrogram('../dig/GEN3CH_4_009.dig', None,
-    #                  None, overlap_shift_factor=1 / 4)
-    # print(sp)
+        plt.rcParams["figure.figsize"] = [width_in-0.5, height_in-0.5]

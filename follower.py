@@ -51,13 +51,15 @@ class Follower:
                         ['magnitude', 'angle', 'phase', 'real', 'imaginary', 'intensity']
                 debug: Do you want to print debugging statements?
         """
-
         self.spectrogram = spectrogram
         self.t_start , self.v_start = start_point
         self.span = span
         self.rotate = rotate
         self.weightingVector = weightingVector if (weightingVector != {}) else {"intensity": 1}
         self.debug = debug
+        if self.rotate:
+            raise NotImplementedError("The rotate capacity for peak follower is not implemented.")
+
 
         # Now establish storage for intermediate results and
         # state. time_index is the index into the spectrogram.intensity

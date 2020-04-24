@@ -273,7 +273,7 @@ def documentationMain():
 
 def setupForDocumentation():
     # Set up
-    filename = "../dig/GEN3CH_4_009.dig"
+    filename = "../dig/CH_4_009.dig"
     t1 = 14.2389/1e6
     t2 = 31.796/1e6
     MySpect = Spectrogram(filename, mode = "complex")

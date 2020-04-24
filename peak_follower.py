@@ -2,7 +2,6 @@
 # coding:utf-8
 """
 ::
-
   Author:  LANL Clinic 2019 --<lanl19@cs.hmc.edu>
   Purpose: Attempt to follow a peak.
   Created: 10/18/19
@@ -18,9 +17,7 @@ class PeakFollower(Follower):
     """
     A naive follower implementation that uses a local-region
     smoothing and then follows the local maximum.
-
     **Inputs to the constructor**
-
     - spectrogram: an instance of Spectrogram
     - start_point: (t, v), the coordinates at which to begin the search
                 The time is in seconds. The velocity is in m/s.
@@ -31,8 +28,6 @@ class PeakFollower(Follower):
       spectrum prior to searching for a peak.
     - max_hop: (50) the largest change in v from the previous time step to consider
       as a continuation.
-
-
     """
 
     def __init__(self, spectrogram, start_point, span=80,
@@ -55,17 +50,20 @@ class PeakFollower(Follower):
         self.results["velocity_index_spans"].append((self.spectrogram._velocity_to_index(self.v_start)-span, self.spectrogram._velocity_to_index(self.v_start) + span))
 
         self.time_index += 1
-    def run(self):
+
+    def run(self, maxIter = 0):
         """
         Repeatedly call step until it fails.
+        Returns the total intensity observed along the trajectory up to the number of iterations allowed by maxIter.
+        If maxIter <= 0 then it will run until completion. 
         """
-        print(f"The span size is {self.span}")
-        print("The list of my times",self.results['times'])
-        print("The list of my velocities", self.results['velocities'])
-        while self.step():
+        while self.step(maxIter):
             pass
+        eIter = len(self.results['intensities']) if maxIter <= 0 else maxIter
+        return np.sum(self.results['intensities'][:eIter])
+        
 
-    def step(self):
+    def step(self, maxIter=0):
         """
         Attempt to fit a gaussian starting from the coeffients
         in the input parameter to intensities vs velocities.
@@ -82,6 +80,9 @@ class PeakFollower(Follower):
         if self.time_index >= self.spectrogram._time_to_index(self.spectrogram.probe_destruction_time):
             return False
 
+        if maxIter > 0:
+            if len(self.results['time_index']) >= maxIter:
+                return False # We have done the maximum number of iterations.
 
         if self.smoothing:
             intensities = moving_average(intensities, n=self.smoothing)
@@ -126,5 +127,3 @@ class PeakFollower(Follower):
         except Exception as eeps:
             print(eeps)
             return False
-
-
