@@ -175,26 +175,22 @@ if __name__ == '__main__':
     import os
     os.chdir('../dig')
     sgram = Spectrogram('./CH_4_009/seg00.dig', 0.0, 50.0e-6)
-    # hoods = baselines_by_fft(sgram)
-    # for n, h in enumerate(hoods):
-    #     print(f"Peak {n}\nVelocity{n}\tIntensity{n}")
-    #     v, i = h
-    #     for j in range(len(v)):
-    #         print(f"{v[j]:.4f}\t{i[j]:.4f}")
-    #     print("\n")
-    # axes = plt.gca()
+
 
     peaks, uncertainties, peak_heights = baselines_by_squash(sgram)
     velos = []
     times = [x for x in range(0,30)]
 
+
     pcms, axes = sgram.plot(min_time=0, min_vel=100, max_vel=10000, cmap='3w_gby')
 
+
+    # add the peaks to the plot and change the color map range
     pcm = pcms['intensity raw']
     pcm.set_clim(-40, -65)
-
     for peak in peaks:
         velo_index = sgram._velocity_to_index(peak)
         axes.plot(times, [peak for x in range(0,30)], color='red', linewidth=3, markersize=15)
+
 
     plt.show()

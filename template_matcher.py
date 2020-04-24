@@ -423,6 +423,8 @@ class TemplateMatcher():
 
 if __name__ == "__main__":
     """
+    example files 
+
     WHITE_CH1_SHOT/seg00.dig -- opencv_long_start_pattern4 span=200 
     WHITE_CH2_SHOT/seg00.dig -- opencv_long_start_pattern4 span=200 
     WHITE_CH3_SHOT/seg00.dig -- opencv_long_start_pattern4 span=200 
@@ -439,7 +441,7 @@ if __name__ == "__main__":
     """
     from ProcessingAlgorithms.preprocess.digfile import DigFile
 
-    path = "../dig/WHITE_CH1_SHOT/seg00.dig"
+    path = "../dig/BLUE_CH1_SHOT/seg00.dig"
     df = DigFile(path)
     spec = Spectrogram(df, 0.0, 60.0e-6, overlap_shift_factor= 7/8, form='db')
 
@@ -457,13 +459,13 @@ if __name__ == "__main__":
     # get the times and velocities from matching
     times, velos, scores, methodsUsed = template_matcher.match()
 
-    pcms, axes = template_matcher.spectrogram.plot(min_time=0, min_vel=100, max_vel=8000, cmap='3w_gby')
+    pcms, axes = template_matcher.spectrogram.plot(min_time=0, min_vel=0, max_vel=10000, cmap='3w_gby')
     pcm = pcms['intensity raw']
-    pcm.set_clim(-20, -62)
+    pcm.set_clim(-30, -65)
 
     template_matcher.add_to_plot(axes, times, velos, scores, methodsUsed, 
                                 show_points=True, 
-                                show_medoids=False, 
+                                show_medoids=True, 
                                 verbose=False, 
                                 visualize_opacity=False, 
                                 show_bounds=True)
