@@ -442,17 +442,22 @@ def downspike(digfile: DigFile, **kwargs):
 
 
 if __name__ == "__main__":
-    os.chdir('../dig')
-    candidates = DigFile.all_dig_files()
-    for filename in candidates:
-        df = DigFile(filename)
-        spike = downspike(df, plot=True)
-        ans = f"{spike:.5f} µs" if spike else "-"
-        print("{0: >.24s}  {1}".format(filename, ans))
 
-    # fid = Fiducials(df)
+    os.chdir('../../../dig')
+    df = DigFile('GEN1_CHAN1TEKBAK001.dig')
+    fids = Fiducials(df)
+    print(fids.values)
+
+    #candidates = DigFile.all_dig_files()
+    # for filename in candidates:
+    #df = DigFile(filename)
+    #spike = downspike(df, plot=True)
+    # ans = f"{spike:.5f} µs" if spike else "-"
+    #print("{0: >.24s}  {1}".format(filename, ans))
+
+    ## fid = Fiducials(df)
     # print(fid.values)
-    # df = DigFile('../dig/GEN3_CHANNEL1KEY001')
-    if False:
-        fid = Fiducials(df)
-        print(fid.values)
+    ## df = DigFile('../dig/GEN3_CHANNEL1KEY001')
+    # if False:
+    #fid = Fiducials(df)
+    # print(fid.values)
