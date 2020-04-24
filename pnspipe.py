@@ -39,6 +39,7 @@
 import datetime
 import os
 import sys
+import subprocess
 from time import time
 import inspect
 import numpy as np
@@ -48,6 +49,125 @@ from plotter import COLORMAPS
 DEFMAP = '3w_gby'
 
 from ProcessingAlgorithms.preprocess.digfile import DigFile
+import concurrent.futures
+
+
+def all_post_functions():
+    funcs = []
+    for name, obj in inspect.getmembers(sys.modules[__name__]):
+        if inspect.isfunction(obj):
+            params = inspect.signature(obj).parameters
+            keys = list(params.keys())
+            if len(keys) != 4:
+                continue
+            try:
+                if isinstance(params[keys[0]].annotation, type(str)) \
+                   and isinstance(params[keys[1]].annotation, type(dict)):
+                    funcs.append(obj)
+            except:
+                pass
+    return funcs
+
+
+def describe_post_functions():
+    pfunc = all_post_functions()
+    return "\n\n".join([f"{x.__name__}: {x.__doc__}" for x
+                        in pfunc])
+
+
+def post_pipe(results, args):
+    """
+    Given a dictionary of results dictionaries and a list of
+    commands (with arguments), process the commands.
+    """
+
+    # First organize the results by base file
+    # The keys are the df.title fields, which may have one or more
+    # slashes. If we are doing segments, we want the penultimate 2.
+    # That's all we really should be doing, so let's go with that.
+    # Prepare the sources dictionary whose keys are the files
+    # and whose values are dictionaries with key
+    # sources = [file][segment][results]
+
+    sources = dict()
+    for key in results.keys():
+        fields = key.split('/')
+        source, segment = fields[-2:]
+        if source not in sources:
+            sources[source] = dict()
+        sources[source][segment] = results[key]
+
+    # Now we can churn through the source files
+    # Let's first decode the commands
+
+    command_file = args.post
+    if not os.path.exists(command_file):
+        print(f"I could not find a file named {command_file} for post processing")
+    else:
+        orders = process_command_file(command_file)
+        for fname, source in sources.items():
+            segments = sorted(list(source.keys()))
+            for order in orders:
+                routine, kwargs = order
+                routine(fname, source, segments, **kwargs)
+
+
+def stats(filename: str, source: dict, segments: dict, **kwargs):
+    """
+
+    """
+    fields = "figname;beta;lam1;lam2;amp;mean;stdev;chisq;prob".split(';')
+    data = {key: [] for key in fields}
+    for n, seg in enumerate(segments):
+        noises = source[seg]['noise']
+        for k in data.keys():
+            try:
+                data[k].append(noises[k])
+            except:
+                if k == 'beta':
+                    data[k].append(None)
+                    data['lam1'].append(noises['lamb'])
+                    data['lam2'].append(None)
+                    data['stdev'].append(noises['mean'])
+    figures = data.pop('figname')
+    df = pd.DataFrame(data)
+    print(df.to_string(sparsify=False))
+    df.to_csv(f"{filename}-noise.csv")
+
+    # Now produce a page showing all the figures
+    figure_page(f"{filename}-figs", figures)
+
+
+def figure_page(fname, files, cols=3, landscape=True):
+    """
+    Produce a page of figures
+    """
+    with open(fname + ".tex", 'w') as f:
+        f.write(r"\documentclass[10pt")
+        if landscape:
+            f.write(',landscape]{article}\n')
+            f.write(
+                r'\usepackage[textheight=7.5in,textwidth=10in]{geometry}')
+        else:
+            f.write(']{article}\n')
+            f.write(
+                r'\usepackage[textheight=10in,textwidth=7.5in]{geometry}')
+        print(r"""
+
+        \usepackage{graphicx}
+        \usepackage{longtable}
+        \begin{document}
+        """, file=f)
+        f.write("\\begin{longtable}{" + "c" * cols + "}\n")
+        width = round(0.9 / cols, 3)
+        ig = "\\" + f"includegraphics[width={width}"
+        ig += "\\textwidth]{"
+        for n, graphic in enumerate(files):
+            f.write(ig + graphic + "}\n")
+            f.write("\\\\\n" if (n + 1) % cols == 0 else " & \n")
+        print(r"\end{longtable}", file=f)
+        print(r"\end{document}", file=f)
+    subprocess.run(['pdflatex', fname])
 
 
 def all_pipe_functions():
@@ -94,6 +214,8 @@ class PNSPipe:
         self.df = DigFile(filename)
         self.rel_dir = os.path.join(self.df.rel_dir, self.df.basename)
         self.output_dir = os.path.join(self.home, self.rel_dir)
+        # Set a title, which can be used in filenames to describe this segment
+        self.title = self.df.title.replace("/", "-")
 
         # Make sure that this directory exists
         os.makedirs(self.rel_dir, exist_ok=True)
@@ -127,6 +249,10 @@ class PNSPipe:
             dcenter=self.twodigit,
         )
 
+        # Routines can store results in the results dictionary.
+        # We keep a catalog of the results dictionaries for further
+        # processing post.
+        self.results = dict()
         # How do we specify spectrogram parameters?
         # If the first command is not a specification for computing
         # a spectrogram, use the defaults
@@ -141,14 +267,33 @@ class PNSPipe:
             routine(self, **kwargs)
             print(self.end())
 
+    @property
+    def segment_parent(self):
+        """
+        Return the path to the segment's parent folder, if we are processing
+        a segment, otherwise return the output_dir.
+        """
+        if self.df.is_segment:
+            return os.path.split(self.output_dir)[0]
+        return self.output_dir
+
+    @property
+    def segment_name(self):
+        """
+        Return a properly neutered name identifying the segment
+        """
+        return self.df.title.replace("/", "-")
+
     def onedigit(self, val):
         return f"{val:.1f}"
 
     def twodigit(self, val):
         return f"{val:.2f}"
 
-    def log(self, x):
-        self.logfile.write(x + '\n')
+    def log(self, x, echo=False):
+        print(x, file=self.logfile)
+        if echo:
+            print(x)
 
     def open(self, message: str, kwargs: dict):
         """
@@ -162,7 +307,7 @@ class PNSPipe:
 
     def close(self, message: str):
         msg = f">>>>> {message}"
-        self.log(msg + "\n")
+        self.log(msg + "\n\n")
         return msg
 
     def start(self, routine, kwargs):
@@ -241,7 +386,7 @@ def find_destruction(pipe: PNSPipe, **kwargs):
     t_blast = sg.vertical_spike()
     if t_blast:
         pipe.probe_destruction = t_blast
-        pipe.log(f"probe destruction at {t_blast*1e6:.2f} µs")
+        pipe.log(f"probe destruction at {t_blast*1e6:.2f} µs", True)
 
 
 def find_baselines(pipe: PNSPipe, **kwargs):
@@ -256,8 +401,8 @@ def find_baselines(pipe: PNSPipe, **kwargs):
     peaks, widths, heights = bline(pipe.spectrogram)
     baseline_limit = kwargs.get('baseline_limit', 0.01)
     pipe.baselines = peaks[heights > baseline_limit]
-    pipe.log(f"Baselines > {baseline_limit*100}%: {pipe.baselines}")
-
+    blines = ", ".join([f"{x:.1f}" for x in pipe.baselines])
+    pipe.log(f"Baselines > {baseline_limit*100}%: {blines}", True)
 
 
 def find_start_points(pipe: PNSPipe, **kwargs):
@@ -310,6 +455,66 @@ def find_signal(pipe: PNSPipe, **kwargs):
     pipe.log(f"find_signal guesses signal is at {pipe.signal_guess}")
 
 
+
+
+def analyze_noise(pipe: PNSPipe, **kwargs):
+    """
+    Attempt to analyze the noise statistics in the spectrogram.
+
+    Possible kwargs:
+        v_min:    defaults to bottom baseline
+        v_max:    defaults to 5000
+        t_min:    defaults to t_start
+        t_max:    defaults to probe destruction
+        n_bins:   defaults to 100
+    """
+    from fit import Exponential, DoubleExponential
+
+    f = pipe.spectrogram.analyze_noise(**kwargs)
+
+    pipe.log(f" + v_max = {f.v_max} = {100*f.v_max/pipe.spectrogram.v_max:.1f}%")
+    pipe.log(f" + t_range = {f.t_min*1e6:0.1f} - {f.t_max*1e6:0.1f} µs")
+    pipe.log(f" + n_bins = {f.n_bins}")
+    pipe.log(f"mean = {f.mean:0.3f}, sigma = {f.stdev:0.3f}", True)
+    try:
+        f.plot(
+            logy=True,
+            legend=(0, 0),
+            figsize=(8, 8),
+            xlabel="Power",
+            ylabel="Counts",
+            title=pipe.segment_name
+        )
+        figname = os.path.join(pipe.segment_parent, f'Noise_{pipe.segment_name}.pdf')
+        f.fig.savefig(figname)
+        plt.close(f.fig)
+        del f.fig
+        if isinstance(f, DoubleExponential):
+            pipe.results['noise'] = dict(
+                figname=figname,
+                beta=f.params[0],
+                lam1=f.params[1],
+                lam2=f.params[2],
+                amp=f.params[3],
+                mean=f.mean,
+                stdev=f.stdev,
+                chisq=f.chisq,
+                prob=f.prob_greater
+            )
+        elif isinstance(f, Exponential):
+            pipe.results['noise'] = dict(
+                figname=figname,
+                lamb=f.params[0],
+                amp=f.params[1],
+                mean=f.mean,
+                chisq=f.chisq,
+                prob=f.prob_greater
+            )
+    except Exception as eeps:
+        print(eeps)
+        pass
+
+
 def find_signal_old(pipenot: PNSPipe, **kwargs):
     """
     Start at t_start and look for a peak above the baseline
@@ -358,7 +563,7 @@ def follow_signal(pipe: PNSPipe, **kwargs):
       plot = extension of the plot file type to save, or None;
              default is 'pdf'
       image = (boolean) produce a spectrogram image with superimposed follower
-
+      gaussian = 'start:stop:step' in microseconds to plot gaussian fits
     """
     from ProcessingAlgorithms.SignalExtraction.peak_follower import PeakFollower
     if not pipe.signal_guess:
@@ -367,9 +572,11 @@ def follow_signal(pipe: PNSPipe, **kwargs):
 
     plot = kwargs.get('plot', 'pdf')
     image = kwargs.get('image', False)
+    gaussian = kwargs.get('gaussian')
+    sg = pipe.spectrogram
 
     follower = PeakFollower(
-        pipe.spectrogram,
+        sg,
         pipe.signal_guess,
         direction=-1)
     pipe.followers.append(follower)
@@ -378,7 +585,7 @@ def follow_signal(pipe: PNSPipe, **kwargs):
     follower.reverse()
     follower.run()
 
-    signal = follower.full_frame  # pd.DataFrame(follower.results)
+    signal = follower.full_frame(pipe.results['noise']['mean'])
     signal.style.format(pipe.pandas_format)
     pipe.signals.append(signal)
 
@@ -417,14 +624,13 @@ def follow_signal(pipe: PNSPipe, **kwargs):
         maxy = np.ceil(np.log10(np.max(signal['peak_int'])))
         intensity.set_ylim(10**miny, 10**maxy)
         intensity.set_title(pipe.df.title, usetex=False)
-        plt.savefig(os.path.join(pipe.output_dir, 'follower.' + plot))
+        fig.savefig(os.path.join(pipe.segment_parent, f'fol-{pipe.segment_name}.{plot}'))
+        plt.close(fig)
 
     if image:
         # Produce a plot that superimposes the follower on the
         # spectrogram, which should be clipped below by the baseline
         # and to the right by probe_destruction, if it exists
-        plt.clf()  # clear current figure
-        sg = pipe.spectrogram
         t_range = (
             sg.time[0], pipe.probe_destruction if pipe.probe_destruction else sg.time[-1])
         r = follower.results
@@ -440,21 +646,56 @@ def follow_signal(pipe: PNSPipe, **kwargs):
             v_min = pipe.baselines[0]
         except:
             v_min = 0.0
-
         v_range = v_min, top
         time, velocity, intensity = sg.slice(t_range, v_range)
         max_intensity = np.max(intensity)
         image = plt.pcolormesh(time * 1e6, velocity,
-                               np.log10(intensity + 0.0001 * max_intensity) * 20)
+                               np.log10(intensity + 0.0001 * max_intensity) * 10)
         image.set_cmap(COLORMAPS[DEFMAP])
+        fig = plt.gcf()
+        # attempt to set the lower boundary of the colormap
+        try:
+            noise = pipe.results['noise']['mean']
+            image.set_clim(vmin=2 * noise)
+        except:
+            pass
         ax = plt.gca()
         ax.plot(signal['time'] * 1e6,
-                signal['peak_v'], 'r.', alpha=0.05)
+                signal['peak_v'], 'o', color="#FF8888", alpha=0.05, markersize=1)
         plt.colorbar(image, ax=ax, fraction=0.08)
         plt.xlabel(r'$t$ ($\mu$s)')
         plt.ylabel('$v$ (m/s)')
         plt.title(pipe.df.title, usetex=False)
-        plt.savefig(os.path.join(pipe.output_dir, 'spectrogram.png'))
+        fig.savefig(os.path.join(pipe.segment_parent, f"sg-{pipe.segment_name}.jpg"))
+        plt.close(fig)
+
+    if gaussian:
+        start, end, step = [1e-6 * float(x) for x in gaussian.split(':')]
+        times = np.arange(start, end + 0.99 * step, step)
+        for t in times:
+            pretitle = [
+                pipe.title,
+                "$N=%d$" % (sg.points_per_spectrum),
+            ]
+            if sg.nfft:
+                pretitle.append(f"padding = {int(sg.nfft/sg.points_per_spectrum)}")
+            try:
+                hood = follower.hood(t=t, expand=(2, 1))
+                ut = 1e6 * hood.time
+                timing = f", {ut:.3f}" + r" $\mu$s"
+                hood.gaussian.plot(
+                    xlabel="$v$ (m/s)",
+                    ylabel="Intensity",
+                    legend=(0, 1),
+                    title=", ".join(pretitle) + timing
+                )
+                fig = plt.gcf()
+                fig.set_size_inches(6, 4.5)
+                fname = f"gauss_{int(ut*1000)}.pdf"
+                fig.savefig(os.path.join(pipe.output_dir, fname))
+                plt.close(fig)
+            except Exception as eeps:
+                print(f"Error {eeps} making gaussian for time {1e6*t:.2} µs")
 
 
 def show_discrepancies(pipe: PNSPipe, **kwargs):
@@ -521,90 +762,90 @@ def show_discrepancies(pipe: PNSPipe, **kwargs):
                 fig.close()
 
 
-def gaussian_fit(pipe: PNSPipe, **kwargs):
-    """
-    oops
-    """
-    for signal in pipe.signals:
+# def gaussian_fit(pipe: PNSPipe, **kwargs):
+    # """
+    # oops
+    # """
+    # for signal in pipe.signals:
         # First add the requisite columns
-        blanks = np.zeros(len(signal)) + np.nan
-        signal['center'] = blanks
-        signal['width'] = blanks
-        signal['amplitude'] = blanks
-        signal['dcenter'] = blanks
-        signal['mean'] = blanks
-        signal['sigma'] = blanks
+        # blanks = np.zeros(len(signal)) + np.nan
+        # signal['center'] = blanks
+        # signal['width'] = blanks
+        # signal['amplitude'] = blanks
+        # signal['dcenter'] = blanks
+        # signal['mean'] = blanks
+        # signal['sigma'] = blanks
 
-        for n in range(len(signal)):
-            row = signal.iloc[n]
-            t_index = row['t_index']
-            vpeak = sg._velocity_to_index(row['velocity'])
+        # for n in range(len(signal)):
+            # row = signal.iloc[n]
+            # t_index = row['t_index']
+            # vpeak = sg._velocity_to_index(row['velocity'])
             # vfrom, vto = row['vi_span']
-            vfrom, vto = vpeak - neighborhood, vpeak + neighborhood
-            powers = sg.intensity[vfrom:vto, t_index]
-            speeds = sg.velocity[vfrom:vto]
-            mom = moment(speeds, powers)
-            signal.loc[n, 'mean'] = mom['center']
-            signal.loc[n, 'sigma'] = mom['std_dev']
-            gus = Gaussian(
-                speeds, powers,
-                center=row['velocity'],
-                width=sg.velocity[2] - sg.velocity[0]
-            )
-            if gus.valid:
-                signal.loc[n, 'center'] = gus.center
-                signal.loc[n, 'width'] = gus.width
-                signal.loc[n, 'amplitude'] = gus.amplitude
-                diff = gus.center - signal.loc[n, 'velocity']
-                signal.loc[n, 'dcenter'] = diff
-                discrepancy = abs(diff / gus.width)
-                if discrepancy > sigmas:
-                    # The difference between the peak follower and the gaussian
-                    # fit was more than 1 value of the width.
-                    # Let's print out a plot to show what's going on
-                    plt.clf()
-                    vmin, vmax = sg.velocity[vfrom], sg.velocity[vto]
-                    # make sure we have all the freshest values
-                    row = signal.iloc[n]
+            # vfrom, vto = vpeak - neighborhood, vpeak + neighborhood
+            # powers = sg.intensity[vfrom:vto, t_index]
+            # speeds = sg.velocity[vfrom:vto]
+            # mom = moment(speeds, powers)
+            # signal.loc[n, 'mean'] = mom['center']
+            # signal.loc[n, 'sigma'] = mom['std_dev']
+            # gus = Gaussian(
+                # speeds, powers,
+                # center=row['velocity'],
+                # width=sg.velocity[2] - sg.velocity[0]
+            # )
+            # if gus.valid:
+                # signal.loc[n, 'center'] = gus.center
+                # signal.loc[n, 'width'] = gus.width
+                # signal.loc[n, 'amplitude'] = gus.amplitude
+                # diff = gus.center - signal.loc[n, 'velocity']
+                # signal.loc[n, 'dcenter'] = diff
+                # discrepancy = abs(diff / gus.width)
+                # if discrepancy > sigmas:
+                # The difference between the peak follower and the gaussian
+                # fit was more than 1 value of the width.
+                # Let's print out a plot to show what's going on
+                # plt.clf()
+                # vmin, vmax = sg.velocity[vfrom], sg.velocity[vto]
+                # make sure we have all the freshest values
+                # row = signal.iloc[n]
 
-                    plt.plot([row['velocity'], ],
-                             [row['intensity'], ], 'k*')
-                    plt.plot([row['mean'] + n * row['sigma'] for n in (-1, 0, 1)],
-                             [row['intensity'] for x in (-1, 0, 1)],
-                             'gs')
-                    plt.plot(speeds, powers, 'r.')
-                    vels = np.linspace(gus.center - 6 * gus.width,
-                                       gus.center + 6 * gus.width, 100)
-                    plt.plot(vels, gus(vels), 'b-', alpha=0.5)
-                    tval = f"${pipe.spectrogram.time[t_index]*1e6:.2f}"
-                    plt.title(tval + "$~ µs")
-                    plt.xlabel("Velocity (m/s)")
-                    plt.ylabel(r"Intensity")
-                    plt.xlim(vmin, vmax)
-                    plt.savefig(os.path.join(pipe.output_dir, f'bad{t_index}.pdf'))
-                    plt.close()
-                    with open(os.path.join(pipe.output_dir, f'bad{t_index}.txt'), 'w') as f:
-                        f.write(pd.DataFrame(
-                            {'power': powers, }, index=speeds).to_csv())
+                # plt.plot([row['velocity'], ],
+                # [row['intensity'], ], 'k*')
+                # plt.plot([row['mean'] + n * row['sigma'] for n in (-1, 0, 1)],
+                # [row['intensity'] for x in (-1, 0, 1)],
+                # 'gs')
+                # plt.plot(speeds, powers, 'r.')
+                # vels = np.linspace(gus.center - 6 * gus.width,
+                # gus.center + 6 * gus.width, 100)
+                # plt.plot(vels, gus(vels), 'b-', alpha=0.5)
+                # tval = f"${pipe.spectrogram.time[t_index]*1e6:.2f}"
+                # plt.title(tval + "$~ µs")
+                # plt.xlabel("Velocity (m/s)")
+                # plt.ylabel(r"Intensity")
+                # plt.xlim(vmin, vmax)
+                # plt.savefig(os.path.join(pipe.output_dir, f'bad{t_index}.pdf'))
+                # plt.close()
+                # with open(os.path.join(pipe.output_dir, f'bad{t_index}.txt'), 'w') as f:
+                # f.write(pd.DataFrame(
+                # {'power': powers, }, index=speeds).to_csv())
 
-    for signal in pipe.signals:
-        pipe.log(signal.to_string(
-            formatters=pipe.pandas_format, sparsify=False))
-        pipe.log("\n\n")
-        plt.clf()
-        fig, axes = plt.subplots(3, 1, sharex=True, figsize=(6, 6))
-        top, middle, bottom = axes
-        top.semilogy(signal.time * 1e6, signal.intensity)
-        top.set_ylabel('Intensity')
-        top.set_title(pipe.df.basename)
-        middle.plot(signal.time * 1e6, signal.velocity)
-        middle.set_ylabel(r'$v~(\mathrm{m/s})$')
-        bottom.errorbar(signal['time'] * 1e6,
-                        signal.dcenter, yerr=signal.width, fmt='b.',
-                        markersize=1.0, lw=0.5)
-        bottom.set_xlabel(r'$t~(\mu \mathrm{s})$')
-        bottom.set_ylabel(r'$\delta v~(\mathrm{m/s})$')
-        plt.savefig(os.path.join(pipe.output_dir, 'gauss.pdf'))
+    # for signal in pipe.signals:
+        # pipe.log(signal.to_string(
+            # formatters=pipe.pandas_format, sparsify=False))
+        # pipe.log("\n\n")
+        # plt.clf()
+        # fig, axes = plt.subplots(3, 1, sharex=True, figsize=(6, 6))
+        # top, middle, bottom = axes
+        # top.semilogy(signal.time * 1e6, signal.intensity)
+        # top.set_ylabel('Intensity')
+        # top.set_title(pipe.df.basename)
+        # middle.plot(signal.time * 1e6, signal.velocity)
+        # middle.set_ylabel(r'$v~(\mathrm{m/s})$')
+        # bottom.errorbar(signal['time'] * 1e6,
+                # signal.dcenter, yerr=signal.width, fmt='b.',
+                # markersize=1.0, lw=0.5)
+        # bottom.set_xlabel(r'$t~(\mu \mathrm{s})$')
+        # bottom.set_ylabel(r'$\delta v~(\mathrm{m/s})$')
+        # plt.savefig(os.path.join(pipe.output_dir, 'gauss.pdf'))
 
 
 def decode_arg(x):
@@ -621,6 +862,27 @@ def decode_arg(x):
             return x
 
 
+def process_command_file(x):
+    ""
+    order_text = open(x, 'r').readlines()
+    orders = []
+    for line in order_text:
+        # first remove any white space around equal signs
+        line = re.sub(r' *= *', "=", line)
+        fields = line.strip().split()
+        if not fields:
+            continue
+        routine = fields.pop(0).strip(',')
+        if routine:
+            func = globals()[routine]
+            kwargs = {}
+            for x in fields:
+                k, v = x.split('=')
+                kwargs[k] = decode_arg(v)
+            orders.append((func, kwargs))
+    return orders
+
+
 if __name__ == '__main__':
     # sys.path.insert(0, '../')
     t0 = time()
@@ -629,15 +891,19 @@ if __name__ == '__main__':
     import shutil
 
     curdir = os.getcwd()
+    epi = "Available operations:\n\n" + describe_pipe_functions()
+    epi += "\n\nAvailable post-processing operations:\n\n" + \
+        describe_post_functions()
+
     parser = argparse.ArgumentParser(
         description='Run a pipe to process .dig files',
         prog="pipe",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="Available operations:\n\n" + describe_pipe_functions()
+        epilog=epi
     )
 
     parser.add_argument('-q', '--quiet', help="Don't report progress")
-    parser.add_argument('-s', '--segments', default=True,
+    parser.add_argument('-s', '--segments', action='store_false',
                         help="Only process segments")
     parser.add_argument('-r', '--regex', default=r'.*',
                         help="Regular expression to select files; defaults to '.*'")
@@ -651,6 +917,10 @@ if __name__ == '__main__':
                         help="Delete existing files before the run")
     parser.add_argument('--dry', action='store_true',
                         help='List the files that would be handled and where the output would be written')
+    parser.add_argument('-p', '--post', default='postscript.txt',
+                        help="File with post processing scripts")
+    parser.add_argument('-t', '--threads', default=1,
+                        help='Run this many threads in parallel')
 
     args = parser.parse_args()
 
@@ -672,7 +942,6 @@ if __name__ == '__main__':
     for line in order_text:
         # first remove any white space around equal signs
         line = re.sub(r' *= *', "=", line)
-        print(line)
         fields = line.strip().split()
         routine = fields.pop(0).strip(',')
         if routine:
@@ -695,21 +964,67 @@ if __name__ == '__main__':
     if args.dry:
         print(f"Dry run, storing output in base directory {os.getcwd()}")
 
+    results = dict()
+    threads = int(args.threads)
+    paths = []
     for file in DigFile.all_dig_files():
-
         if not include.search(file):
             continue
+
         if exclude and exclude.search(file):
             continue
+
         path = os.path.join(DigFile.dig_dir(), file)
         if args.segments:
             df = DigFile(path)
             if not df.is_segment:
                 continue
-        if args.dry:
-            print(path)
+
+        paths.append(path)
+
+    if not paths:
+        print("No files selected")
+    else:
+        if threads > 1:
+            def run_pipe(path, dry, orders):
+                if dry:
+                    df = DigFile(path)
+                    return df.title
+                return PNSPipe(path, orders)
+
+            with concurrent.futures.ProcessPoolExecutor(max_workers=threads) as executor:
+                future_runs = {executor.submit(run_pipe, path, args.dry, orders): path for
+                               path in paths}
+
+                for run in concurrent.futures.as_completed(future_runs):
+                    path = future_runs[run]
+                    try:
+                        pipe = run.result()
+                        results[pipe.df.title] = pipe.results
+                    except Exception as eeps:
+                        print('%r generated an exception: %s' % (path, eeps))
         else:
-            pipe = PNSPipe(path, orders)
+            for path in paths:
+                if args.dry:
+                    print(path)
+                    df = DigFile(path)
+                    results[df.title] = "Sure!"
+                else:
+                    try:
+                        pipe = PNSPipe(path, orders)
+                        results[pipe.df.title] = pipe.results
+                    except Exception as eeps:
+                        print(f"\n********************\n")
+                        print(f"Encountered error {eeps}")
+                        print(f"while processing  {path}")
+                        print("\n**********************\n")
+
+    # Now we need to deliver the results dictionary to any and all
+    # post-processing routines
+
+    post_process_file = args.post
+    if post_process_file:
+        post_pipe(results, args)
 
     # restore the working directory (is this necessary?)
     os.chdir(curdir)

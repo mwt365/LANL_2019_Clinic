@@ -33,13 +33,12 @@ def save_as_dig(filename, vvals, datatype, dt=20e-12, initialTime=0,
             The rest of the file will be writing the datapoints in binary.
     """
     dataformat = ""
-    print(datatype)
     date = kwargs.get("date", "")
     if isinstance(datatype, type(str("example"))
                   ) or isinstance(datatype, type('8')):
         if datatype == '8':
             dataformat = '8'
-            datatype = np.dtype("ubyte")
+            datatype = np.dtype("u1")
         elif datatype == '16':
             dataformat = '16'
             datatype = np.dtype("<u2")
@@ -49,6 +48,7 @@ def save_as_dig(filename, vvals, datatype, dt=20e-12, initialTime=0,
         else:
             raise ValueError(
                 "datatype corresponds to an unsupported data type.")
+    elif datatype == np.dtype("u1"):
     elif datatype == np.dtype("ubyte"):
         dataformat = '8'
     elif datatype == np.dtype("<u2"):
@@ -67,10 +67,10 @@ def save_as_dig(filename, vvals, datatype, dt=20e-12, initialTime=0,
         head = "\r\n".join([f"{k} = {top_header[k]}" for k in keys])
         top_header = head
 
-
     # Now write the header, the important parts of which are
     # nsamples, bits, dt, t0, dv, v0
     # This will fail if the file is not already created.
+
     with open(filename, 'w') as f:
         if len(top_header) < 512:
             top_header += " " * (512 - len(top_header))

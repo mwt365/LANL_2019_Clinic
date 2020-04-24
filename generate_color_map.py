@@ -95,9 +95,8 @@ if __name__ == '__main__':
     sg = Spectrogram('../dig/CH_4_009.dig')
     roids = make_spectrogram_color_map(sg, 4, "Kitty")
 
-
     sg.plot(cmap = roids["cmap"])
     import matplotlib.pyplot as plt
-    plt.xlim((0,50))
+    plt.xlim((0, 50))
     plt.ylim((1500, 5000))
     plt.show()

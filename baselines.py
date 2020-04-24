@@ -106,7 +106,6 @@ def baselines_by_squash(
     return peaks[keepers], (np.ones(len(peaks)) * dv)[keepers], heights[keepers]
 
 
-
 def baselines_by_fft(spectrogram):
     """
     Return a list of baseline velocities and their uncertainties.
@@ -191,6 +190,5 @@ if __name__ == '__main__':
     for peak in peaks:
         velo_index = sgram._velocity_to_index(peak)
         axes.plot(times, [peak for x in range(0,30)], color='red', linewidth=3, markersize=15)
-
 
     plt.show()
