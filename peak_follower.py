@@ -2,7 +2,6 @@
 # coding:utf-8
 """
 ::
-
   Author:  LANL Clinic 2019 --<lanl19@cs.hmc.edu>
   Purpose: Attempt to follow a peak.
   Created: 10/18/19
@@ -18,9 +17,7 @@ class PeakFollower(Follower):
     """
     A naive follower implementation that uses a local-region
     smoothing and then follows the local maximum.
-
     **Inputs to the constructor**
-
     - spectrogram: an instance of Spectrogram
     - start_point: (t, v), the coordinates at which to begin the search
     - span: (60) the number of pixels on either side of the starting value of v
@@ -30,8 +27,6 @@ class PeakFollower(Follower):
       spectrum prior to searching for a peak.
     - max_hop: (50) the largest change in v from the previous time step to consider
       as a continuation.
-
-
     """
 
     def __init__(self, spectrogram, start_point, span=80,
@@ -118,5 +113,3 @@ class PeakFollower(Follower):
         except Exception as eeps:
             print(eeps)
             return False
-
-

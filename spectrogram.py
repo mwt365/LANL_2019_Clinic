@@ -476,7 +476,7 @@ class Spectrogram:
         # Our prediction for the probe destruction time. Just to make it easier to plot. 
 
         cmapUsed = COLORMAPS[DEFMAP]
-        print(COLORMAPS.keys())
+        # print(COLORMAPS.keys())
         if 'cmap' in kwargs:
             # To use the sciviscolor colormaps that we have downloaded.
             attempt = kwargs['cmap']
