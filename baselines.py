@@ -15,33 +15,49 @@ from scipy.fftpack import fft
 import matplotlib.pyplot as plt
 
 
-def baselines_by_squash(spectrogram: Spectrogram):
+def baselines_by_squash(
+    spectrogram: Spectrogram,
+    segments = 8,
+    min_height = 0.0005,  # minimum fraction of the tallest peak for consideration
+    min_separation = 400,  # minimum separation of peaks in m/s
+    peak_width = 20,
+    min_percent = 80,
+    max_side_lobe = 0.5
+):
     """
     Return a list of baseline velocities and their uncertainties.
-
     Inputs:
       -  spectrogram: an instance of Spectrogram
-
+    Optional inputs:
+      -  segments: an integer specifying the number of segments into which to
+         divide the time dimension to look for a consistent peak
+      -  min_height: the minimum fraction of the strongest squashed peak
+         to consider when looking for baselines
+      -  min_separation: the minimum separation of baselines, in m/s
+      -  peak_width: to be considered a peak, look at points at this remove
+         (in m/s) from a candidate peak to see that their values are lower than
+         max_side_lobe times the peak's value
+      -  min_percent: minimum percentage of segments satisfying the peak criterion
+         described above under peak_width
+      -  max_side_lobe: the segment's squashed value at ± peak_width must be
+         less than or equal to max_side_lobe times the peak's value
     Outputs:
       -  peaks: an array of peaks, in descending order of strength
       -  widths: an array of uncertainty values for the peaks
       -  heights: corresponding peak heights, normalized to
             the greatest height
-
-    Observations:
-        This routine probably does a poor job of discriminating against
-        lone peaks arising from an anomalously large value at a fairly
-        isolated time. It might be better to chop the range into several
-        intervals and insist on a significant peak in each.
     """
-    # assert isinstance(spectrogram, Spectrogram)
+    assert isinstance(spectrogram, Spectrogram)
     # Collapse along the time axis, making sure to use power,
     # not dB
+    dv = spectrogram.velocity[1] - spectrogram.velocity[0]
+
     powers = spectrogram.power(spectrogram.intensity)
+
     # We'd like to squash into about 8 distinct segments
     # along axis 1 and then make sure that we get consistent
     # values before calling a peak a baseline
-    segments = 8
+
     boundaries = list(range(0, len(spectrogram.time),
                             len(spectrogram.time) // segments))
     boundaries.append(len(spectrogram.time))
@@ -51,21 +67,44 @@ def baselines_by_squash(spectrogram: Spectrogram):
             powers[:, boundaries[n]:boundaries[n + 1]].mean(axis=1))
 
     combined_spectrum = spectrogram.power(
-        spectrogram.intensity).sum(axis=1)
+        spectrogram.intensity).mean(axis=1)
     tallest = combined_spectrum.max()
+    # this should be improved
     peaks, properties = find_peaks(
         combined_spectrum,
-        height=0.1 * tallest,  # peaks must be this tall to count
-        distance=100,  # peaks must be separated by this much at minimum
+        height=min_height * tallest,  # peaks must be this tall to count
+        distance=min_separation / dv  # peaks must be separated by this much at minimum
     )
     heights = properties['peak_heights']
     peak_ht = heights.max()
+    # produce an ordering from tallest to shortest peak
     ordering = np.flip(np.argsort(heights))
     peak_positions = peaks[ordering]
     peaks = spectrogram.velocity[peak_positions]
     heights = heights[ordering] / peak_ht
-    dv = spectrogram.velocity[1] - spectrogram.velocity[0]
-    return peaks, np.ones(len(peaks)) * dv, heights
+
+    # Now we want to filter out the peaks that don't correspond to
+    # consistent signal across the segments
+
+    strong_peaks = []
+    delta = int(peak_width / dv)
+    for n, pk_pos in enumerate(peak_positions):
+        if pk_pos >= delta:
+            totes = 0
+            for sq in squash:
+                try:
+                    if sq[pk_pos + delta] < max_side_lobe * sq[pk_pos] > sq[pk_pos - delta]:
+                        totes += 1
+                except IndexError:
+                    pass
+            strong_peaks.append(totes >= segments * min_percent * 0.01)
+            # print(f"[{pk_pos}] -> {spectrogram.velocity[pk_pos]} ({heights[n]})) got {totes}")
+        else:
+            strong_peaks.append(False)
+    keepers = np.array(strong_peaks)
+
+    return peaks[keepers], (np.ones(len(peaks)) * dv)[keepers], heights[keepers]
+
 
 
 def baselines_by_fft(spectrogram):
@@ -149,7 +188,8 @@ if __name__ == '__main__':
     velos = []
     times = [x for x in range(0,30)]
 
-    pcms, axes = sgram.plot(min_time=0, min_vel=100, max_vel=5000, cmap='3w_gby')
+    pcms, axes = sgram.plot(min_time=0, min_vel=100, max_vel=10000, cmap='3w_gby')
+
     pcm = pcms['intensity raw']
     pcm.set_clim(-40, -65)
 

@@ -223,7 +223,7 @@ class Spectrogram:
         """
         epsilon = 1e-10
         if self.form == 'db':
-            return 20 * np.log10(vals + epsilon) # Since you are already starting with power.
+            return 10 * np.log10(vals + epsilon) # Since you are already starting with power.
         if self.form == 'log':
             return np.log10(vals + epsilon)
         return vals
