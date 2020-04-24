@@ -106,7 +106,6 @@ def baselines_by_squash(
     return peaks[keepers], (np.ones(len(peaks)) * dv)[keepers], heights[keepers]
 
 
-
 def baselines_by_fft(spectrogram):
     """
     Return a list of baseline velocities and their uncertainties.

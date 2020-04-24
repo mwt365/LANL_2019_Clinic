@@ -7,13 +7,15 @@
   Created: 11/10/19
 """
 
+import os
 import numpy as np
 from scipy.optimize import curve_fit
 import pandas as pd
+from collections import OrderedDict
+
 from ProcessingAlgorithms.preprocess.digfile import DigFile
 from ProcessingAlgorithms.SaveFiles.save_as_dig_file import save_as_dig
 from ProcessingAlgorithms.Fitting.moving_average import compress
-import os
 
 
 class Fiducials:
@@ -284,7 +286,8 @@ class Fiducials:
         df = self.digfile
         text = open(df.path, 'rb').read(512).decode('ascii')
         text = text.replace("\000", "").strip()
-        header = "Segment {0:02d}\r\n" + text
+        the_date = df.date
+
         kwargs = dict(
             dt=df.dt,
             initialTime=0,
@@ -292,18 +295,26 @@ class Fiducials:
             voltageOffset=df.V0
         )
         for n in range(len(times)):
-            head = header.format(n)
             t_start = times[n]
+            n_start = int((t_start - self.digfile.t0) / self.digfile.dt)
             try:
                 t_stop = times[n + 1]
             except:
                 t_stop = df.t_final
+            heading = OrderedDict(
+                Segment=n,
+                n_start = n_start,
+                t_start = f"{t_start:.6e}",
+                t_stop=f"{t_stop:.6e}",
+                date = the_date,
+                header = "\r\n" + text,
+            )
+
             vals = df.raw_values(t_start, t_stop)
             name = f"{basename}{n:02d}.dig"
             save_as_dig(os.path.join(folder, name),
                         vals, df.data_format,
-                        top_header=head, **kwargs)
-            # df.extract(os.path.join(folder, name), t_start, t_stop)
+                        top_header=heading, date = the_date, **kwargs)
         return f"{len(times)} files written in {folder}"
 
 

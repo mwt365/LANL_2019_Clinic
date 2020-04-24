@@ -11,7 +11,7 @@
 import numpy as np
 from spectrogram import Spectrogram
 from scipy.optimize import curve_fit
-from follower import Follower
+from ProcessingAlgorithms.SignalExtraction.follower import Follower
 
 
 def _gauss(x, *p):
@@ -50,7 +50,7 @@ class GaussianFitter(Follower):
         """
         p_start, p_end = self.data_range()
         velocities = self.velocity[p_start:p_end]
-        intensities = self.intensity[p_start:p_end, self.time_index]
+        intensities = self.intensity[p_start:p_end, self.t_index]
         # make sure we are dealing with power
         powers = self.spectrogram.power(intensities)
 
@@ -76,13 +76,13 @@ class GaussianFitter(Follower):
             return False
         else:
             # add this to our results
-            self.results['time_index'].append(self.time_index)
-            self.results['times'].append(
-                self.spectrogram._point_to_time(self.time_index))
-            self.results['velocities'].append(coeff[1])
-            self.results['widths'].append(coeff[2])
-            self.results['amplitudes'].append(coeff[0])
-            self.results['backgrounds'].append(coeff[3])
+            self.results['t_index'].append(self.t_index)
+            self.results['time'].append(
+                self.spectrogram._point_to_time(self.t_index))
+            self.results['velocity'].append(coeff[1])
+            self.results['width'].append(coeff[2])
+            self.results['amplitude'].append(coeff[0])
+            self.results['background'].append(coeff[3])
         return True
 
     def show_fit(self, axes, n=-1):
@@ -92,7 +92,7 @@ class GaussianFitter(Follower):
         p_start, p_end = self.data_range(n)
         velocities = self.velocity[p_start:p_end]
         intensities = self.intensity[p_start:p_end,
-                                     self.results['time_index'][n]]
+                                     self.results['t_index'][n]]
         powers = self.spectrogram.power(intensities)
 
         axes.lines = []
@@ -101,7 +101,7 @@ class GaussianFitter(Follower):
         # compute the fitted curve
         # A, mu, sigma, background = p
         params = [self.results[x][n] for x in
-                  ('amplitudes', 'velocities', 'widths', 'backgrounds')]
+                  ('amplitude', 'velocity', 'width', 'background')]
         curve = _gauss(velocities, *params)
         axes.plot(velocities, curve, 'b-', alpha=0.8)
 

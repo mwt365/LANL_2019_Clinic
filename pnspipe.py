@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 # coding:utf-8
-
 """
   Author:  LANL Clinic 2019 --<lanl19@cs.hmc.edu>
   Purpose: Process a set of .dig files
@@ -310,7 +309,7 @@ def find_signal(pipe: PNSPipe, **kwargs):
     pipe.log(f"find_signal guesses signal is at {pipe.signal_guess}")
 
 
-def find_signal_old(pipenot: PNSPipe, **kwargs):
+def find_signal_old(pipe: PNSPipe, **kwargs):
     """
     Start at t_start and look for a peak above the baseline
     """
@@ -417,6 +416,10 @@ def follow_signal(pipe: PNSPipe, **kwargs):
         maxy = np.ceil(np.log10(np.max(signal['peak_int'])))
         intensity.set_ylim(10**miny, 10**maxy)
         intensity.set_title(pipe.df.title, usetex=False)
+        plt.plot(signal['time'] * 1e6, signal['peak_v'])
+        plt.xlabel('$t~(\mu \mathrm{s})$')
+        plt.ylabel('$v~(\mathrm{m/s})$')
+        plt.title(pipe.df.title, usetex=False)
         plt.savefig(os.path.join(pipe.output_dir, 'follower.' + plot))
 
     if image:
@@ -440,7 +443,6 @@ def follow_signal(pipe: PNSPipe, **kwargs):
             v_min = pipe.baselines[0]
         except:
             v_min = 0.0
-
         v_range = v_min, top
         time, velocity, intensity = sg.slice(t_range, v_range)
         max_intensity = np.max(intensity)
@@ -672,7 +674,6 @@ if __name__ == '__main__':
     for line in order_text:
         # first remove any white space around equal signs
         line = re.sub(r' *= *', "=", line)
-        print(line)
         fields = line.strip().split()
         routine = fields.pop(0).strip(',')
         if routine:

@@ -9,11 +9,14 @@
   Created: 09/26/19
 """
 import cv2
+
+import os
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.colors
 import matplotlib.gridspec as gridspec
 import ipywidgets as widgets
+
 from matplotlib import widgets as mwidgets
 from IPython.display import display
 
@@ -88,7 +91,7 @@ class SpectrogramWidget:
     def __init__(self, *args, **kwargs):
         """
         If one passes in a single unnamed arg, it can either be a digfile,
-        a string pointing to a digfile, or a two-dimensional ndarray. 
+        a string pointing to a digfile, or a two-dimensional ndarray.
         If we are founded on a dig file, it is possible to recompute
         things. Only a subset of operations are possible when we're
         based on a two-dimensional array, but perhaps that is sometimes
@@ -365,13 +368,18 @@ class SpectrogramWidget:
             lambda x: self.update_baselines(x["new"]),
             names="value")
 
+        cd['squash'] = widgets.Button(
+            description="Squash in Vertical"
+        )
+        cd['squash'].on_click(lambda b: self.squash_vertical())
+
         columns = [
             'color_map;t_range;velocity_range;intensity_range;threshold',
             'clicker;clear_spectra;clear_followers',
         ]
         if self.dig:
             columns.append(
-                'spectrum_size;overlap;raw_signal;baselines')
+                'spectrum_size;overlap;raw_signal;baselines;squash')
 
         vboxes = []
         for col in columns:
@@ -495,7 +503,6 @@ class SpectrogramWidget:
         self.update_cmap()
 
     def update_threshold(self, x):
-        n = x
         sg = self.spectrogram
         if int(x) == 0:
             self.threshold = None
@@ -572,6 +579,15 @@ class SpectrogramWidget:
         if char == 'x':
             # remove the all spectra
             self.clear_spectra()
+        if char in ('f', 'b', 'F', 'B'):
+            # We'd like to go exploring
+            if not hasattr(self, 'explorer_mark'):
+                self.explorer_mark = 2
+            else:
+                shifts = dict(f=4, F=20, b=-4, B=-40)
+                self.explorer_mark += shifts[char]
+
+            self.gaussian_explorer(self.explorer_mark)
         if char in ('m', 'M'):
             self.selecting = not self.selecting
             self.controls['marquee'].set_active(self.selecting)
@@ -615,16 +631,21 @@ class SpectrogramWidget:
             follower.run()
             tsec, v = follower.v_of_t
             follower.line = self.axSpectrogram.plot(
-                tsec * 1e6, v, 'r-', alpha=0.4)[0]
+                tsec * 1e6, v, 'r.', alpha=0.4, markersize=2)[0]
         # print("Create a figure and axes, then call self.gauss.show_fit(axes)")
 
     def gauss_out(self, n: int):
+        """
+        Show center velocity, width, and amplitude for gaussian
+        fits to the data in follower n.
+        """
         if n >= len(self.peak_followers):
             return 0
+        WRITEOUT, fnum = False, 0
         pf = self.peak_followers[n]
         times, centers, widths, amps = [], [], [], []
-        vind = pf.frame['velocity_index_spans'].to_numpy()
-        tind = pf.frame['time_index'].to_numpy()
+        vind = pf.frame['vi_span'].to_numpy()
+        tind = pf.frame['t_index'].to_numpy()
         sp = self.spectrogram
         for j in range(len(tind)):
             t = sp.time[tind[j]] * 1e6
@@ -638,6 +659,16 @@ class SpectrogramWidget:
                 centers.append(gus.center)
                 widths.append(gus.width)
                 amps.append(gus.amplitude)
+                if WRITEOUT:
+                    fname = f"{os.path.splitext(self.digfile.filename)[0]}_{fnum:04d}.csv"
+                    gus.write_csv(fname)
+                    fnum += 1
+        if WRITEOUT:
+            # write out the times, too
+            fname = f"{os.path.splitext(self.digfile.filename)[0]}_t.csv"
+            v = np.asarray(times)
+            np.savetxt(v, fname)
+
         fig, axes = plt.subplots(nrows=1, ncols=3, squeeze=True)
         ax1, ax2, ax3 = axes
         ax1.errorbar(times, centers, fmt='b-', yerr=widths)
@@ -665,6 +696,74 @@ class SpectrogramWidget:
             amplitude=np.array(amps)
         )
 
+    def gaussian_explorer(self, follower_pt: int):
+        """
+        Show center velocity, width, and amplitude for gaussian
+        fits to the data in follower n.
+        """
+        if len(self.peak_followers) == 0:
+            return 0
+        pf = self.peak_followers[0]
+        res = pf.results
+        points = len(res['t_index'])
+
+        def bound(x): return x % points
+        follower_pt = bound(follower_pt)
+
+        # We'd like to show data for this index, the previous one,
+        #  and the next one, along with the gaussian fit
+        hoods = [pf.hood(n=bound(x + follower_pt))
+                 for x in (-2, -1, 0, 1, 2)]
+
+        # Check that we have the requisite figure, and make it if we don't
+        if not hasattr(self, 'explorer_fig'):
+            self.explorer_fig, self.explorer_axes = plt.subplots(
+                1, 5, sharey=True)
+            # also add a marker to the follower's representation on the
+            # spectrogram to make it easier to see where we are
+            self.explorer_marker = self.axSpectrogram.plot([], [], 'k*')[0]
+
+        # show where we are
+        tsec, v = pf.v_of_t
+        self.explorer_marker.set_data(
+            [tsec[follower_pt] * 1e6, ], [v[follower_pt], ])
+
+        min_v, max_v, max_peak = 1e10, 0, 0
+        for ax, hood in zip(self.explorer_axes, hoods):
+            ax.clear()
+            # plot the data
+            ax.plot(hood.velocity, hood.intensity, 'ko', alpha=0.5)
+
+            # plot the background level used for the moment calculation
+            bg = hood.moment['background']
+            ax.plot([hood.velocity[0], hood.velocity[-1]], [bg, bg], 'r-')
+            # show the center and widths from the moment calculation
+            pk = hood.peak_int
+            tallest = np.max(hood.intensity)
+            max_peak = max(tallest, max_peak)
+            ax.plot([hood.moment['center'] + x * hood.moment['std_dev'] for x in
+                     (-1, 0, 1)], 0.5 * tallest * np.ones(3), 'r.')
+            # show the gaussian
+            hood.plot_gaussian(ax)
+            vcenter, width = hood.peak_v, hood.moment['std_dev']
+            min_v = min(min_v, vcenter - 12 * width)
+            max_v = max(max_v, vcenter + 12 * width)
+            # ax.set_xlim(vcenter - 12 * width, vcenter + 12 * width)
+            ax.set_xlabel(f"$v$ (m/s)")
+            ax.set_title(f"{hood.time*1e6:.2f}" + " $\\mu$s")
+            txt = f"m = {hood.moment['center']:.1f} ± {hood.moment['std_dev']:.1f}"
+            txt = f"{txt}\ng = {hood.gaussian.center:.1f} ± {hood.gaussian.width:.1f}"
+            ax.annotate(txt, xy=(0.05, 0.95), xycoords='axes fraction',
+                        horizontalalignment='left', verticalalignment='top')
+
+        for ax in self.explorer_axes:
+            ax.set_xlim(min_v, max_v)
+
+        # label the common velocity axis
+        ax = self.explorer_axes[0]
+        ax.set_ylim(-0.05 * max_peak, 1.2 * max_peak)
+        ax.set_ylabel("Intensity")
+
     def analyze_roi(self):
         """
         Extract the region(s) of interest and process them
@@ -679,8 +778,8 @@ class SpectrogramWidget:
         if n >= len(self.peak_followers):
             return 0
         pf = self.peak_followers[n]
-        vind = pf.frame['velocity_index_spans'].to_numpy()
-        tind = pf.frame['time_index'].to_numpy()
+        vind = pf.frame['vi_span'].to_numpy()
+        tind = pf.frame['t_index'].to_numpy()
         self.subfig, axes = plt.subplots(
             nrows=1, ncols=2, sharey=True,
             squeeze=True, gridspec_kw=self._gspec)
@@ -723,6 +822,11 @@ class SpectrogramWidget:
             )
         self.axTrack.set_ylabel('$v$')
 
+    def squash_vertical(self):
+        normy = self.spectrogram.squash(dB=False) * 2000
+        self.axSpectrogram.plot(self.spectrogram.time * 1e6, normy,
+                                'b-', alpha=0.75)
+
     def update_baselines(self, method):
         """
         Handle the baselines popup menu
@@ -732,9 +836,11 @@ class SpectrogramWidget:
         self.baselines = []  # remove any existing baselines
         if method == "Squash":
             peaks, sigs, heights = baselines_by_squash(self.spectrogram)
-            for n in range(len(heights)):
-                if heights[n] > 0.1:
-                    blines.append(peaks[n])
+            blines.extend(peaks)
+
+            # for n in range(len(heights)):
+            # if heights[n] > 0.1:
+            # blines.append(peaks[n])
 
         # Now show the baselines in blines or remove any
         # if blines is empty

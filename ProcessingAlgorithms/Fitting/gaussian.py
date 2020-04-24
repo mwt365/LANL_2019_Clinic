@@ -8,6 +8,7 @@
    Created: 11/17/19
 """
 import numpy as np
+import pandas as pd  # for exporting fit data
 from scipy.optimize import curve_fit, OptimizeWarning
 from ProcessingAlgorithms.Fitting.moving_average import moving_average
 
@@ -25,7 +26,8 @@ class Gaussian:
       - width
 
     If the fit is successful, the field Gaussian.valid is
-    set to True.
+    set to True, and the properties center, width, amplitude, and background
+    are set.
     """
 
     def __init__(self, x: np.ndarray, y: np.ndarray, **kwargs):
@@ -39,50 +41,71 @@ class Gaussian:
         else:
             self.x = x
             self.y = y
-            # sort y and use the boundaries to estimate
-            # the background and amplitude
-            ysorted = sorted(y)
-            # the gaussian could be a peak or a dip
+
+            # Figure out whether the data represent a peak
+            # or a dip by sorting the y values and comparing
+            # the largest to the midpoint and the smallest to
+            # the midpoint.
+
+            ysorted = sorted(y)  # low to high
             midpt = ysorted[len(y) // 2]
+            # peak is True if the Gaussian should rise above
             peak = (ysorted[-1] - midpt) > (midpt - ysorted[0])
-            amplitude = (ysorted[-1] - ysorted[len(y) // 8]
-                         ) * (1 if peak else -1)
-            background = ysorted[len(
-                y) // 8] if peak else ysorted[(7 * len(y)) // 8]
+
+            average = y.mean()
+            if 'amplitude' in kwargs:
+                amplitude = kwargs['amplitude']
+            else:
+                amplitude = ysorted[-1 if peak else 0] - average
+
+            background = kwargs.get('background', average)
             if background == 0:
                 background = 0.01 * amplitude
-            center = x[y.argmax()]
+            center = kwargs.get('center', x[y.argmax()])
+
+            width = kwargs.get('width', 0)
             self.p0 = [
-                kwargs.get('amplitude', amplitude),
-                kwargs.get('center', center),
-                kwargs.get('width', 0),
-                kwargs.get('background', background)
-            ]
-            self.params = []
-            self.error = None
+                amplitude,
+                center,
+                width,
+                background]
             if self.p0[2] == 0:
                 self.estimate_width(y.argmax())
+            self.params = []
+            self.error = None
             self.valid = self.do_fit()
 
     @property
     def center(self):
         "The location of the peak of the gaussian"
-        return self.params[1]
+        try:
+            return self.params[1]
+        except:
+            return None
 
     @property
     def width(self):
         "The standard deviation of the gaussian"
-        return self.params[2]
+        try:
+            return self.params[2]
+        except:
+            return None
 
     @property
     def amplitude(self):
         "The amplitude of the gaussian"
-        return self.params[0]
+        try:
+            return self.params[0]
+        except:
+            return None
 
     @property
     def background(self):
         "The (constant) background level surrounding the gaussian"
-        return self.params[3]
+        try:
+            return self.params[3]
+        except:
+            return None
 
     def __str__(self):
         if self.valid:
@@ -119,7 +142,12 @@ class Gaussian:
         if np.inf in covar or np.nan in covar:
             self.error = 'infinity or nan in cavariance matrix'
             return False
-        self.errors = np.sqrt(np.diag(covar))
+        diag = np.diag(covar)
+        try:
+            self.errors = np.sqrt(diag)
+        except:
+            self.errors = None
+
         # if width is negative, flip it
         self.params[2] = abs(self.params[2])
         # How do we know that it worked?
@@ -149,6 +177,16 @@ class Gaussian:
             k -= 1
         width = (self.x[n + j] - self.x[n - k]) * 0.6
         self.p0[2] = width if width > 0 else self.x[1] - self.x[0]
+
+    def write_csv(self, filename: str):
+        """Write out a CSV file of the data for this gaussian"""
+        df = pd.DataFrame(
+            dict(
+                x=self.x,
+                y=self.y
+            )
+        )
+        df.to_csv(filename)
 
 
 if __name__ == '__main__':
