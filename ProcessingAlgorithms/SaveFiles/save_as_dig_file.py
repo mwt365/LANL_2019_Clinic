@@ -2,7 +2,7 @@
 # coding: utf-8
 
 import numpy as np
-
+from datetime import datetime
 
 def save_as_dig(filename, vvals, datatype, dt=20e-12, initialTime=0,
                 voltageMultiplier=6.103516e-5, voltageOffset=0,
@@ -41,18 +41,19 @@ def save_as_dig(filename, vvals, datatype, dt=20e-12, initialTime=0,
             datatype = np.dtype("u1")
         elif datatype == '16':
             dataformat = '16'
-            datatype = np.dtype(">u2")
+            datatype = np.dtype("<u2")
         elif datatype == '32':
             dataformat = '32'
-            datatype = np.dtype(">u4")
+            datatype = np.dtype("<u4")
         else:
             raise ValueError(
                 "datatype corresponds to an unsupported data type.")
     elif datatype == np.dtype("u1"):
+    elif datatype == np.dtype("ubyte"):
         dataformat = '8'
-    elif datatype == np.dtype(">u2"):
+    elif datatype == np.dtype("<u2"):
         dataformat = '16'
-    elif datatype == np.dtype(">u4"):
+    elif datatype == np.dtype("<u4"):
         dataformat = '32'
     else:
         raise ValueError("datatype corresponds to an unsupported data type.")
@@ -66,6 +67,7 @@ def save_as_dig(filename, vvals, datatype, dt=20e-12, initialTime=0,
         head = "\r\n".join([f"{k} = {top_header[k]}" for k in keys])
         top_header = head
 
+
     # Now write the header, the important parts of which are
     # nsamples, bits, dt, t0, dv, v0
     # This will fail if the file is not already created.
@@ -75,7 +77,9 @@ def save_as_dig(filename, vvals, datatype, dt=20e-12, initialTime=0,
             top_header += " " * (512 - len(top_header))
         f.write(top_header)  # write 512 bytes of spaces
         stuff = "\r\n".join([
-            # today's date Day Mon NumDay HH:MM:SS: YEAR
+            # todays date Day Mon NumDay HH:MM:SS: YEAR
+            # This is achieved using ctime() in the datetime library. 
+            # Reference https://docs.python.org/3/library/datetime.html
             date,
             # the number of samples used.
             str(nsamples),
