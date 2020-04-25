@@ -66,8 +66,8 @@ class TemplateMatcher():
         self.k = int(k)
 
         # To get the intensity matrix the way it was when we trained it.
-        epsilon = 1e-10
-        self.matrixToMatch = 20 * np.log10(2*self.spectrogram.psd/(self.spectrogram.points_per_spectrum*self.spectrogram.data.dt) + epsilon)
+        # epsilon = 1e-10
+        # self.matrixToMatch = 20 * np.log10(2*self.spectrogram.psd/(self.spectrogram.points_per_spectrum*self.spectrogram.data.dt) + epsilon)
 
         self.zero_time_index = spectrogram._time_to_index(0)
         self.zero_velo_index = spectrogram._velocity_to_index(0)
@@ -96,7 +96,11 @@ class TemplateMatcher():
             velocity_index = 0
 
         max_time_index = self.spectrogram.intensity.shape[1] - 1
-        ending_time_index = time_index + self.span
+        ending_time_index = time_index + self.span * 10
+
+        print(time_index)
+        print(ending_time_index)
+        print(self.span)
 
         assert (ending_time_index < max_time_index)
         start_time = self.spectrogram.time[time_index]
@@ -146,7 +150,7 @@ class TemplateMatcher():
 
         cleaned_matrix = np.where(cleaned_matrix > threshold_percentile, cleaned_matrix+threshold_percentile, threshold_percentile)
 
-        imsave("./flipped_original.png", cleaned_matrix[:])
+        # imsave("./flipped_original.png", cleaned_matrix[:])
 
         
 
@@ -160,7 +164,8 @@ class TemplateMatcher():
 
     def match(self):
 
-        cropped_spectrogram = self.crop_intensities(self.matrixToMatch)
+        matrix = self.spectrogram.intensity
+        cropped_spectrogram = self.crop_intensities(matrix)
 
         imsave("./im_template.png", self.template[:])
         imsave("./im_cropped_bg.png", cropped_spectrogram[:])
@@ -360,7 +365,7 @@ class TemplateMatcher():
 
         if show_bounds:
             dv = spec.velocity[self.velo_scale * self.span]
-            dt = spec.time[self.span] * 1e6
+            dt = spec.time[self.time_bounds[1]] * 1e6
             patch = Rectangle((0,0), dt, dv, fill=False, color='b', alpha=0.8)
             axes.add_patch(patch)
 
@@ -445,10 +450,13 @@ if __name__ == "__main__":
 
     path = "../dig/BLUE_CH1_SHOT/seg00.dig"
     df = DigFile(path)
-    spec = Spectrogram(df, 0.0, 60.0e-6, overlap_shift_factor= 7/8, form='db')
+    spec = Spectrogram(df, 0.0, 60.0e-6, overlap_shift_factor= 1/8, form='db')
+    spec.availableData = ['intensity']
+
+    print(spec.time[200])
 
     # gives user the option to click, by default it searches from (0,0)
-    template_matcher = TemplateMatcher(spec, None,
+    template_matcher = TemplateMatcher(spec,None,
                                             template=Templates.opencv_long_start_pattern5.value,
                                             span=200,
                                             k=20,
