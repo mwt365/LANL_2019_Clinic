@@ -1,7 +1,7 @@
 
 import tqdm # To get a progress bar.
 import os
-from ImageProcessing.Templates.templates import Templates
+from ImageProcessing.TemplateMatching.Templates.templates import Templates
 
 
 import scipy
