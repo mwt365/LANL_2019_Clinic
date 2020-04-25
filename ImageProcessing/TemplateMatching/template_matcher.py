@@ -11,9 +11,9 @@ import cv2 # The general computer vision library for python.
 import numpy as np
 from baselines import baselines_by_squash
 from spectrogram import Spectrogram
-import ImageProcessing.Templates.saveTemplateImages as templateHelper
+import ImageProcessing.TemplateMatching.Templates.saveTemplateImages as templateHelper
 import os
-from ImageProcessing.Templates.templates import Templates
+from ImageProcessing.TemplateMatching.Templates.templates import Templates
 import scipy
 if scipy.__version__ > "1.2.1":
     from imageio import imsave
@@ -264,6 +264,12 @@ class TemplateMatcher():
 
             outputValues = [[] for i in range(len(templatesList))]
             imageSaveDir = templateHelper.getImageDirectory()
+            
+            # If at least one file does not exist just make all of them.
+            for tempInd, temp in enumerate(templatesList):
+                if not os.path.exists(os.path.join(imageSaveDir, f"im_template_{temp}.png")):
+                    templateHelper.saveAllTemplateImages()
+                    break
 
             for tempInd, temp in enumerate(templatesList):
                 template = cv2.imread(os.path.join(imageSaveDir, f"im_template_{temp}.png"), 0)

@@ -411,8 +411,8 @@ def find_start_points(pipe: PNSPipe, **kwargs):
     template matching with opencv. Specify the type of template 
     to use, or use a list of them.
     """
-    from template_matcher import TemplateMatcher
-    from ImageProcessing.Templates.templates import Templates
+    from ImageProcessing.TemplateMatching.template_matcher import TemplateMatcher
+    from ImageProcessing.TemplateMatching.Templates.templates import Templates
     template_matcher = TemplateMatcher(pipe.spectrogram, None, Templates.opencv_long_start_pattern5.value, span=150, k=10)
     times, velos, scores, methodUsed = template_matcher.match()
     centers = template_matcher.find_kmedoids(times, velos, clusters=5)
@@ -429,8 +429,8 @@ def find_start_points_no_baselines(pipe: PNSPipe, **kwargs):
     baselines or echoes within a certain percentage of the max
     signal.
     """
-    from template_matcher import TemplateMatcher
-    from ImageProcessing.Templates.templates import Templates
+    from ImageProcessing.TemplateMatching.template_matcher import TemplateMatcher
+    from ImageProcessing.TemplateMatching.Templates.templates import Templates
     template_matcher = TemplateMatcher(pipe.spectrogram, None, Templates.opencv_long_start_pattern5.value, span=150, k=10)
     template_matcher.mask_baselines()
     times, velos, scores, methodUsed = template_matcher.match()
