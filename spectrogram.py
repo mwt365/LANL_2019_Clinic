@@ -633,8 +633,6 @@ class Spectrogram:
                     **kwargs)
 
             dataToLookAt = self.transform(zData[:,:endTime]) if (data != "intensity" and transformData) else zData[:,:endTime]
-
-            print(f"The current maximum of the colorbar is {np.max(dataToLookAt) } for the dataset {data}")
             
             if self.estimatedStartTime_ != None:
                 # Plot the start time estimate.
