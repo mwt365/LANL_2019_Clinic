@@ -23,7 +23,7 @@ from IPython.display import display
 from ProcessingAlgorithms.preprocess.digfile import DigFile
 from spectrogram import Spectrogram
 from ProcessingAlgorithms.spectrum import Spectrum
-from plotter import COLORMAPS
+
 from ProcessingAlgorithms.Fitting.gaussian import Gaussian
 from ProcessingAlgorithms.SignalExtraction.gaussian_follow import GaussianFitter
 from peak_follower import PeakFollower
@@ -32,11 +32,9 @@ from ImageProcessing.Templates.templates import *
 from matplotlib.patches import Rectangle
 import time as Time
 
-
+from UI_Elements.plotter import COLORMAPS, DEFMAP
 from UI_Elements.value_sliders import ValueSlider
 from UI_Elements.percent_slider import PercentSlider # Note that this class is not actually used yet. 02/07/20
-
-DEFMAP = '3w_gby'  # should really be in an .ini file
 
 class SpectrogramWidget:
     """
