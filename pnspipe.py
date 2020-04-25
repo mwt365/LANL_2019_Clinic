@@ -45,9 +45,9 @@ import inspect
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from plotter import COLORMAPS
-DEFMAP = '3w_gby'
 
+
+from UI_Elements.plotter import COLORMAPS, DEFMAP
 from ProcessingAlgorithms.preprocess.digfile import DigFile
 import concurrent.futures
 
