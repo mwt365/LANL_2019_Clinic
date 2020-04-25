@@ -1,6 +1,3 @@
-import baselines
-from spectrogram import Spectrogram
-
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -8,6 +5,7 @@ import os
 import tqdm # For printing a timing information to see how far you have gotten.
 
 
+from spectrogram import Spectrogram
 
 
 
@@ -38,7 +36,7 @@ def saveBaselineIntensityImages(files, saveLoc:str = None, imageExt:str = "png")
         plt.clf()
         del MySpect
 
-def baselineTracking(spectrogram, baselineVel, changeThreshold, skipUntilTime:float=12e-6):
+def baselineTracking(spectrogram:Spectrogram, baselineVel, changeThreshold, skipUntilTime:float=12e-6):
     """
         Return the first time in microseconds that baseline's intensity value changes outside the changeThreshold.
         Use the average baseline value as the estimate
@@ -59,6 +57,7 @@ def baselineTracking(spectrogram, baselineVel, changeThreshold, skipUntilTime:fl
 
 
 def runExperiment(trainingFilePath, thresholds:list, skipUntilTimes:list = []):
+    import baselines
 
     data = pd.read_excel(trainingFilePath)
 
@@ -140,6 +139,7 @@ def runExperiment(trainingFilePath, thresholds:list, skipUntilTimes:list = []):
     return summaryStatistics, d
 
 if __name__ == "__main__":
+
     thresholds = np.linspace(0.3, 1)
     skipUntilTimes = [12e-6]
     saveLoc = r"../baselineIntensityMaps"
