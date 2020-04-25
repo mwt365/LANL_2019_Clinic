@@ -22,9 +22,10 @@ def getImageDirectory():
     return os.path.split(os.path.relpath(__file__))[0]
 
 
-# Save all the image files in the appropriate directory.
-imageSaveDir = getImageDirectory()
-currDir = os.getcwd()
-os.chdir(imageSaveDir)
-saveAllTemplateImages()
-os.chdir(currDir)
+if __name__ == "__main__":
+	# Save all the image files in the appropriate directory.
+	imageSaveDir = getImageDirectory()
+	currDir = os.getcwd()
+	os.chdir(imageSaveDir)
+	saveAllTemplateImages()
+	os.chdir(currDir)
