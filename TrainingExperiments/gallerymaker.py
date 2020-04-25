@@ -10,8 +10,8 @@
 
 import os
 currDir = os.getcwd()
-os.chdir(os.path.split(__file__)[0]) # Since this file is in one level up from the root and we want act as if we are working from there.
-
+os.chdir(os.path.split(os.path.split(__file__)[0])[0]) # Since this file is in one level up from the root and we want act as if we are working from there.
+print(os.getcwd())
 
 from spectrogram import Spectrogram
 from ProcessingAlgorithms.preprocess.digfile import DigFile
