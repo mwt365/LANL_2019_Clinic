@@ -2,7 +2,6 @@
 
 """
 ::
-
   Author:  LANL Clinic 2019 --<lanl19@cs.hmc.edu>
   Purpose: Attempt to follow a peak.
   Created: 10/18/19
@@ -83,7 +82,7 @@ def extrapolate(xvals, yvals, x, grouping=5, order=3):
     return yvals[0]  # ???
 
 
-class FollowerGoBothWays:
+class Follower:
     """
     Given a spectrogram and a starting point (t, v) --
     or a list of such points -- a follower
@@ -91,16 +90,13 @@ class FollowerGoBothWays:
     This base class handles storage of the spectrogram reference, the
     starting point, and a span value describing the width of the
     neighborhood to search, centered on the previous found maximum.
-
     It also holds a results dictionary with several obligatory
     fields, to which a subclass may add. The required fields are
-
         vi_span: the range of point indices used
         time:                the times found (s)
         t_index:          the index of the time columns
         peak_v:       the peak velocities
         peak_int:      the intensity at the peak
-
     """
 
     def __init__(self, spectrogram, start_point, span=80):
@@ -449,7 +445,6 @@ class FollowHood(object):
     """
     All information about the neighborhood around a point
     identified on a curve by a follower:
-
       - time       in seconds
       - t_index    column of the spectrogram
       - peak_v     in m/s
@@ -462,9 +457,8 @@ class FollowHood(object):
       - gaussian   {background, amplitude, center, width}
     """
 
-    def __init__(self, follower: FollowerGoBothWays, pt: int, expand=None):
+    def __init__(self, follower: Follower, pt: int, expand=None):
         """
-
         """
         # from gaussian import Gaussian
         from fit import Gaussian
