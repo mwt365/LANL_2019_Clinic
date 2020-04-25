@@ -19,14 +19,14 @@ import ipywidgets as widgets
 
 from matplotlib import widgets as mwidgets
 from IPython.display import display
+from plotter import COLORMAPS
+from spectrogram import Spectrogram
 
 from ProcessingAlgorithms.preprocess.digfile import DigFile
-from spectrogram import Spectrogram
 from ProcessingAlgorithms.spectrum import Spectrum
-from plotter import COLORMAPS
 from ProcessingAlgorithms.Fitting.gaussian import Gaussian
-from gaussian_follow import GaussianFitter
-from peak_follower import PeakFollower
+from ProcessingAlgorithms.SignalExtraction.gaussian_follow import GaussianFitter
+from ProcessingAlgorithms.SignalExtraction.peak_follower import PeakFollower
 from template_matcher import TemplateMatcher
 from ImageProcessing.Templates.templates import *
 from matplotlib.patches import Rectangle
@@ -34,9 +34,11 @@ import time as Time
 
 
 from UI_Elements.value_sliders import ValueSlider
-from UI_Elements.percent_slider import PercentSlider # Note that this class is not actually used yet. 02/07/20
+# Note that this class is not actually used yet. 02/07/20
+from UI_Elements.percent_slider import PercentSlider
 
 DEFMAP = '3w_gby'  # should really be in an .ini file
+
 
 class SpectrogramWidget:
     """
@@ -331,7 +333,8 @@ class SpectrogramWidget:
         # Click selector  ###########################################
         # What to do when registering a click in the spectrogram
         cd['clicker'] = widgets.Select(
-            options=("Spectrum (dB)", "Spectrum", "Peak", "Gauss", "Template_Matching"),
+            options=("Spectrum (dB)", "Spectrum", "Peak",
+                     "Gauss", "Template_Matching"),
             value='Spectrum (dB)',
             description="Click:",
             disabled=False
@@ -837,7 +840,7 @@ class SpectrogramWidget:
         """
         Handle the baselines popup menu
         """
-        from baselines import baselines_by_squash
+        from ProcessingAlgorithms.SignalExtraction.baselines import baselines_by_squash
         blines = []
         self.baselines = []  # remove any existing baselines
         if method == "Squash":
@@ -978,7 +981,6 @@ class SpectrogramWidget:
 
             line.set(xdata=[tval, tval], ydata=[0, self.spectrogram.v_max])
 
-
     def match_templates(self, time, velocity):
 
         template = opencv_long_start_pattern4
@@ -986,38 +988,40 @@ class SpectrogramWidget:
         span = 210
         vscale = 9
 
-        dv = self.spectrogram.velocity[vscale*span]
+        dv = self.spectrogram.velocity[vscale * span]
         dt = self.spectrogram.time[span] * 1e6
 
         # print(self.spectrogram.intensity.shape)
 
         new_click = (0, 0)
 
-        matcher = TemplateMatcher(self.spectrogram, new_click, template, span=span, velo_scale=vscale)
+        matcher = TemplateMatcher(
+            self.spectrogram, new_click, template, span=span, velo_scale=vscale)
 
         times, velos, scores = matcher.match()
 
         # print(times, velos, scores)
- 
-        patch = Rectangle( new_click, dt, dv, fill=False, color='b', alpha=0.15)
-        self.axSpectrogram.add_patch(patch)
 
+        patch = Rectangle(new_click, dt, dv, fill=False,
+                          color='b', alpha=0.15)
+        self.axSpectrogram.add_patch(patch)
 
         colors = ['ro', 'bo', 'go', 'mo', 'ko', 'co']
         color_names = ['red', 'blue', 'green', 'magenta', 'black', 'cyan']
         # methods = ['cv2.TM_CCOEFF', 'cv2.TM_CCOEFF_NORMED', 'cv2.TM_CCORR',
         #     'cv2.TM_CCORR_NORMED', 'cv2.TM_SQDIFF', 'cv2.TM_SQDIFF_NORMED']
 
-        methods = ['cv2.TM_SQDIFF_NORMED', 'cv2.TM_CCOEFF_NORMED', 'cv2.TM_SQDIFF'] # the 'best' method for matching
-
+        methods = ['cv2.TM_SQDIFF_NORMED', 'cv2.TM_CCOEFF_NORMED',
+                   'cv2.TM_SQDIFF']  # the 'best' method for matching
 
         for i in range(len(times)):
             print("method: ", methods[i])
             print("color: ", color_names[i])
             print("time: ", times[i])
-            print("velocity: ", velos[i],'\n')
+            print("velocity: ", velos[i], '\n')
             # print("score: ", scores[i])
-            self.axSpectrogram.plot(times[i], velos[i], colors[i], markersize=3, alpha=0.7)
+            self.axSpectrogram.plot(
+                times[i], velos[i], colors[i], markersize=3, alpha=0.7)
 
         # self.axSpectrogram.plot( times, velos, 'ro', markersize=2.5, alpha=0.9)
 
@@ -1032,7 +1036,7 @@ class SpectrogramWidget:
             v = velos[i]
 
             follower = PeakFollower(self.spectrogram, (t, v))
-            
+
             self.peak_followers.append(follower)
             follow_sum = follower.run()
 
@@ -1050,11 +1054,11 @@ class SpectrogramWidget:
         most_likely_time = times[max_index]
         most_likely_velo = velos[max_index]
 
-        print("(most confident) time: ",most_likely_time)
-        print("             velocity: ",most_likely_velo,"\n")
+        print("(most confident) time: ", most_likely_time)
+        print("             velocity: ", most_likely_velo, "\n")
 
-
-        self.axSpectrogram.plot( most_likely_time, most_likely_velo, 'ko', markersize=2, alpha=1)
+        self.axSpectrogram.plot(
+            most_likely_time, most_likely_velo, 'ko', markersize=2, alpha=1)
 
 
 

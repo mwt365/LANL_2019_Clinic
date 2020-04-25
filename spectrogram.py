@@ -18,6 +18,7 @@ from plotter import COLORMAPS
 
 DEFMAP = '3w_gby'
 
+
 class Spectrogram:
     """
 
@@ -121,7 +122,6 @@ class Spectrogram:
 
         # deal with kwargs
 
-
         try:
             if False:
                 self._load()
@@ -147,16 +147,15 @@ class Spectrogram:
 
         scaling = kwargs.get('scaling', 'spectrum')
 
-
         modes = ["complex", "phase", "psd"]
-                
+
         self.availableData = modes
         self.complex = []
         self.phase = []
 
         for mode in modes:
             # ["complex", "magnitude", "angle", "phase", "psd"]
-            # The available modes for signal.spectrogram 
+            # The available modes for signal.spectrogram
             # Only need to compute complex, phase, and psd and then we can derive the rest.
 
             # You can probably compute the psd from the complex spectrum
@@ -176,7 +175,6 @@ class Spectrogram:
             )
             setattr(self, mode, spec)
 
-
         times += self.t_start
 
         self.magnitude = np.abs(getattr(self, "complex"))
@@ -184,7 +182,8 @@ class Spectrogram:
         self.real = np.real(getattr(self, "complex"))
         self.imaginary = np.imag(getattr(self, "complex"))
 
-        self.availableData.extend(["magnitude", "angle", "real", "imaginary"])
+        self.availableData.extend(
+            ["magnitude", "angle", "real", "imaginary"])
         self.availableData.remove("complex")
 
         self.availableData.append("intensity")
@@ -204,7 +203,7 @@ class Spectrogram:
 
         # Now compute the probe destruction time.
         self.probeDestructionTime()
-        
+
         self.estimateStartTime()
 
     def transform(self, vals):
@@ -213,7 +212,8 @@ class Spectrogram:
         """
         epsilon = 1e-10
         if self.form == 'db':
-            return 10 * np.log10(vals + epsilon) # Since you are already starting with power.
+            # Since you are already starting with power.
+            return 10 * np.log10(vals + epsilon)
         if self.form == 'log':
             return np.log10(vals + epsilon)
         return vals
@@ -278,7 +278,7 @@ class Spectrogram:
             return 0
         return min(p, -1 + len(self.velocity))
 
-    def slice(self, time_range, velocity_range, complexData:bool = False, phaseData:bool = False):
+    def slice(self, time_range, velocity_range, complexData: bool = False, phaseData: bool = False):
         """
         Input:
             time_range: Array/Tuple/List of times (t0, t1)
@@ -315,14 +315,14 @@ class Spectrogram:
         ivals = self.intensity[vel0:vel1 + 1, time0:time1 + 1]
 
         if complexData and phaseData:
-            return tvals, vvals, ivals, self.complex[vel0:vel1+1, time0:time1+1], self.phase[vel0:vel1+1, time0:time1+1]
+            return tvals, vvals, ivals, self.complex[vel0:vel1 + 1, time0:time1 + 1], self.phase[vel0:vel1 + 1, time0:time1 + 1]
         elif complexData:
-            return tvals, vvals, ivals, self.complex[vel0:vel1+1, time0:time1+1]
+            return tvals, vvals, ivals, self.complex[vel0:vel1 + 1, time0:time1 + 1]
         elif phaseData:
-            return tvals, vvals, ivals, self.phase[vel0:vel1+1, time0:time1+1]
+            return tvals, vvals, ivals, self.phase[vel0:vel1 + 1, time0:time1 + 1]
 
         return tvals, vvals, ivals
-        
+
     def analyze_noise(self, **kwargs):
         """
         Analyze the noise by performing a double-exponential fit.
@@ -339,7 +339,7 @@ class Spectrogram:
             fields beta, lam1, lam2, amp, mean, stdev, chisq, and
             prob_greater
         """
-        from fit import DoubleExponential, Exponential
+        from ProcessingAlgorithms.Fitting.fit import DoubleExponential, Exponential
         from baselines import baselines_by_squash
 
         v_min = kwargs.get('v_min')
@@ -539,39 +539,43 @@ class Spectrogram:
         inds2 = np.where(maxArray == a)
         self.probe_destruction_index_max = inds2[0][0]
         if False:
-            print("The value of PD index using the max estimate is", self.probe_destruction_index_max, "it has type", type(self.probe_destruction_index_max))
+            print("The value of PD index using the max estimate is",
+                  self.probe_destruction_index_max, "it has type", type(self.probe_destruction_index_max))
             print("The time array has shape", self.time.shape)
 
         self.probe_destruction_time_max = self.time[self.probe_destruction_index_max]
 
     def estimateStartTime(self):
         """
-        Compute an approximate value for the jump off time based upon the change in 
+        Compute an approximate value for the jump off time based upon the change in
         the baseline intensity.
         """
-        import baselineTracking
-        peaks, _, _ = baselineTracking.baselines.baselines_by_squash(self)
-        self.estimatedStartTime_ = baselineTracking.baselineTracking(self, peaks[0], 0.024761904761904763)
+        from ProcessingAlgorithms.SignalExtraction.baselines import baselines_by_squash
+        from ProcessingAlgorithms.SignalExtraction.baselineTracking import baselineTracking
+        peaks, _, _ = baselines_by_squash(self)
+        self.estimatedStartTime_ = baselineTracking.baselineTracking(
+            self, peaks[0], 0.024761904761904763)
 
-    def plotHist(self, fig = None, minFrac=0.0, maxFrac = 1.0, numBins = 1001, **kwargs):
+    def plotHist(self, fig=None, minFrac=0.0, maxFrac=1.0, numBins=1001, **kwargs):
         if fig == None:
             fig = plt.figure()
         bins = np.linspace(self.min, self.max, numBins)
 
-        threshold = bins[int(numBins*minFrac):int(numBins*maxFrac)]
+        threshold = bins[int(numBins * minFrac):int(numBins * maxFrac)]
 
         plt.hist(self.intensity.flatten(), threshold, **kwargs)
         axes = plt.gca()
-        axes.set_ylabel('Counts', fontsize = 18)
-        axes.set_xlabel('Intensity', fontsize = 18)
+        axes.set_ylabel('Counts', fontsize=18)
+        axes.set_xlabel('Intensity', fontsize=18)
         axes.xaxis.set_tick_params(labelsize=14)
-        axes.yaxis.set_tick_params(labelsize=14)        
+        axes.yaxis.set_tick_params(labelsize=14)
         title = self.data.filename.split('/')[-1]
-        axes.set_title(title.replace("_", "-")+" Intensity Histogram", fontsize = 24)
-        
+        axes.set_title(title.replace("_", "-") +
+                       " Intensity Histogram", fontsize=24)
+
         return fig
 
-    def plot(self, transformData = False, **kwargs):
+    def plot(self, transformData=False, **kwargs):
         # max_vel=6000, vmin=-200, vmax=100):
         pcms = {}
         if "psd" in self.availableData:
@@ -580,9 +584,9 @@ class Spectrogram:
             self.availableData.append("real")
             self.availableData.append("imaginary")
 
-
-        endTime = self._time_to_index((self.probe_destruction_time + self.probe_destruction_time_max)/2)
-        # Our prediction for the probe destruction time. Just to make it easier to plot. 
+        endTime = self._time_to_index(
+            (self.probe_destruction_time + self.probe_destruction_time_max) / 2)
+        # Our prediction for the probe destruction time. Just to make it easier to plot.
 
         cmapUsed = COLORMAPS[DEFMAP]
         print(COLORMAPS.keys())
@@ -612,52 +616,56 @@ class Spectrogram:
         if right != None:
             del kwargs["max_time"]
 
-
-
         for data in self.availableData:
-            zData = getattr(self, data, "intensity") # getattr(object, itemname, default)
-            
+            # getattr(object, itemname, default)
+            zData = getattr(self, data, "intensity")
+
             key = f"{data}" + (f" transformed to {self.form}" if transformData else " raw")
             fig = plt.figure(num=key)
             axes = plt.gca()
 
-            pcm = None # To define the scope.
+            pcm = None  # To define the scope.
             if 'cmap' not in kwargs:
                 pcm = axes.pcolormesh(
                     self.time[:endTime] * 1e6,
                     self.velocity,
-                    self.transform(zData[:,:endTime]) if (data != "intensity" and transformData) else zData[:,:endTime],
-                    cmap = cmapUsed,
+                    self.transform(zData[:, :endTime]) if (
+                        data != "intensity" and transformData) else zData[:, :endTime],
+                    cmap=cmapUsed,
                     **kwargs)
             else:
                 pcm = axes.pcolormesh(
                     self.time[:endTime] * 1e6,
                     self.velocity,
-                    self.transform(zData[:,:endTime]) if (data != "intensity" and transformData) else zData[:,:endTime],
+                    self.transform(zData[:, :endTime]) if (
+                        data != "intensity" and transformData) else zData[:, :endTime],
                     **kwargs)
 
-            dataToLookAt = self.transform(zData[:,:endTime]) if (data != "intensity" and transformData) else zData[:,:endTime]
+            dataToLookAt = self.transform(zData[:, :endTime]) if (
+                data != "intensity" and transformData) else zData[:, :endTime]
 
             print(f"The current maximum of the colorbar is {np.max(dataToLookAt) } for the dataset {data}")
-            
+
             # Plot the start time estimate.
-            axes.plot([self.estimatedStartTime_]*len(self.velocity), self.velocity, "k-", label = "Estimated Start Time", alpha = 0.75)
+            axes.plot([self.estimatedStartTime_] * len(self.velocity),
+                      self.velocity, "k-", label="Estimated Start Time", alpha=0.75)
             # plt.legend()
-            
+
             print(f"The current maximum of the colorbar is {np.max(zData[:,:endTime])} for the dataset {data}")
             plt.gcf().colorbar(pcm, ax=axes)
-            axes.set_ylabel('Velocity (m/s)', fontsize = 14)
-            axes.set_xlabel('Time ($\mu$s)', fontsize = 14)
+            axes.set_ylabel('Velocity (m/s)', fontsize=14)
+            axes.set_xlabel('Time ($\mu$s)', fontsize=14)
             axes.xaxis.set_tick_params(labelsize=12)
-            axes.yaxis.set_tick_params(labelsize=12)        
+            axes.yaxis.set_tick_params(labelsize=12)
             title = self.data.filename.split('/')[-1]
-            axes.set_title(title.replace("_", "-") + f" {data} spectrogram", fontsize = 24)
+            axes.set_title(title.replace("_", "-") + f" {data} spectrogram", fontsize=24)
 
             axes.set_xlim(left, right)
-            axes.set_ylim(bot, top) # The None value is the default value and does not update the axes limits.            
+            # The None value is the default value and does not update the axes limits.
+            axes.set_ylim(bot, top)
 
             pcms[key] = pcm
-        
+
         return pcms, axes
 
     def save_fig(self, **kwargs):

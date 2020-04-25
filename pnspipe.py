@@ -49,6 +49,8 @@ from plotter import COLORMAPS
 DEFMAP = '3w_gby'
 
 from ProcessingAlgorithms.preprocess.digfile import DigFile
+from ProcessingAlgorithms.Fitting.fit import Exponential, DoubleExponential
+
 import concurrent.futures
 
 
@@ -397,7 +399,7 @@ def find_baselines(pipe: PNSPipe, **kwargs):
     that are larger than this value (which should be between
     0 and 1).
     """
-    from baselines import baselines_by_squash as bline
+    from ProcessingAlgorithms.SignalExtraction.baselines import baselines_by_squash as bline
     peaks, widths, heights = bline(pipe.spectrogram)
     baseline_limit = kwargs.get('baseline_limit', 0.01)
     pipe.baselines = peaks[heights > baseline_limit]
@@ -417,9 +419,6 @@ def find_signal(pipe: PNSPipe, **kwargs):
     guess = signal_finder(sg, blines, t_start)
     pipe.signal_guess = (t_start, guess)
     pipe.log(f"find_signal guesses signal is at {pipe.signal_guess}")
-
-
-from fit import Exponential, DoubleExponential
 
 
 def analyze_noise(pipe: PNSPipe, **kwargs):

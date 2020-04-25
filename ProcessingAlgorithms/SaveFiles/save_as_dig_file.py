@@ -4,6 +4,7 @@
 import numpy as np
 from datetime import datetime
 
+
 def save_as_dig(filename, vvals, datatype, dt=20e-12, initialTime=0,
                 voltageMultiplier=6.103516e-5, voltageOffset=0,
                 top_header="", **kwargs):
@@ -49,7 +50,7 @@ def save_as_dig(filename, vvals, datatype, dt=20e-12, initialTime=0,
             raise ValueError(
                 "datatype corresponds to an unsupported data type.")
     elif datatype == np.dtype("u1"):
-    elif datatype == np.dtype("ubyte"):
+        # elif datatype == np.dtype("ubyte"):
         dataformat = '8'
     elif datatype == np.dtype("<u2"):
         dataformat = '16'
@@ -67,7 +68,6 @@ def save_as_dig(filename, vvals, datatype, dt=20e-12, initialTime=0,
         head = "\r\n".join([f"{k} = {top_header[k]}" for k in keys])
         top_header = head
 
-
     # Now write the header, the important parts of which are
     # nsamples, bits, dt, t0, dv, v0
     # This will fail if the file is not already created.
@@ -78,7 +78,7 @@ def save_as_dig(filename, vvals, datatype, dt=20e-12, initialTime=0,
         f.write(top_header)  # write 512 bytes of spaces
         stuff = "\r\n".join([
             # todays date Day Mon NumDay HH:MM:SS: YEAR
-            # This is achieved using ctime() in the datetime library. 
+            # This is achieved using ctime() in the datetime library.
             # Reference https://docs.python.org/3/library/datetime.html
             date,
             # the number of samples used.
