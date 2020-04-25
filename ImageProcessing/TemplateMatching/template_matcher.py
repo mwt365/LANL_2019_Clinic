@@ -366,8 +366,8 @@ class TemplateMatcher():
                     show_bounds=True):
 
         if show_bounds:
-            firstVel, dv = spec.velocity[self.velo_bounds]
-            firstTime, dt = spec.time[self.time_bounds] * 1e6
+            firstVel, dv = spec.velocity[list(self.velo_bounds)]
+            firstTime, dt = spec.time[list(self.time_bounds)] * 1e6
             patch = Rectangle((firstTime, firstVel), dt, dv, fill=False, color='b', alpha=0.8)
             axes.add_patch(patch)
 
@@ -414,7 +414,7 @@ class TemplateMatcher():
     
         # cluster coordinates received from template matching, find cluster centers and plot them
         if show_medoids:
-            centers = self.find_kmedoids(times, velos)
+            centers = self.find_kmedoids(times, velos, clusters = self.num_methods)
             for t,v in centers:
                 center, = axes.plot(t, v, 'ro', markersize=4, alpha=.9)
             center.set_label("cluster center")
