@@ -7,12 +7,18 @@
    Purpose: Make a gallery of images of spectrograms.
    Created: 3/1/20
 """
+
+import os
+currDir = os.getcwd()
+os.chdir(os.path.split(__file__)[0]) # Since this file is in one level up from the root and we want act as if we are working from there.
+
+
 from spectrogram import Spectrogram
 from ProcessingAlgorithms.preprocess.digfile import DigFile
 
+os.chdir(currDir)
 
 import matplotlib.pyplot as plt
-import os
 
 def createGallery(digsToLookAt:list=None, colormap="blue-orange-div", fileext="jpeg", transformData = False):
 	if type(digsToLookAt) == type(None):
