@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 currDir = os.getcwd()
-os.chdir(os.path.split(os.path.split((__file__))[0])[0])
+os.chdir(os.path.split(os.path.split(os.path.split((__file__))[0])[0])[0])
 
 from spectrogram import Spectrogram
 from ProcessingAlgorithms.SaveFiles.save_as_dig_file import save_as_dig
