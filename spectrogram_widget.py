@@ -27,8 +27,8 @@ from ProcessingAlgorithms.spectrum import Spectrum
 from ProcessingAlgorithms.Fitting.gaussian import Gaussian
 from ProcessingAlgorithms.SignalExtraction.gaussian_follow import GaussianFitter
 from peak_follower import PeakFollower
-from template_matcher import TemplateMatcher
-from ImageProcessing.Templates.templates import *
+from ImageProcessing.TemplateMatching.template_matcher import TemplateMatcher
+from ImageProcessing.TemplateMatching.Templates.templates import Templates
 from matplotlib.patches import Rectangle
 import time as Time
 
@@ -979,7 +979,7 @@ class SpectrogramWidget:
 
     def match_templates(self, time, velocity):
 
-        template = opencv_long_start_pattern4
+        template = Templates.opencv_long_start_pattern4
 
         span = 210
         vscale = 9
@@ -1032,7 +1032,7 @@ class SpectrogramWidget:
             follower = PeakFollower(self.spectrogram, (t, v))
             
             self.peak_followers.append(follower)
-            follow_sum = follower.run()
+            follow_sum = follower.run(20)
 
             tsec, v = follower.v_of_t
 
