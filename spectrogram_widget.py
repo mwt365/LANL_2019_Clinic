@@ -993,31 +993,14 @@ class SpectrogramWidget:
 
         matcher = TemplateMatcher(self.spectrogram, new_click, template, span=span, velo_scale=vscale)
 
-        times, velos, scores = matcher.match()
+        times, velos, scores, methodsUsed = matcher.match()
 
-        # print(times, velos, scores)
- 
-        patch = Rectangle( new_click, dt, dv, fill=False, color='b', alpha=0.15)
-        self.axSpectrogram.add_patch(patch)
-
-
-        colors = ['ro', 'bo', 'go', 'mo', 'ko', 'co']
-        color_names = ['red', 'blue', 'green', 'magenta', 'black', 'cyan']
-        # methods = ['cv2.TM_CCOEFF', 'cv2.TM_CCOEFF_NORMED', 'cv2.TM_CCORR',
-        #     'cv2.TM_CCORR_NORMED', 'cv2.TM_SQDIFF', 'cv2.TM_SQDIFF_NORMED']
-
-        methods = ['cv2.TM_SQDIFF_NORMED', 'cv2.TM_CCOEFF_NORMED', 'cv2.TM_SQDIFF'] # the 'best' method for matching
-
-
-        for i in range(len(times)):
-            print("method: ", methods[i])
-            print("color: ", color_names[i])
-            print("time: ", times[i])
-            print("velocity: ", velos[i],'\n')
-            # print("score: ", scores[i])
-            self.axSpectrogram.plot(times[i], velos[i], colors[i], markersize=3, alpha=0.7)
-
-        # self.axSpectrogram.plot( times, velos, 'ro', markersize=2.5, alpha=0.9)
+        matcher.add_to_plot(self.axSpectrogram, times, velos, scores, methodsUsed, 
+                                show_points=True, 
+                                show_medoids=True, 
+                                verbose=False, 
+                                visualize_opacity=False, 
+                                show_bounds=True)
 
         max_follower = 0
         max_index = 0
@@ -1032,7 +1015,7 @@ class SpectrogramWidget:
             follower = PeakFollower(self.spectrogram, (t, v))
             
             self.peak_followers.append(follower)
-            follow_sum = follower.run(20)
+            follow_sum = follower.run()
 
             tsec, v = follower.v_of_t
 
