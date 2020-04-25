@@ -264,6 +264,12 @@ class TemplateMatcher():
 
             outputValues = [[] for i in range(len(templatesList))]
             imageSaveDir = templateHelper.getImageDirectory()
+            
+            # If at least one file does not exist just make all of them.
+            for tempInd, temp in enumerate(templatesList):
+                if not os.path.exists(os.path.join(imageSaveDir, f"im_template_{temp}.png")):
+                    templateHelper.saveAllTemplateImages()
+                    break
 
             for tempInd, temp in enumerate(templatesList):
                 template = cv2.imread(os.path.join(imageSaveDir, f"im_template_{temp}.png"), 0)
