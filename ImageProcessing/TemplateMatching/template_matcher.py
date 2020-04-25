@@ -101,7 +101,7 @@ class TemplateMatcher():
             velocity_index = 0
 
         max_time_index = self.spectrogram.intensity.shape[1] - 1
-        ending_time_index = time_index + self.span
+        ending_time_index = time_index + self.span * 15
 
         assert (ending_time_index < max_time_index)
         start_time = self.spectrogram.time[time_index]
@@ -366,9 +366,9 @@ class TemplateMatcher():
                     show_bounds=True):
 
         if show_bounds:
-            dv = spec.velocity[self.velo_scale * self.span]
-            dt = spec.time[self.span] * 1e6
-            patch = Rectangle((0,0), dt, dv, fill=False, color='b', alpha=0.8)
+            firstVel, dv = spec.velocity[self.velo_bounds]
+            firstTime, dt = spec.time[self.time_bounds] * 1e6
+            patch = Rectangle((firstTime, firstVel), dt, dv, fill=False, color='b', alpha=0.8)
             axes.add_patch(patch)
 
         method_color_dict = {}
