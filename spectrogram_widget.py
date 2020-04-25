@@ -10,11 +10,10 @@
 """
 
 import os
-import cv2
+# import cv2
 import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib.colors
-import matplotlib.gridspec as gridspec
+# import matplotlib.colors
 import ipywidgets as widgets
 
 from matplotlib import widgets as mwidgets
@@ -27,15 +26,15 @@ from ProcessingAlgorithms.spectrum import Spectrum
 from ProcessingAlgorithms.Fitting.gaussian import Gaussian
 from ProcessingAlgorithms.SignalExtraction.gaussian_follow import GaussianFitter
 from ProcessingAlgorithms.SignalExtraction.peak_follower import PeakFollower
-from template_matcher import TemplateMatcher
-from ImageProcessing.Templates.templates import *
+from ImageProcessing.TemplateMatching.template_matcher import TemplateMatcher
+from ImageProcessing.TemplateMatching.Templates.templates import *
 from matplotlib.patches import Rectangle
 import time as Time
 
 
 from UI_Elements.value_sliders import ValueSlider
 # Note that this class is not actually used yet. 02/07/20
-from UI_Elements.percent_slider import PercentSlider
+# from UI_Elements.percent_slider import PercentSlider
 
 DEFMAP = '3w_gby'  # should really be in an .ini file
 
@@ -581,7 +580,7 @@ class SpectrogramWidget:
     def handle_key(self, event):
         try:
             # convert time to seconds
-            t, v = event.xdata * 1e-6, event.ydata
+            _, v = event.xdata * 1e-6, event.ydata
         except:
             pass
         char = event.key
@@ -716,7 +715,9 @@ class SpectrogramWidget:
         res = pf.results
         points = len(res['t_index'])
 
-        def bound(x): return x % points
+        def bound(x):
+            return x % points
+
         follower_pt = bound(follower_pt)
 
         # We'd like to show data for this index, the previous one,
@@ -747,7 +748,6 @@ class SpectrogramWidget:
             bg = hood.moment['background']
             ax.plot([hood.velocity[0], hood.velocity[-1]], [bg, bg], 'r-')
             # show the center and widths from the moment calculation
-            pk = hood.peak_int
             tallest = np.max(hood.intensity)
             max_peak = max(tallest, max_peak)
             ax.plot([hood.moment['center'] + x * hood.moment['std_err'] for x in
@@ -982,8 +982,7 @@ class SpectrogramWidget:
             line.set(xdata=[tval, tval], ydata=[0, self.spectrogram.v_max])
 
     def match_templates(self, time, velocity):
-
-        template = opencv_long_start_pattern4
+        template = Templates.opencv_long_start_pattern4
 
         span = 210
         vscale = 9

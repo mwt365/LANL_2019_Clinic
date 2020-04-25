@@ -340,7 +340,7 @@ class Spectrogram:
             prob_greater
         """
         from ProcessingAlgorithms.Fitting.fit import DoubleExponential, Exponential
-        from baselines import baselines_by_squash
+        from ProcessingAlgorithms.SignalExtraction.baselines import baselines_by_squash
 
         v_min = kwargs.get('v_min')
         if not v_min:
@@ -553,7 +553,7 @@ class Spectrogram:
         from ProcessingAlgorithms.SignalExtraction.baselines import baselines_by_squash
         from ProcessingAlgorithms.SignalExtraction.baselineTracking import baselineTracking
         peaks, _, _ = baselines_by_squash(self)
-        self.estimatedStartTime_ = baselineTracking.baselineTracking(
+        self.estimatedStartTime_ = baselineTracking(
             self, peaks[0], 0.024761904761904763)
 
     def plotHist(self, fig=None, minFrac=0.0, maxFrac=1.0, numBins=1001, **kwargs):

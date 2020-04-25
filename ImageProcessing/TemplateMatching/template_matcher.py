@@ -11,14 +11,16 @@ import cv2  # The general computer vision library for python.
 import numpy as np
 from ProcessingAlgorithms.SignalExtraction.baselines import baselines_by_squash
 from spectrogram import Spectrogram
-import ImageProcessing.Templates.saveTemplateImages as templateHelper
+import ImageProcessing.TemplateMatching.Templates.saveTemplateImages as templateHelper
 import os
-from ImageProcessing.Templates.templates import Templates
+from ImageProcessing.TemplateMatching.Templates.templates import Templates
+
 import scipy
 if scipy.__version__ > "1.2.1":
     from imageio import imsave
 else:
     from scipy.misc import imsave
+
 from matplotlib import pyplot as plt
 from matplotlib.patches import Rectangle
 from sklearn_extra.cluster import KMedoids

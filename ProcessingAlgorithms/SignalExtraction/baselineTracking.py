@@ -7,6 +7,7 @@ import tqdm
 import matplotlib.pyplot as plt
 
 from spectrogram import Spectrogram
+from ProcessingAlgorithms.SignalExtraction.baselines import baselines_by_squash
 
 
 def saveBaselineIntensityImages(files, saveLoc: str = None, imageExt: str = "png"):
@@ -19,7 +20,7 @@ def saveBaselineIntensityImages(files, saveLoc: str = None, imageExt: str = "png
     for i in tqdm.trange(len(files)):
         filename = f"../dig/{files[i]}"
         MySpect = Spectrogram(filename)
-        peaks, _, heights = baselines.baselines_by_squash(MySpect)
+        peaks, _, heights = baselines_by_squash(MySpect)
 
         plt.plot(np.array(MySpect.time) * 1e6,
                  MySpect.intensity[MySpect._velocity_to_index(peaks[0])])
@@ -61,7 +62,6 @@ def baselineTracking(spectrogram, baselineVel, changeThreshold, skipUntilTime: f
 
 
 def runExperiment(trainingFilePath, thresholds: list, skipUntilTimes: list = []):
-    from ProcessingAlgorithms.SignalExtraction import baselines
 
     data = pd.read_excel(trainingFilePath)
 
@@ -88,7 +88,7 @@ def runExperiment(trainingFilePath, thresholds: list, skipUntilTimes: list = [])
     for i in tqdm.trange(len(files)):
         filename = os.path.join(os.path.join("..", "dig"), f"{files[i]}")
         MySpect = Spectrogram(filename)
-        peaks, _, heights = baselines.baselines_by_squash(MySpect)
+        peaks, _, heights = baselines_by_squash(MySpect)
 
         for thres in thresholds:
 
