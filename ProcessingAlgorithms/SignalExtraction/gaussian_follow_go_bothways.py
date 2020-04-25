@@ -11,7 +11,7 @@
 import numpy as np
 from spectrogram import Spectrogram
 from scipy.optimize import curve_fit
-from ProcessingAlgorithms.SignalExtraction.follower import Follower
+from ProcessingAlgorithms.SignalExtraction.followerGoBothWays import FollowerGoBothWays
 
 
 def _gauss(x, *p):
