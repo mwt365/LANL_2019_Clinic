@@ -25,7 +25,7 @@ from spectrogram import Spectrogram
 from ProcessingAlgorithms.spectrum import Spectrum
 from plotter import COLORMAPS
 from ProcessingAlgorithms.Fitting.gaussian import Gaussian
-from gaussian_follow import GaussianFitter
+from ProcessingAlgorithms.SignalExtraction.gaussian_follow import GaussianFitter
 from peak_follower import PeakFollower
 from template_matcher import TemplateMatcher
 from ImageProcessing.Templates.templates import *
