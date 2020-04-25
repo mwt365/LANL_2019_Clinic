@@ -83,7 +83,7 @@ def extrapolate(xvals, yvals, x, grouping=5, order=3):
     return yvals[0]  # ???
 
 
-class Follower:
+class FollowerGoBothWays:
     """
     Given a spectrogram and a starting point (t, v) --
     or a list of such points -- a follower
@@ -462,7 +462,7 @@ class FollowHood(object):
       - gaussian   {background, amplitude, center, width}
     """
 
-    def __init__(self, follower: Follower, pt: int, expand=None):
+    def __init__(self, follower: FollowerGoBothWays, pt: int, expand=None):
         """
 
         """
