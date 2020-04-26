@@ -40,8 +40,8 @@ class TemplateMatcher():
     """
 
     def __init__(self, spectrogram, 
-                       start_point, 
                        template, 
+                       start_point=None, 
                        span=80, 
                        velo_scale=10, 
                        k=10,
