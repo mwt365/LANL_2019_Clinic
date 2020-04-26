@@ -1,8 +1,8 @@
 #! /usr/bin/env python3
 
-
-import xml_cm_files.cm_xml_to_matplotlib as cm # Due to the updated folder structure.
 import os
+import UI_Elements.xml_cm_files.cm_xml_to_matplotlib as cm # Due to the updated folder structure.
+
 
 DIR = os.path.join(os.path.split(__file__)[0], "xml_cm_files")
 # This should be pulling the folder structure from the current file
@@ -24,8 +24,7 @@ try:
 except FileNotFoundError:
     print("No folder named 'xml color map files' in the source directory.")
 
-# mycmap = cm.make_cmap(os.path.join(DIR, '3w_gby.xml'))
-# to use colormap: matplotlib.pyplot.imshow(your_image,
-# cmap=matplotlib.pyplot.get_cmap(mycmap))
+DEFMAP = '3w_gby'
+if '3w_gby' not in COLORMAPS:
+	DEFMAP = list(COLORMAPS.keys())[0] # Just give me the first colormap in these colormaps.
 
-# cm.plot_cmap(mycmap)  # plot an 8 by 1 copy of the colormap

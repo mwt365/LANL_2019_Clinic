@@ -14,7 +14,7 @@ from spectrogram import Spectrogram
 from scipy.optimize import curve_fit
 from ProcessingAlgorithms.Fitting.moving_average import normalize
 
-import imageRot
+from ProcessingAlgorithms.Fitting.imageRot import *
 
 
 class Follower:

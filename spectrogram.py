@@ -14,9 +14,7 @@ from scipy import signal
 from scipy.signal import find_peaks
 
 from ProcessingAlgorithms.preprocess.digfile import DigFile
-from plotter import COLORMAPS
-
-DEFMAP = '3w_gby'
+from UI_Elements.plotter import COLORMAPS, DEFMAP
 
 class Spectrogram:
     """
@@ -115,9 +113,6 @@ class Spectrogram:
         self.frequency = None
         self.velocity = None
         self.intensity = None
-        # This will contain the intensity values if possible.
-        # Otherwise it will contain the phase or angle information.
-        # Containment determined by the value of computeMode.
 
         # deal with kwargs
 
@@ -205,7 +200,8 @@ class Spectrogram:
         # Now compute the probe destruction time.
         self.probeDestructionTime()
         
-        self.estimateStartTime()
+        self.estimatedStartTime_ = None
+        # self.estimateStartTime()
 
     def transform(self, vals):
         """
@@ -549,9 +545,10 @@ class Spectrogram:
         Compute an approximate value for the jump off time based upon the change in 
         the baseline intensity.
         """
-        import baselineTracking
-        peaks, _, _ = baselineTracking.baselines.baselines_by_squash(self)
-        self.estimatedStartTime_ = baselineTracking.baselineTracking(self, peaks[0], 0.024761904761904763)
+        from baselineTracking import baselineTracking
+        import baselines
+        peaks, _, _ = baselines.baselines_by_squash(self)
+        self.estimatedStartTime_ = baselineTracking(self, peaks[0], 0.024761904761904763)
 
     def plotHist(self, fig = None, minFrac=0.0, maxFrac = 1.0, numBins = 1001, **kwargs):
         if fig == None:
@@ -585,7 +582,6 @@ class Spectrogram:
         # Our prediction for the probe destruction time. Just to make it easier to plot. 
 
         cmapUsed = COLORMAPS[DEFMAP]
-        # print(COLORMAPS.keys())
         if 'cmap' in kwargs:
             # To use the sciviscolor colormaps that we have downloaded.
             attempt = kwargs['cmap']
@@ -637,12 +633,11 @@ class Spectrogram:
                     **kwargs)
 
             dataToLookAt = self.transform(zData[:,:endTime]) if (data != "intensity" and transformData) else zData[:,:endTime]
-
-            print(f"The current maximum of the colorbar is {np.max(dataToLookAt) } for the dataset {data}")
             
-            # Plot the start time estimate.
-            axes.plot([self.estimatedStartTime_]*len(self.velocity), self.velocity, "k-", label = "Estimated Start Time", alpha = 0.75)
-            # plt.legend()
+            if self.estimatedStartTime_ != None:
+                # Plot the start time estimate.
+                axes.plot([self.estimatedStartTime_]*len(self.velocity), self.velocity, "k-", label = "Estimated Start Time", alpha = 0.75)
+                # plt.legend()
             
             print(f"The current maximum of the colorbar is {np.max(zData[:,:endTime])} for the dataset {data}")
             plt.gcf().colorbar(pcm, ax=axes)
@@ -660,73 +655,23 @@ class Spectrogram:
         
         return pcms, axes
 
-    def save_fig(self, **kwargs):
-        """
-        Prepare a plot and save the figure in appropriate
-        size.
-
-        Interesting possible keyword arguments:
-
-            - filename (default is data.title)
-            - folder (default is dig/../figs)
-            - min_vel and max_vel
-            - title (string)
-            - extension (.jpg)
-            - color_range
-            - cmap
-        """
-        from plotter import COLORMAPS
-
-        if 'folder' in kwargs:
-            folder = kwargs.pop('folder')
-        else:
-            folder = os.path.join(os.path.split(
-                DigFile.dig_dir())[0], 'figs')
-
-        filename = kwargs.pop(
-            'filename') if 'filename' in kwargs else self.data.title
-        filename = filename.replace('/', '-')
-        extension = kwargs.pop(
-            'extension') if 'extension' in kwargs else '.jpg'
-        cmap = COLORMAPS[kwargs.pop(
-            'cmap') if 'cmap' in kwargs else '3w_gby']
-
-        # Attempt to set the color_range
-        if 'color_range' in kwargs:
-            color_range = kwargs.pop('color_range')
-        else:
-            # use the 90th percentile to set the floor
-            bottom = self.transform(self.histogram_levels['ones'][0])
-            top = bottom + 40
-            color_range = (bottom, top)
-
-        fig, axes = plt.subplots(figsize=(6, 4.5))
-        image = self.plot(axes, cmap=cmap, **kwargs)
-        image.set_clim(color_range)
-        where = os.path.join(folder, filename + extension)
-        fig.savefig(where)
-        print(f"Saved {where}")
-
 
 if __name__ == '__main__':
-    os.chdir(DigFile.dig_dir())
-    df = DigFile('GEN3CH_4_009/seg00')
-    sp = Spectrogram(df, ending=35.0e-6)
-    sp.save_fig(max_vel=6000, color_range=(10, 50))
-    if False:
-        sp = Spectrogram(
-            '../dig/GEN3CH_4_009/seg10',
-            None,
-            None,
-            mode=('psd', 'phase', 'angle'))
-        print(sp)
-        fig, ax = plt.subplots()
-        pcm = ax.pcolormesh(
-            sp.time * 1e6,
-            sp.velocity,
-            sp.angle
-        )
-        fig.colorbar(pcm, ax=ax)
-        ax.set_ylabel('Velocity (m/s)')
-        ax.set_xlabel('Time ($\mu$s)')
-        plt.show()
+    currDir = os.getcwd()
+    sp = Spectrogram(
+        '../dig/CH_4_009/seg10',
+        None,
+        None,
+        mode=('psd', 'phase', 'angle'))
+    print(sp)
+    fig, ax = plt.subplots()
+    pcm = ax.pcolormesh(
+        sp.time * 1e6,
+        sp.velocity,
+        sp.angle
+    )
+    fig.colorbar(pcm, ax=ax)
+    ax.set_ylabel('Velocity (m/s)')
+    ax.set_xlabel('Time ($\mu$s)')
+    plt.show()
+    os.chdir(currDir)

@@ -7,16 +7,22 @@
    Purpose: Make a gallery of images of spectrograms.
    Created: 3/1/20
 """
+
+import os
+currDir = os.getcwd()
+os.chdir(os.path.split(os.path.split(__file__)[0])[0]) # Since this file is in one level up from the root and we want act as if we are working from there.
+print(os.getcwd())
+
 from spectrogram import Spectrogram
 from ProcessingAlgorithms.preprocess.digfile import DigFile
 
+os.chdir(currDir)
 
 import matplotlib.pyplot as plt
-import os
 
 def createGallery(digsToLookAt:list=None, colormap="blue-orange-div", fileext="jpeg", transformData = False):
 	if type(digsToLookAt) == type(None):
-		digsToLookAt = DigFile.inventory()['file']
+		digsToLookAt = DigFile.inventory(justSegments = True)['file']
 
 	digDir = DigFile.dig_dir()
 	imageDir, _ = os.path.split(digDir) 
@@ -26,14 +32,14 @@ def createGallery(digsToLookAt:list=None, colormap="blue-orange-div", fileext="j
 	for i in range(len(digsToLookAt)):
 		filename = digsToLookAt[i]
 		print(filename)
-		spec = Spectrogram(os.path.join(digDir,filename), mode = "all")
-		pcms = spec.plot(transformData, cmap = colormap)
+		spec = Spectrogram(os.path.join(digDir,filename))
+		pcms, lastAxes = spec.plot(transformData, cmap = colormap)
 		fileloc, filename = os.path.split(os.path.splitext(os.path.join(imageDir,filename))[0])
 		fileloc = os.path.join(fileloc, filename)
 
 		for key in pcms.keys():
-			if key == "complex":
-				continue # There is not a graph with this name.
+			if "complex" in key:
+				continue # There is not a graph with a name that contains complex.
 			if not os.path.exists(fileloc):
 				os.makedirs(fileloc)
 

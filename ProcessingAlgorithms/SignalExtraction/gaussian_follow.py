@@ -4,7 +4,6 @@
   Author:  LANL Clinic 2019 --<lanl19@cs.hmc.edu>
   Purpose: Attempt to follow a peak.
   Created: 10/18/19
-
 .. module:: gaussian_follow
 """
 
@@ -23,7 +22,6 @@ def _gauss(x, *p):
 
 class GaussianFitter(Follower):
     """
-
     """
 
     def __init__(self, spectrogram, start_point, span=80):
@@ -141,6 +139,4 @@ def gaussian_follow(spectrogram, start):
         width=coef[:, 3],
         background=coef[:, 4]
     )
-
-
 

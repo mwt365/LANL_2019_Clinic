@@ -11,9 +11,9 @@ import cv2 # The general computer vision library for python.
 import numpy as np
 from baselines import baselines_by_squash
 from spectrogram import Spectrogram
-import ImageProcessing.Templates.saveTemplateImages as templateHelper
+import ImageProcessing.TemplateMatching.Templates.saveTemplateImages as templateHelper
 import os
-from ImageProcessing.Templates.templates import Templates
+from ImageProcessing.TemplateMatching.Templates.templates import Templates
 import scipy
 if scipy.__version__ > "1.2.1":
     from imageio import imsave
@@ -50,7 +50,8 @@ class TemplateMatcher():
                                 'cv2.TM_CCORR', 
                                 'cv2.TM_CCORR_NORMED', 
                                 'cv2.TM_SQDIFF', 
-                                'cv2.TM_SQDIFF_NORMED']
+                                'cv2.TM_SQDIFF_NORMED'],
+                        useCorrectionFactor:bool = False
                         ):
 
         assert isinstance(spectrogram, Spectrogram)
@@ -66,8 +67,12 @@ class TemplateMatcher():
         self.k = int(k)
 
         # To get the intensity matrix the way it was when we trained it.
-        # epsilon = 1e-10
-        # self.matrixToMatch = 20 * np.log10(2*self.spectrogram.psd/(self.spectrogram.points_per_spectrum*self.spectrogram.data.dt) + epsilon)
+        if useCorrectionFactor:
+            epsilon = 1e-10
+            self.matrixToMatch = 20 * np.log10(2*self.spectrogram.psd/(self.spectrogram.points_per_spectrum*self.spectrogram.data.dt) + epsilon)
+        else:
+            # This will increase the memory usage but it will make it so that we do not overwrite the data in spectrogram.intensity that might be needed later.
+            self.matrixToMatch = np.copy(self.spectrogram.intensity) 
 
         self.zero_time_index = spectrogram._time_to_index(0)
         self.zero_velo_index = spectrogram._velocity_to_index(0)
@@ -96,11 +101,7 @@ class TemplateMatcher():
             velocity_index = 0
 
         max_time_index = self.spectrogram.intensity.shape[1] - 1
-        ending_time_index = time_index + self.span * 10
-
-        print(time_index)
-        print(ending_time_index)
-        print(self.span)
+        ending_time_index = time_index + self.span * 15
 
         assert (ending_time_index < max_time_index)
         start_time = self.spectrogram.time[time_index]
@@ -264,6 +265,12 @@ class TemplateMatcher():
 
             outputValues = [[] for i in range(len(templatesList))]
             imageSaveDir = templateHelper.getImageDirectory()
+            
+            # If at least one file does not exist just make all of them.
+            for tempInd, temp in enumerate(templatesList):
+                if not os.path.exists(os.path.join(imageSaveDir, f"im_template_{temp}.png")):
+                    templateHelper.saveAllTemplateImages()
+                    break
 
             for tempInd, temp in enumerate(templatesList):
                 template = cv2.imread(os.path.join(imageSaveDir, f"im_template_{temp}.png"), 0)
@@ -332,16 +339,12 @@ class TemplateMatcher():
 
 
 
-    def find_kmedoids(self, xcoords, ycoords, clusters=5, random_state=0):
+    def find_kmedoids(self, xcoords, ycoords, clusters=5, random_state=None):
         assert(len(xcoords) == len(ycoords))
-        X = np.zeros( (len(xcoords), 2) )
-        for i in range(len(xcoords)):
-            X[i] = [xcoords[i], ycoords[i]]
+        X = np.stack((xcoords, ycoords), axis = 1) # Give me an array of with columns xcoords and ycoords.
+
         kmedoids = KMedoids(n_clusters=clusters, random_state=random_state).fit(X)
-        cluster_centers = []
-        for t,v in kmedoids.cluster_centers_:
-            cluster_centers.append((t,v))
-        return cluster_centers
+        return kmedoids.cluster_centers_ # return a np array of shape (clusters, 2). The columns are xcoords and ycoords.
 
 
 
@@ -352,7 +355,7 @@ class TemplateMatcher():
             velo_index = self.spectrogram._velocity_to_index(peak)
             velo_index = velo_index - 20
             for i in range(velo_index, velo_index + 40, 1):
-                self.spectrogram.intensity[i][:] = minimum
+                self.matrixToMatch[i][:] = minimum
 
 
 
@@ -364,9 +367,9 @@ class TemplateMatcher():
                     show_bounds=True):
 
         if show_bounds:
-            dv = spec.velocity[self.velo_scale * self.span]
-            dt = spec.time[self.time_bounds[1]] * 1e6
-            patch = Rectangle((0,0), dt, dv, fill=False, color='b', alpha=0.8)
+            firstVel, dv = spec.velocity[list(self.velo_bounds)]
+            firstTime, dt = spec.time[list(self.time_bounds)] * 1e6
+            patch = Rectangle((firstTime, firstVel), dt, dv, fill=False, color='b', alpha=0.8)
             axes.add_patch(patch)
 
         method_color_dict = {}
@@ -412,7 +415,7 @@ class TemplateMatcher():
     
         # cluster coordinates received from template matching, find cluster centers and plot them
         if show_medoids:
-            centers = self.find_kmedoids(times, velos)
+            centers = self.find_kmedoids(times, velos, clusters = self.num_methods)
             for t,v in centers:
                 center, = axes.plot(t, v, 'ro', markersize=4, alpha=.9)
             center.set_label("cluster center")

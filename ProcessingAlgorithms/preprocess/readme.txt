@@ -1,0 +1,1 @@
+This folder is generally for algorithms that can operate on only the voltage data as opposed to needing both the intensity as a function of velocity and time.
