@@ -367,8 +367,8 @@ class TemplateMatcher():
                     show_bounds=True):
 
         if show_bounds:
-            firstVel, dv = spec.velocity[list(self.velo_bounds)]
-            firstTime, dt = spec.time[list(self.time_bounds)] * 1e6
+            firstVel, dv = self.spectrogram.velocity[list(self.velo_bounds)]
+            firstTime, dt = self.spectrogram.time[list(self.time_bounds)] * 1e6
             patch = Rectangle((firstTime, firstVel), dt, dv, fill=False, color='b', alpha=0.8)
             axes.add_patch(patch)
 
@@ -459,8 +459,7 @@ if __name__ == "__main__":
     print(spec.time[200])
 
     # gives user the option to click, by default it searches from (0,0)
-    template_matcher = TemplateMatcher(spec,None,
-                                            template=Templates.opencv_long_start_pattern5.value,
+    template_matcher = TemplateMatcher(spec,template=Templates.opencv_long_start_pattern5.value,
                                             span=200,
                                             k=20,
                                             methods=['cv2.TM_CCOEFF_NORMED', 'cv2.TM_SQDIFF', 'cv2.TM_SQDIFF_NORMED'])
