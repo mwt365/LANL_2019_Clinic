@@ -25,28 +25,7 @@ class Spectrogram:
     Required arguments to the constructor:
         digfile: either an instance of DigFile or the filename of a .dig file
 
-    **Optional arguments and their default values**
 
-    t_start: (digfile.t0) time of the first point to use in the spectrogram
-    ending:  (None) either the time of the last point or a positive integer
-             representing the number of points to use; if None, the final
-             point in the digfile is used.
-    wavelength: (1550.0e-9) the wavelength in meters
-    points_per_spectrum: (8192) the number of values used to generate
-        each spectrum. Should be a power of 2.
-    overlap: (1/4) the fraction of points_per_spectrum to overlap in
-        successive spectra. An overlap of 0 means that each sample is used
-        in only one spectrum. The default value means that successive
-        spectra share 1/4 of their source samples.
-    window_function: (None) the window function used by signal.spectrogram.
-        The default value implies a ('tukey', 0.25) window.
-    form: ('db') whether to use power values ('power'), decibels ('db'),
-        or log(power) ('log') in reporting spectral intensities.
-    convert_to_voltage: (True) scale the integer values stored in the
-        .dig file to voltage before computing the spectrogram. If False,
-        the raw integral values are used.
-    detrend: ("linear") the background subtraction method.
-    complex_value: (False) do you want to maintain the phase information as well. 
     **Computed fields**
 
     time:      array of times at which the spectra are computed
@@ -55,8 +34,18 @@ class Spectrogram:
     intensity: two-dimensional array of (scaled) intensities, which
                is the spectrogram. The first index corresponds to
                frequency/velocity, the second to time.
-    """
 
+
+   
+
+        /*! \fn const char *Fn_Test::member(char c,int n) 
+    *  \brief A member function.
+    *  \param c a character.
+    *  \param n an integer.
+    *  \exception std::out_of_range parameter is out of range.
+    *  \return a character pointer.
+    */
+ """
     # The following fields may be set with the spectrogram.set call using
     # kwargs
     _fields = ("points_per_spectrum",
@@ -80,11 +69,36 @@ class Spectrogram:
                  **kwargs
                  ):
         """
-        Keyword arguments we handle:
+
+        **Optional arguments and their default values**
+
+        t_start: (digfile.t0) time of the first point to use in the spectrogram
+        ending:  (None) either the time of the last point or a positive integer
+                representing the number of points to use; if None, the final
+                point in the digfile is used.
+        wavelength: (1550.0e-9) the wavelength in meters
+        points_per_spectrum: (8192) the number of values used to generate
+            each spectrum. Should be a power of 2.
+        overlap: (1/4) the fraction of points_per_spectrum to overlap in
+            successive spectra. An overlap of 0 means that each sample is used
+            in only one spectrum. The default value means that successive
+            spectra share 1/4 of their source samples.
+        window_function: (None) the window function used by signal.spectrogram.
+            The default value implies a ('tukey', 0.25) window.
+        form: ('db') whether to use power values ('power'), decibels ('db'),
+            or log(power) ('log') in reporting spectral intensities.
+        convert_to_voltage: (True) scale the integer values stored in the
+            .dig file to voltage before computing the spectrogram. If False,
+            the raw integral values are used.
+        detrend: ("linear") the background subtraction method.
+        complex_value: (False) do you want to maintain the phase information as well. 
+            Keyword arguments we handle:
 
         mode: if 'complex', compute the complex spectrogram, which gets
               stored in self.complex
         scaling: 'spectrum' or 'density'
+
+        
         """
         if isinstance(digfile, str):
             digfile = DigFile(digfile)
@@ -98,10 +112,7 @@ class Spectrogram:
         self.t_end = self.t_start + self.data.dt * (p_end - p_start + 1)
 
         self.wavelength = wavelength
-        """
-        The wavelength of the spectrogram
-        """
-        self.points_per_spectrum = points_per_spectrum
+        self.points_per_spectrum = points_per_spectrum #!< Enum value TVal1.
         self.overlap = overlap
         self.window_function = window_function
         self.form = form
@@ -145,9 +156,8 @@ class Spectrogram:
 
     def _compute(self, ending, **kwargs):
         """
-        Compute a spectrogram. This needs work! There need to be
-        lots more options that we either want to supply with
-        default values or decode kwargs. But it should be a start.
+        Private Function
+        Compute a spectrogram.
         """
         if self.use_voltage:
             vals = self.data.values(self.t_start, ending)
@@ -206,7 +216,10 @@ class Spectrogram:
 
     def transform(self, vals):
         """
+        Input: vals - the raw array \n
+        Output: The array modified to the log form \n
         Perform any modification to values dictated by the value of self.form
+
         """
         epsilon = 1e-10
         if self.form == 'db':
@@ -217,9 +230,8 @@ class Spectrogram:
 
     def histo_levels(self, array: np.ndarray):
         """
-        Input: self
-        array
-        Output: vector
+        Inputs: self \n
+        Output: One dimensional histogram showing a histogram of values \n
         Sort a one-dimensional version of the array and report a vector of
         the values at 0%, 1%, ..., 100%
         """
@@ -316,7 +328,7 @@ class Spectrogram:
 
     def _location(self, location, create=False):
         """
-
+        Private function, finds specotrogram on disk
         """
         if location == "":
             location = os.path.splitext(self.data.path)[0] + \
@@ -376,6 +388,7 @@ class Spectrogram:
 
     @property
     def v_max(self):
+        """The maximum velocity value"""
         return self.wavelength * 0.25 / self.data.dt
 
     def power(self, values):
@@ -392,8 +405,7 @@ class Spectrogram:
 
     def signal_to_noise(self):
         """
-        Give an approximate signal to noise ratio for each time slice.
-        Max/Mean
+        Output: a vector of the approimate signal to noise ratio for each time slice.
         """
         timeVelInten = np.transpose(self.intensity)
         answer = np.zeros(len(self.time))
@@ -403,6 +415,12 @@ class Spectrogram:
         return answer
 
     def plot(self, axes=None, **kwargs):
+        """
+        Inputs: \n
+        max_vel = maximum velocity to be plottted \n
+        min_vel = minimum velocity to be plotted \n
+        Outputs: a color mesh plot of the spectrogram.
+        """
         # max_vel=6000, vmin=-200, vmax=100):
         if axes == None:
             axes = plt.gca()
@@ -434,7 +452,9 @@ class Spectrogram:
         return pcm
 
     def squash(self, along = 'time', dB = False):
-        """Sum along either rows or columns (as power) and return an
+        """
+        Input: along = time or velocity (axis to squash along) \n
+        Output: Sum along either rows or columns (as power) and return an
         array normalized to unit height.
         """
         vals = np.sum(self.power(self.intensity),
