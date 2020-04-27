@@ -1,6 +1,6 @@
-# LANL_2019_Clinic
+# LANL 2019-2020 Clinic
 
-This project is the product of the Los Alamos National Lab 2020 Harvey Mudd Clinic Team
+This project is the product of the Los Alamos National Lab 2019-2020 Harvey Mudd Clinic Team
 
 ## Purpose
 
