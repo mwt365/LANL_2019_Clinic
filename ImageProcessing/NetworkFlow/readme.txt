@@ -1,0 +1,1 @@
+Network Flow Image Segmentation works but is not effective currently as the algorithm is non-deterministic and when we use a deterministic algorithm it runs too slow.
