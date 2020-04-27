@@ -10,3 +10,8 @@ jupyter
 pandas
 pep8
 lxml
+opencv-python
+scikit-learn
+scikit-learn-extra
+tqdm
+imageio
