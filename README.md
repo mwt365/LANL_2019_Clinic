@@ -77,8 +77,8 @@ From `pipeline.py` batches of files can be processed at the same time, and the t
 1) Create a subdirectory with only the `.dig` files to be extracted.
 2) Create a JSON file with the names and start points of the files.
 3) Execute 
-```python
-python pipeline.py --json_name=NAME_OF_JSON_FILE_
+```bash
+python pipeline.py --json_name=NAME_OF_JSON_FILE
 ```
 
 The output of this program will be stored in a direcotry. More information can be found in the documentation
