@@ -1,4 +1,4 @@
-# LANL_2019_Clinic
+# Los Alamos National Laboratory 2019-2020 Clinic Project
 
 
 ## Purpose
@@ -35,7 +35,6 @@ PDV_project
 │   │   baselines.py
 │   │   pnspipe.py
 │   │   spectrogram_widget.py
-│   │   template_matcher.py
 │   │   ...
 │   │
 │   └───ProcessingAlgorithms
@@ -47,6 +46,12 @@ PDV_project
 │   │
 │   └───ImageProcessing
 │       │   ...
+│       │
+│       │
+│       └───TemplateMatching
+│       │   │  template_matcher.py
+│       │   │  ...
+│       │
 │       │
 │       └───Templates
 │           │  im_template.png
@@ -117,6 +122,7 @@ $ python3 template_matcher.py
 
 ```
 from ProcessingAlgorithms.preprocess.digfile import DigFile
+from ImageProcessing.TemplateMatching.template_matcher import TemplateMatcher
 from spectrogram import Spectrogram
 
 df = DigFile('GEN3CH_4_009/seg00')
