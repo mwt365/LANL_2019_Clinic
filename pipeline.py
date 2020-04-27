@@ -1,4 +1,15 @@
-#Gallerymaker.py
+##
+# @package pipeline 
+# Module tool to generate spectrograms for entire directory
+# @param -json_name *required* Name of JSON file where starts and file info is stored
+# @param \--file-Name *optional* the name of the specific file to be processsed \n default = False, will
+# recurse through directory
+# @param \--peak_follower *optional* Boolean whether or not peak following is to be used  \n default = True
+# @param \--manual_start *optional* Boolean whether manual starts are given \n default = True
+# @param \--velocity_cutoff *optional* max velocity of the spectrogram, above this threshold is cut \n
+# default = 10,000
+# @param \--colormap *optional* Name of colormap to be used \n default = viridis
+#
 
 from spectrogram import Spectrogram
 
@@ -11,6 +22,8 @@ from jsonDriver import JsonReadDriver
 from jsonDriver import JsonWriteDriver
 import datetime
 import cv2
+
+###cond PIPELINE
 
 # process command line args
 import argparse
@@ -99,4 +112,5 @@ for filename in os.listdir(directory):
         continue
 
 jsonwriting.flush()
-print("done")
+print("done")  
+##@endcond
