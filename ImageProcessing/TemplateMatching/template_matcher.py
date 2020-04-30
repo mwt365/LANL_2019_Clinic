@@ -231,6 +231,7 @@ class TemplateMatcher():
 
                 real_velo_index = abs(self.flipped_velo_bounds[0] + bottom_right[1]) + velo_offset_index
 
+                # there might be a bug here. Causing issues with jupyter notebook timing index offsets.
                 time_match = self.spectrogram.time[top_left[0]] * 1e6
                 template_offset_time = self.spectrogram.time[time_offset_index] * 1e6
                 start_time = self.spectrogram.time[self.zero_time_index] * 1e6 * -1
@@ -426,6 +427,8 @@ class TemplateMatcher():
         axes.legend(handles=handles, loc='upper right')
 
         # display plot
+        # print(plt.rcParams)
+
         plt.show()
 
 
@@ -456,7 +459,7 @@ if __name__ == "__main__":
     spec = Spectrogram(df, 0.0, 60.0e-6, overlap_shift_factor= 1/8, form='db')
     spec.availableData = ['intensity']
 
-    print(spec.time[200])
+    # print(spec.time[200])
 
     # gives user the option to click, by default it searches from (0,0)
     template_matcher = TemplateMatcher(spec,template=Templates.opencv_long_start_pattern5.value,
