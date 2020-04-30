@@ -34,7 +34,7 @@ class TemplateMatcher():
     - start_point: (t, v), the coordinates at which to begin the search
     - template: a two-dimensional array that is read into to OpenCV as 
         a template image for matching.
-    - span: (60) a 'radius' of pixels surrounding the starting point to 
+    - span: (80) a 'radius' of pixels surrounding the starting point to 
         increase the searching space for the starting point.
 
     """
@@ -101,7 +101,7 @@ class TemplateMatcher():
             velocity_index = 0
 
         max_time_index = self.spectrogram.intensity.shape[1] - 1
-        ending_time_index = time_index + self.span * 15
+        ending_time_index = time_index + self.span * 10
 
         assert (ending_time_index < max_time_index)
         start_time = self.spectrogram.time[time_index]
