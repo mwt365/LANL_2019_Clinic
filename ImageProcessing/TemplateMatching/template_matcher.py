@@ -34,14 +34,14 @@ class TemplateMatcher():
     - start_point: (t, v), the coordinates at which to begin the search
     - template: a two-dimensional array that is read into to OpenCV as 
         a template image for matching.
-    - span: (60) a 'radius' of pixels surrounding the starting point to 
+    - span: (80) a 'radius' of pixels surrounding the starting point to 
         increase the searching space for the starting point.
 
     """
 
     def __init__(self, spectrogram, 
-                       start_point, 
                        template, 
+                       start_point=None, 
                        span=80, 
                        velo_scale=10, 
                        k=10,
@@ -101,7 +101,7 @@ class TemplateMatcher():
             velocity_index = 0
 
         max_time_index = self.spectrogram.intensity.shape[1] - 1
-        ending_time_index = time_index + self.span * 15
+        ending_time_index = time_index + self.span * 10
 
         assert (ending_time_index < max_time_index)
         start_time = self.spectrogram.time[time_index]
@@ -151,7 +151,7 @@ class TemplateMatcher():
 
         cleaned_matrix = np.where(cleaned_matrix > threshold_percentile, cleaned_matrix+threshold_percentile, threshold_percentile)
 
-        imsave("./flipped_original.png", cleaned_matrix[:])
+        # imsave("./flipped_original.png", cleaned_matrix[:])
 
         
 
@@ -230,6 +230,7 @@ class TemplateMatcher():
 
                 real_velo_index = abs(self.flipped_velo_bounds[0] + bottom_right[1]) + velo_offset_index
 
+                # there might be a bug here. Causing issues with jupyter notebook timing index offsets.
                 time_match = self.spectrogram.time[top_left[0]] * 1e6
                 template_offset_time = self.spectrogram.time[time_offset_index] * 1e6
                 start_time = self.spectrogram.time[self.zero_time_index] * 1e6 * -1
@@ -366,8 +367,8 @@ class TemplateMatcher():
                     show_bounds=True):
 
         if show_bounds:
-            firstVel, dv = spec.velocity[list(self.velo_bounds)]
-            firstTime, dt = spec.time[list(self.time_bounds)] * 1e6
+            firstVel, dv = self.spectrogram.velocity[list(self.velo_bounds)]
+            firstTime, dt = self.spectrogram.time[list(self.time_bounds)] * 1e6
             patch = Rectangle((firstTime, firstVel), dt, dv, fill=False, color='b', alpha=0.8)
             axes.add_patch(patch)
 
@@ -425,6 +426,8 @@ class TemplateMatcher():
         axes.legend(handles=handles, loc='upper right')
 
         # display plot
+        # print(plt.rcParams)
+
         plt.show()
 
 
@@ -452,11 +455,13 @@ if __name__ == "__main__":
 
     path = "../dig/BLUE_CH1_SHOT/seg00.dig"
     df = DigFile(path)
-    spec = Spectrogram(df, 0.0, 60.0e-6, overlap_shift_factor= 7/8, form='db')
+    spec = Spectrogram(df, 0.0, 60.0e-6, overlap_shift_factor= 1/8, form='db')
+    spec.availableData = ['intensity']
+
+    # print(spec.time[200])
 
     # gives user the option to click, by default it searches from (0,0)
-    template_matcher = TemplateMatcher(spec, None,
-                                            template=Templates.opencv_long_start_pattern5.value,
+    template_matcher = TemplateMatcher(spec,template=Templates.opencv_long_start_pattern5.value,
                                             span=200,
                                             k=20,
                                             methods=['cv2.TM_CCOEFF_NORMED', 'cv2.TM_SQDIFF', 'cv2.TM_SQDIFF_NORMED'])
