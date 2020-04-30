@@ -165,8 +165,7 @@ class TemplateMatcher():
 
     def match(self):
 
-        matrix = self.spectrogram.intensity
-        cropped_spectrogram = self.crop_intensities(matrix)
+        cropped_spectrogram = self.crop_intensities(self.matrixToMatch)
 
         imsave("./im_template.png", self.template[:])
         imsave("./im_cropped_bg.png", cropped_spectrogram[:])
