@@ -615,6 +615,7 @@ class Spectrogram:
             
             key = f"{data}" + (f" transformed to {self.form}" if transformData else " raw")
             fig = plt.figure(num=key)
+            fig.set_size_inches(10, 5)
             axes = plt.gca()
 
             pcm = None # To define the scope.
@@ -646,12 +647,14 @@ class Spectrogram:
             axes.xaxis.set_tick_params(labelsize=12)
             axes.yaxis.set_tick_params(labelsize=12)        
             title = self.data.filename.split('/')[-1]
-            axes.set_title(title.replace("_", "-") + f" {data} spectrogram", fontsize = 24)
+            axes.set_title(title.replace("_", "-") + f" {data} spectrogram", fontsize = 18)
 
             axes.set_xlim(left, right)
             axes.set_ylim(bot, top) # The None value is the default value and does not update the axes limits.            
 
             pcms[key] = pcm
+
+
         
         return pcms, axes
 
