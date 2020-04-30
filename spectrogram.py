@@ -147,11 +147,13 @@ class Spectrogram:
 
         scaling = kwargs.get('scaling', 'spectrum')
 
-        modes = ["complex", "phase", "psd"]
+        # modes = ["complex", "phase", "psd"]
+        modes = ["psd"]
 
         self.availableData = modes
-        self.complex = []
-        self.phase = []
+        if "complex" in modes:
+            self.complex = []
+            self.phase = []
 
         for mode in modes:
             # ["complex", "magnitude", "angle", "phase", "psd"]
@@ -176,22 +178,25 @@ class Spectrogram:
             setattr(self, mode, spec)
 
         times += self.t_start
+        if hasattr(self, "complex"):
+            self.magnitude = np.abs(self.complex)
+            self.angle = np.angle(self.complex)
+            self.real = np.real(self.complex)
+            self.imaginary = np.imag(self.complex)
 
-        self.magnitude = np.abs(getattr(self, "complex"))
-        self.angle = np.angle(getattr(self, "complex"))
-        self.real = np.real(getattr(self, "complex"))
-        self.imaginary = np.imag(getattr(self, "complex"))
+            self.availableData.extend(
+                ["magnitude", "angle", "real", "imaginary"])
+            self.availableData.remove("complex")
 
-        self.availableData.extend(
-            ["magnitude", "angle", "real", "imaginary"])
-        self.availableData.remove("complex")
+            self.availableData.append("intensity")
+            self.availableData.remove("psd")
+            self.intensity = self.transform(self.psd)
+        else:
+            # assuming just psd
+            self.intensity = self.transform(self.psd)
 
-        self.availableData.append("intensity")
-        self.availableData.remove("psd")
-        self.intensity = self.transform(getattr(self, "psd"))
-
-        # Convert to a logarithmic representation and use floor to attempt
-        # to suppress some noise.
+            # Convert to a logarithmic representation and use floor to attempt
+            # to suppress some noise.
         self.histogram_levels = self.histo_levels(self.intensity)
 
         # the first index is frequency, the second time
@@ -373,11 +378,16 @@ class Spectrogram:
         dub.n_bins = n_bins
         return dub
 
-    def noise_level(self, percentile=0.75):
+    def noise_level(self, percentile: float = 90.0):
         """
         Estimate the noise level by sorting all intensities and
         returning the level of the point at the given percentile.
         """
+        if percentile <= 90.0:
+            return self.histogram_levels['tens'][int(percentile / 10)]
+        if percentile <= 99.0:
+            return self.histogram_levels['ones'][int((percentile - 90) * 10)]
+        return self.histogram_levels['tenths'][int((percentile - 99) * 100)]
         all_intensity = np.sort(self.intensity.flatten())
         index = int(percentile * len(all_intensity))
         return all_intensity[index]

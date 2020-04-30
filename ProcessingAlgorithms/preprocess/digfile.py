@@ -7,7 +7,6 @@
   Created: 9/18/19
 """
 import os
-import sys
 import re
 import numpy as np
 import pandas as pd
@@ -106,6 +105,14 @@ class DigFile:
     def basename(self):
         "Return the name of this file, without extension"
         return os.path.splitext(os.path.split(self.path)[1])[0]
+
+    @property
+    def source(self):
+        "If this file is a segment, return the name of the source file"
+        if not self.is_segment:
+            return ""
+        parent = os.path.split(os.path.split(self.path)[0])[1]
+        return parent
 
     @property
     def title(self):
@@ -444,6 +451,18 @@ class DigFile:
     @property
     def is_segment(self):
         return self.header_text.startswith('Segment')
+
+    @property
+    def has_segments(self):
+        if self.is_segment:
+            return 0
+        # Segments are stored in a folder with the same base
+        # name as our name
+        folder = os.path.splitext(self.path)[0]
+        if not os.path.exists(folder):
+            return 0
+        segs = [x for x in os.listdir(folder) if x.endswith('.dig')]
+        return len(segs)
 
 
 if __name__ == '__main__':

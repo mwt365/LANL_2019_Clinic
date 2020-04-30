@@ -139,7 +139,7 @@ class SpectrogramWidget:
                 self.digfile, None, None, **kwargs)
             self.spectrogram_fresh = True  # flag for the first pass
 
-            self.spectrogram.overlap = .125
+            self.spectrogram.overlap = 0.875
 
         self.fig, axes = plt.subplots(
             nrows=1, ncols=2, sharey=True,
@@ -564,14 +564,14 @@ class SpectrogramWidget:
             return 0
         # Look up what we should do with the click
         action = self.controls['clicker'].value
-        print(f"The action I am attempting to do is {action}")
+        # print(f"The action I am attempting to do is {action}")
         try:
             if 'Spectrum' in action:
                 self.spectrum(t, action)
             elif 'Template_Matching' in action:
                 self.match_templates(t, v)
             else:
-                print("I am handling a click that should be a peak follower")
+                # print("I am handling a click that should be a peak follower")
                 self.follow(t, v, action)
 
         except Exception as eeps:

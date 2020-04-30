@@ -87,7 +87,7 @@ class Fiducials:
             # Look for the next one
             self.find_fiducial(self.t_fiducial + self.window * 0.9,
                                0.2 * self.window)
-            if self.width_test and self.snr_test:
+            if self.width_test and self.snr_test and len(self.marks) == 2:
                 self.propagate()
 
     @property
@@ -130,47 +130,51 @@ class Fiducials:
         """
         self.smooth(t_from, dt)
         diff = self.diff
-        low, hi = np.argmin(diff), np.argmax(diff)
-        # a first sanity test is whether these are
-        # suitably spaced
-        t_ratio = (abs(hi - low) * self.t_step) / self.width
-        # if the t_ratio is near 1, we pass
-        self.width_test = t_ratio > 0.5 and t_ratio < 2
+        try:
+            low, hi = np.argmin(diff), np.argmax(diff)
+            # a first sanity test is whether these are
+            # suitably spaced
+            t_ratio = (abs(hi - low) * self.t_step) / self.width
+            # if the t_ratio is near 1, we pass
+            self.width_test = t_ratio > 0.5 and t_ratio < 2
 
-        # Let's try to quantify the signal-to-noise ratio
-        if low > 100:
-            sigma = np.std(diff[low - 100:low - 10])
-        else:
-            sigma = np.std(diff[low + 10:low + 100])
+            # Let's try to quantify the signal-to-noise ratio
+            if low > 100:
+                sigma = np.std(diff[low - 100:low - 10])
+            else:
+                sigma = np.std(diff[low + 10:low + 100])
 
-        if not self.width_test:
-            # See if among the top 3 peaks and the top 3 troughs
-            # there isn't a pair that has the suitable time separation
-
-            ordering = np.argsort(self.diff)
-            troughs, peaks = ordering[:15], ordering[-15:]
-            for trough in troughs:
-                if diff[trough + 8] > sigma:
-                    low = trough
-                    hi = low + np.argmax(diff[low:low + 15])
-                    self.width_test = True
-                    break
             if not self.width_test:
-                for peak in peaks:
-                    if diff[peak - 8] < -sigma:
-                        low = peak - 15 + np.argmin(diff[peak - 15:peak])
-                        hi = peak
-                        self.width_test = True
+                # See if among the top 3 peaks and the top 3 troughs
+                # there isn't a pair that has the suitable time separation
 
-        min_voltage, max_voltage = diff[low], diff[hi]
-        snr = (max_voltage - min_voltage) / (2 * sigma)
-        self.snr_test = snr > 2
-        self.t_fiducial = (0.5 + min(low, hi)) * self.t_step + self.t_start
-        self.dt_fiducial = abs(hi - low) * self.t_step
-        self.dv_fiducial = -min_voltage
-        if self.width_test:
-            # Is it now possible to refine the fiducial time?
-            self.refine()
+                ordering = np.argsort(self.diff)
+                troughs, peaks = ordering[:15], ordering[-15:]
+                for trough in troughs:
+                    if diff[trough + 8] > sigma:
+                        low = trough
+                        hi = low + np.argmax(diff[low:low + 15])
+                        self.width_test = True
+                        break
+                if not self.width_test:
+                    for peak in peaks:
+                        if diff[peak - 8] < -sigma:
+                            low = peak - 15 + np.argmin(diff[peak - 15:peak])
+                            hi = peak
+                            self.width_test = True
+
+            min_voltage, max_voltage = diff[low], diff[hi]
+            snr = (max_voltage - min_voltage) / (2 * sigma)
+            self.snr_test = snr > 2
+            self.t_fiducial = (0.5 + min(low, hi)) * \
+                self.t_step + self.t_start
+            self.dt_fiducial = abs(hi - low) * self.t_step
+            self.dv_fiducial = -min_voltage
+            if self.width_test:
+                # Is it now possible to refine the fiducial time?
+                self.refine()
+        except:
+            pass
 
     def plot(self):
         """
@@ -221,32 +225,35 @@ class Fiducials:
             width = self.width
 
         params = (self.t_fiducial, vals[0], vals[-1], dt_start)
-        coeffs, covar = curve_fit(edge, tvals, vals, p0=params)
-        errs = np.sqrt(np.diag(covar))
-        if np.nan not in covar and np.inf not in covar:
-            # Update the values for t_fiducial and dv_fiducial
-            self.t_fiducial = dic['t_start'] = coeffs[0]
-            dic['dt_start'] = coeffs[3]
-            depth = abs(coeffs[1] - coeffs[2])
-            depth_err = np.sqrt(errs[1]**2 + errs[2]**2)
-            if depth_err > depth:
-                return 0
-            # Now look to find the upswing
-            t = coeffs[0] + width
-            vals = self.digfile.values(t - dt, t + dt)
-            tvals = self.digfile.time_values(t - dt, t + dt)
-            params = (t, coeffs[2], coeffs[1], dt_end)
+        try:
             coeffs, covar = curve_fit(edge, tvals, vals, p0=params)
             errs = np.sqrt(np.diag(covar))
-            depth_err = np.sqrt(errs[1]**2 + errs[2]**2)
-            depth2 = abs(coeffs[2] - coeffs[1])
-            if np.nan not in covar and np.inf not in covar \
-               and depth2 > depth_err:
-                dic['t_end'] = coeffs[0]
-                dic['dt_end'] = coeffs[3]
-                dic['depth'] = 0.5 * (depth + depth2)
-                dic['width'] = dic['t_end'] - dic['t_start']
-                self.marks = self.marks.append(dic, ignore_index=True)
+            if np.nan not in covar and np.inf not in covar:
+                # Update the values for t_fiducial and dv_fiducial
+                self.t_fiducial = dic['t_start'] = coeffs[0]
+                dic['dt_start'] = coeffs[3]
+                depth = abs(coeffs[1] - coeffs[2])
+                depth_err = np.sqrt(errs[1]**2 + errs[2]**2)
+                if depth_err > depth:
+                    return 0
+                # Now look to find the upswing
+                t = coeffs[0] + width
+                vals = self.digfile.values(t - dt, t + dt)
+                tvals = self.digfile.time_values(t - dt, t + dt)
+                params = (t, coeffs[2], coeffs[1], dt_end)
+                coeffs, covar = curve_fit(edge, tvals, vals, p0=params)
+                errs = np.sqrt(np.diag(covar))
+                depth_err = np.sqrt(errs[1]**2 + errs[2]**2)
+                depth2 = abs(coeffs[2] - coeffs[1])
+                if np.nan not in covar and np.inf not in covar \
+                   and depth2 > depth_err:
+                    dic['t_end'] = coeffs[0]
+                    dic['dt_end'] = coeffs[3]
+                    dic['depth'] = 0.5 * (depth + depth2)
+                    dic['width'] = dic['t_end'] - dic['t_start']
+                    self.marks = self.marks.append(dic, ignore_index=True)
+        except Exception as eeps:
+            print(f"Exception {eeps} refining fiducial for {self.digfile.title}")
 
     def propagate(self):
         """
