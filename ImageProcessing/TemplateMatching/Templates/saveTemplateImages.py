@@ -11,6 +11,8 @@ else:
     from scipy.misc import imsave
 
 def saveAllTemplateImages():
+	currDir = os.getcwd()
+	os.chdir(imageSaveDir)
 
     for ind, x in tqdm.tqdm(enumerate(Templates)):
     	if not os.path.exists(f"./im_template_{x}.png"):
@@ -18,14 +20,12 @@ def saveAllTemplateImages():
 
     # Template images saved to the template directory.
 
+    os.chdir(currDir)
+
 def getImageDirectory():
     return os.path.split(os.path.relpath(__file__))[0]
 
 
 if __name__ == "__main__":
 	# Save all the image files in the appropriate directory.
-	imageSaveDir = getImageDirectory()
-	currDir = os.getcwd()
-	os.chdir(imageSaveDir)
 	saveAllTemplateImages()
-	os.chdir(currDir)
