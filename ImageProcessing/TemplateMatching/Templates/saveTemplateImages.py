@@ -22,6 +22,8 @@ def saveAllTemplateImages():
 
     os.chdir(currDir)
 
+    return imageSaveDir
+    
 def getImageDirectory():
     return os.path.split(os.path.relpath(__file__))[0]
 
