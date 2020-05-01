@@ -190,7 +190,7 @@ class Spectrogram:
             self.angle = np.angle(getattr(self, "complex"))
             self.availableData.extend(["magnitude", "angle"])
 
-        if not (kwargs.get("mode", "none") in ['complex', 'phase', 'angle']:
+        if not (kwargs.get("mode", "none") in ['complex', 'phase', 'angle']):
             self.availableData.append("intensity")
             self.availableData.remove("psd")
             self.intensity = self.transform(getattr(self, "psd"))
@@ -211,7 +211,7 @@ class Spectrogram:
         
         self.estimatedStartTime_ = None
         # self.estimateStartTime()
-        
+
 
     def transform(self, vals):
         """
