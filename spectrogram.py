@@ -141,9 +141,14 @@ class Spectrogram:
         # 'angle', and 'phase'
 
         scaling = kwargs.get('scaling', 'spectrum')
+        modes = kwargs.get("mode", "none")
 
-
-        modes = ["complex", "phase", "psd"]
+        if modes == "none" or (not (modes in ['phase', 'magnitude', 'angle', 'complex', 'psd', "all"])):
+            modes = ["psd"]
+        elif modes == "all":
+            modes = ['phase', 'complex', 'psd']
+        else:
+            modes = [modes]
                 
         self.availableData = modes
         self.complex = []
@@ -174,17 +179,21 @@ class Spectrogram:
 
         times += self.t_start
 
-        self.magnitude = np.abs(getattr(self, "complex"))
-        self.angle = np.angle(getattr(self, "complex"))
-        self.real = np.real(getattr(self, "complex"))
-        self.imaginary = np.imag(getattr(self, "complex"))
+        if kwargs.get("mode", "none") in ["all", 'complex']:
+            self.real = np.real(getattr(self, "complex"))
+            self.imaginary = np.imag(getattr(self, "complex"))
+            self.availableData.extend(["real", "imaginary"])
+            self.availableData.remove("complex")
 
-        self.availableData.extend(["magnitude", "angle", "real", "imaginary"])
-        self.availableData.remove("complex")
+        if kwargs.get("mode", "none") == "all":
+            self.magnitude = np.abs(getattr(self, "complex"))
+            self.angle = np.angle(getattr(self, "complex"))
+            self.availableData.extend(["magnitude", "angle"])
 
-        self.availableData.append("intensity")
-        self.availableData.remove("psd")
-        self.intensity = self.transform(getattr(self, "psd"))
+        if not (kwargs.get("mode", "none") in ['complex', 'phase', 'angle']):
+            self.availableData.append("intensity")
+            self.availableData.remove("psd")
+            self.intensity = self.transform(getattr(self, "psd"))
 
         # Convert to a logarithmic representation and use floor to attempt
         # to suppress some noise.
@@ -197,11 +206,12 @@ class Spectrogram:
         # scale the frequency axis to velocity
         self.velocity = freqs * 0.5 * self.wavelength  # velocities
 
-        # Now compute the probe destruction time.
+        # Now compute the probe destruction time estimate.
         self.probeDestructionTime()
         
         self.estimatedStartTime_ = None
         # self.estimateStartTime()
+
 
     def transform(self, vals):
         """
@@ -573,12 +583,15 @@ class Spectrogram:
         pcms = {}
         if "psd" in self.availableData:
             self.availableData.append("intensity")
+            self.availableData.remove("psd")
         if "complex" in self.availableData:
             self.availableData.append("real")
             self.availableData.append("imaginary")
+            self.availableData.remove("complex")
 
 
-        endTime = self._time_to_index((self.probe_destruction_time + self.probe_destruction_time_max)/2)
+        # endTime = self._time_to_index((self.probe_destruction_time + self.probe_destruction_time_max)/2)
+        endTime = self._time_to_index(50e-6)
         # Our prediction for the probe destruction time. Just to make it easier to plot. 
 
         cmapUsed = COLORMAPS[DEFMAP]
@@ -660,21 +673,22 @@ class Spectrogram:
 
 
 if __name__ == '__main__':
-    currDir = os.getcwd()
-    sp = Spectrogram(
-        '../dig/CH_4_009/seg10',
-        None,
-        None,
-        mode=('psd', 'phase', 'angle'))
-    print(sp)
-    fig, ax = plt.subplots()
-    pcm = ax.pcolormesh(
-        sp.time * 1e6,
-        sp.velocity,
-        sp.angle
-    )
-    fig.colorbar(pcm, ax=ax)
-    ax.set_ylabel('Velocity (m/s)')
-    ax.set_xlabel('Time ($\mu$s)')
-    plt.show()
-    os.chdir(currDir)
+    pass
+    # currDir = os.getcwd()
+    # sp = Spectrogram(
+    #     '../dig/CH_4_009/seg10',
+    #     None,
+    #     None,
+    #     mode=('psd', 'phase', 'angle'))
+    # print(sp)
+    # fig, ax = plt.subplots()
+    # pcm = ax.pcolormesh(
+    #     sp.time * 1e6,
+    #     sp.velocity,
+    #     sp.angle
+    # )
+    # fig.colorbar(pcm, ax=ax)
+    # ax.set_ylabel('Velocity (m/s)')
+    # ax.set_xlabel('Time ($\mu$s)')
+    # plt.show()
+    # os.chdir(currDir)
