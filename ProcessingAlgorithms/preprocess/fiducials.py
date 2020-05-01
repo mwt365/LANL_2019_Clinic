@@ -164,7 +164,10 @@ class Fiducials:
                             self.width_test = True
 
             min_voltage, max_voltage = diff[low], diff[hi]
-            snr = (max_voltage - min_voltage) / (2 * sigma)
+            if sigma > 0:
+                snr = (max_voltage - min_voltage) / (2 * sigma)
+            else:
+                snr = 0
             self.snr_test = snr > 2
             self.t_fiducial = (0.5 + min(low, hi)) * \
                 self.t_step + self.t_start
@@ -176,6 +179,52 @@ class Fiducials:
         except:
             pass
 
+    def show(self, n: int, ax=None):
+        """
+        Prepare a plot showing the data surrounding the fiducial
+        and the fitted curve of the fiducial.
+        """
+        import matplotlib.pyplot as plt
+        df = self.digfile
+        vals = self.values.iloc[n]
+        us = 1e6
+        t_start = vals['t_start'] - vals['width']
+        t_end = vals['t_end'] + vals['width']
+        voltages = df.values(t_start, t_end)
+        t_values = df.time_values(t_start, t_end)
+        times = t_values[t_values < vals['t_start']]
+        baseline = voltages[:len(times)].mean()
+        if not ax:
+            fig, ax = plt.subplots()
+        ax.plot(t_values * us, voltages, 'r.', alpha=0.5)
+        # Now compute the fitted
+        depth2 = vals['depth'] / 2
+        arg1 = (t_values - vals['t_start']) / vals['dt_start']
+        arg2 = (t_values - vals['t_end']) / vals['dt_end']
+        fitted = baseline + depth2 * (- np.tanh(arg1) + np.tanh(arg2))
+        ax.plot(t_values * us, fitted, 'k-', alpha=0.75, linewidth=5)
+        ax.set_xlabel('$t (\\mu \\rm s)$')
+        ax.set_ylabel('Voltage')
+
+    def show_all(self, nrows=0, ncols=0, figsize=(16, 16)):
+        """
+        Prepare a page of plots
+        """
+        import matplotlib.pyplot as plt
+
+        nplots = len(self.marks)
+        if nrows == 0 and ncols == 0:
+            ncols = int(np.sqrt(nplots))
+        if nrows == 0 and ncols > 0:
+            nrows = int(np.ceil(nplots / ncols))
+        else:
+            ncols = int(np.ceil(nplots / nrows))
+
+        fig, axes = plt.subplots(nrows, ncols, figsize=figsize)
+        flat = [item for sublist in axes for item in sublist]
+        for n in range(nplots):
+            self.show(n, flat[n])
+
     def plot(self):
         """
         For debugging purposes, plot the data we're using
@@ -183,8 +232,7 @@ class Fiducials:
         """
         import matplotlib.pyplot as plt
         tvals = self.t_start + np.arange(len(self.diff)) * self.t_step
-        fig = plt.figure(1)
-        ax = fig.add_subplot(1, 1, 1)
+        fig, ax = plt.subplots()
         ax.clear()
         ax.plot(tvals * 1e6, self.diff, 'b-', alpha=0.5)
         # add points for the guessed fiducial
@@ -253,7 +301,8 @@ class Fiducials:
                     dic['width'] = dic['t_end'] - dic['t_start']
                     self.marks = self.marks.append(dic, ignore_index=True)
         except Exception as eeps:
-            print(f"Exception {eeps} refining fiducial for {self.digfile.title}")
+            print(
+                f"Exception {eeps} refining fiducial for {self.digfile.title}")
 
     def propagate(self):
         """
