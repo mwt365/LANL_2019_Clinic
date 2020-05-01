@@ -143,8 +143,10 @@ class Spectrogram:
         scaling = kwargs.get('scaling', 'spectrum')
         modes = kwargs.get("mode", "none")
 
-        if modes == "none" or (not (modes in ['phase', 'magnitude', 'angle', 'complex', 'psd'])):
+        if modes == "none" or (not (modes in ['phase', 'magnitude', 'angle', 'complex', 'psd', "all"])):
             modes = ["psd"]
+        elif modes == "all":
+            modes = ['phase', 'magnitude', 'angle', 'complex', 'psd']
         else:
             modes = [modes]
         # modes = ["complex", "phase", "psd"]
@@ -577,9 +579,11 @@ class Spectrogram:
         pcms = {}
         if "psd" in self.availableData:
             self.availableData.append("intensity")
+            self.availableData.remove("psd")
         if "complex" in self.availableData:
             self.availableData.append("real")
             self.availableData.append("imaginary")
+            self.availableData.remove("complex")
 
 
         # endTime = self._time_to_index((self.probe_destruction_time + self.probe_destruction_time_max)/2)
