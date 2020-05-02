@@ -568,7 +568,7 @@ class Spectrogram:
         
         return fig
 
-    def plot(self, transformData = False, **kwargs):
+    def plot(self, transformData = False, includeAllTime = False, **kwargs):
         # max_vel=6000, vmin=-200, vmax=100):
         pcms = {}
         if "psd" in self.availableData:
@@ -620,20 +620,33 @@ class Spectrogram:
 
             pcm = None # To define the scope.
             if 'cmap' not in kwargs:
-                pcm = axes.pcolormesh(
-                    self.time[:endTime] * 1e6,
-                    self.velocity,
-                    self.transform(zData[:,:endTime]) if (data != "intensity" and transformData) else zData[:,:endTime],
-                    cmap = cmapUsed,
-                    **kwargs)
+                if not includeAllTime:
+                    pcm = axes.pcolormesh(
+                        self.time[:endTime] * 1e6,
+                        self.velocity,
+                        self.transform(zData[:,:endTime]) if (data != "intensity" and transformData) else zData[:,:endTime],
+                        cmap = cmapUsed,
+                        **kwargs)
+                else:
+                    pcm = axes.pcolormesh(
+                        self.time * 1e6,
+                        self.velocity,
+                        self.transform(zData) if (data != "intensity" and transformData) else zData,
+                        cmap = cmapUsed,
+                        **kwargs)
             else:
-                pcm = axes.pcolormesh(
-                    self.time[:endTime] * 1e6,
-                    self.velocity,
-                    self.transform(zData[:,:endTime]) if (data != "intensity" and transformData) else zData[:,:endTime],
-                    **kwargs)
-
-            dataToLookAt = self.transform(zData[:,:endTime]) if (data != "intensity" and transformData) else zData[:,:endTime]
+                if not includeAllTime:
+                    pcm = axes.pcolormesh(
+                        self.time[:endTime] * 1e6,
+                        self.velocity,
+                        self.transform(zData[:,:endTime]) if (data != "intensity" and transformData) else zData[:,:endTime],
+                        **kwargs)
+                else:
+                    pcm = axes.pcolormesh(
+                        self.time * 1e6,
+                        self.velocity,
+                        self.transform(zData) if (data != "intensity" and transformData) else zData,
+                        **kwargs)
             
             if self.estimatedStartTime_ != None:
                 # Plot the start time estimate.
