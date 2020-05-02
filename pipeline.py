@@ -5,7 +5,7 @@ from spectrogram import Spectrogram
 import matplotlib.pyplot as plt
 import numpy as np
 import os
-import pipelineProcessor as process
+# import pipelineProcessor as process
 from peak_follower import PeakFollower
 from jsonDriver import JsonReadDriver
 from jsonDriver import JsonWriteDriver
@@ -18,7 +18,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--file_name',type=str,default=False)
 parser.add_argument('--peak_follow', type = str,default = True)
 parser.add_argument('--manual_start', type = bool, default = True)
-parser.add_argument('-json_name',type = str)
+parser.add_argument('-json_name',type = str, default = "CH_1.json")
 parser.add_argument('--velocity_cutoff', type = int, default = 10000)
 parser.add_argument('--denoise', type=bool,default = False)
 parser.add_argument('--colormap', type=str, default = 'viridis')
