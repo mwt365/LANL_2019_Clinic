@@ -3,16 +3,16 @@ from baselines import baselines_by_squash as bline
 from spectrogram import Spectrogram
 from ProcessingAlgorithms.preprocess.digfile import DigFile
 from ImageProcessing.TemplateMatching.Templates.templates import Templates
+from matplotlib import pyplot as plt
 
 
 if __name__ == "__main__":
 
-    df = DigFile("../dig/WHITE_CH4_SHOT/seg00")
+    df = DigFile("../dig/WHITE_CH2_SHOT/seg00")
     
 
-    spec = Spectrogram(df, 0.0, 60.0e-6, overlap_shift_factor= 1/4, form='db')
+    spec = Spectrogram(df, 0.0, 60.0e-6, overlap_shift_factor= 1/8, form='db')
     spec.availableData = ['intensity']
-
 
     methodsToUse = ['cv2.TM_CCORR_NORMED', 'cv2.TM_SQDIFF', 'cv2.TM_SQDIFF_NORMED']
     template_matcher = TemplateMatcher(spec, template=Templates.opencv_long_start_pattern5.value, span=200, k=30, methods=methodsToUse)
@@ -28,11 +28,11 @@ if __name__ == "__main__":
 
 
     pcm = pcms['intensity raw']
-    pcm.set_clim(-2, -55)
+    pcm.set_clim(-10, -65)
     template_matcher.add_to_plot(axes, times, velos, scores, methodsUsed, 
                                 show_points=True, 
-                                show_medoids=False, 
+                                show_medoids=True, 
                                 verbose=False, 
                                 visualize_opacity=False, 
-                                show_bounds=False)
+                                show_bounds=True)
 
