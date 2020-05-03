@@ -38,8 +38,7 @@
 
 import datetime
 import os
-import sys
-import subprocess
+import re
 from time import time
 import inspect
 import numpy as np
@@ -50,148 +49,6 @@ import matplotlib.pyplot as plt
 from UI_Elements.plotter import COLORMAPS, DEFMAP
 from ProcessingAlgorithms.preprocess.digfile import DigFile
 import concurrent.futures
-
-
-def all_post_functions():
-    funcs = []
-    for name, obj in inspect.getmembers(sys.modules[__name__]):
-        if inspect.isfunction(obj):
-            params = inspect.signature(obj).parameters
-            keys = list(params.keys())
-            if len(keys) != 4:
-                continue
-            try:
-                if isinstance(params[keys[0]].annotation, type(str)) \
-                   and isinstance(params[keys[1]].annotation, type(dict)):
-                    funcs.append(obj)
-            except:
-                pass
-    return funcs
-
-
-def describe_post_functions():
-    pfunc = all_post_functions()
-    return "\n\n".join([f"{x.__name__}: {x.__doc__}" for x
-                        in pfunc])
-
-
-def post_pipe(results, args):
-    """
-    Given a dictionary of results dictionaries and a list of
-    commands (with arguments), process the commands.
-    """
-
-    # First organize the results by base file
-    # The keys are the df.title fields, which may have one or more
-    # slashes. If we are doing segments, we want the penultimate 2.
-    # That's all we really should be doing, so let's go with that.
-    # Prepare the sources dictionary whose keys are the files
-    # and whose values are dictionaries with key
-    # sources = [file][segment][results]
-
-    sources = dict()
-    for key in results.keys():
-        fields = key.split('/')
-        source, segment = fields[-2:]
-        if source not in sources:
-            sources[source] = dict()
-        sources[source][segment] = results[key]
-
-    # Now we can churn through the source files
-    # Let's first decode the commands
-
-    command_file = args.post
-    if not os.path.exists(command_file):
-        print(f"I could not find a file named {command_file} for post processing")
-    else:
-        orders = process_command_file(command_file)
-        for fname, source in sources.items():
-            segments = sorted(list(source.keys()))
-            for order in orders:
-                routine, kwargs = order
-                routine(fname, source, segments, **kwargs)
-
-
-def stats(filename: str, source: dict, segments: dict, **kwargs):
-    """
-
-    """
-    fields = "figname;beta;lam1;lam2;amp;mean;stdev;chisq;prob".split(';')
-    data = {key: [] for key in fields}
-    for n, seg in enumerate(segments):
-        noises = source[seg]['noise']
-        for k in data.keys():
-            try:
-                data[k].append(noises[k])
-            except:
-                if k == 'beta':
-                    data[k].append(None)
-                    data['lam1'].append(noises['lamb'])
-                    data['lam2'].append(None)
-                    data['stdev'].append(noises['mean'])
-    figures = data.pop('figname')
-    df = pd.DataFrame(data)
-    print(df.to_string(sparsify=False))
-    df.to_csv(f"{filename}-noise.csv")
-
-    # Now produce a page showing all the figures
-    figure_page(f"{filename}-figs", figures)
-
-
-def figure_page(fname, files, cols=3, landscape=True):
-    """
-    Produce a page of figures
-    """
-    with open(fname + ".tex", 'w') as f:
-        f.write(r"\documentclass[10pt")
-        if landscape:
-            f.write(',landscape]{article}\n')
-            f.write(
-                r'\usepackage[textheight=7.5in,textwidth=10in]{geometry}')
-        else:
-            f.write(']{article}\n')
-            f.write(
-                r'\usepackage[textheight=10in,textwidth=7.5in]{geometry}')
-        print(r"""
-
-        \usepackage{graphicx}
-        \usepackage{longtable}
-        \begin{document}
-        """, file=f)
-        f.write("\\begin{longtable}{" + "c" * cols + "}\n")
-        width = round(0.9 / cols, 3)
-        ig = "\\" + f"includegraphics[width={width}"
-        ig += "\\textwidth]{"
-        for n, graphic in enumerate(files):
-            f.write(ig + graphic + "}\n")
-            f.write("\\\\\n" if (n + 1) % cols == 0 else " & \n")
-        print(r"\end{longtable}", file=f)
-        print(r"\end{document}", file=f)
-    subprocess.run(['pdflatex', fname])
-
-
-def all_pipe_functions():
-    """
-    Identify all functions in the current file that have a call signature
-    matching the pattern for pnspipe operations; namely, that they
-    have a first argument named 'pipe' and second argument (which should
-    be **kwargs, although this function doesn't insist).
-    """
-    funcs = []
-    for name, obj in inspect.getmembers(sys.modules[__name__]):
-        if inspect.isfunction(obj):
-            sig = list(inspect.signature(obj).parameters.keys())
-            if sig and sig[0] == 'pipe' and len(sig) == 2:
-                funcs.append(obj)
-    return funcs
-
-
-def describe_pipe_functions():
-    """
-    List all defined pipe functions, with their docstrings.
-    """
-    thestrs = [f"{x.__name__}\n{x.__doc__}" for x in all_pipe_functions()]
-    return "\n\n".join(thestrs)
 
 
 class PNSPipe:
@@ -257,6 +114,7 @@ class PNSPipe:
         # If the first command is not a specification for computing
         # a spectrogram, use the defaults
 
+        from Pipeline.persegment import make_spectrogram
         if orders[0][0] != make_spectrogram:
             orders.insert(0, (make_spectrogram, {}))
 
@@ -788,45 +646,45 @@ def show_discrepancies(pipe: PNSPipe, **kwargs):
             # signal.loc[n, 'mean'] = mom['center']
             # signal.loc[n, 'sigma'] = mom['std_dev']
             # gus = Gaussian(
-                # speeds, powers,
-                # center=row['velocity'],
-                # width=sg.velocity[2] - sg.velocity[0]
+            # speeds, powers,
+            # center=row['velocity'],
+            # width=sg.velocity[2] - sg.velocity[0]
             # )
             # if gus.valid:
-                # signal.loc[n, 'center'] = gus.center
-                # signal.loc[n, 'width'] = gus.width
-                # signal.loc[n, 'amplitude'] = gus.amplitude
-                # diff = gus.center - signal.loc[n, 'velocity']
-                # signal.loc[n, 'dcenter'] = diff
-                # discrepancy = abs(diff / gus.width)
-                # if discrepancy > sigmas:
-                # The difference between the peak follower and the gaussian
-                # fit was more than 1 value of the width.
-                # Let's print out a plot to show what's going on
-                # plt.clf()
-                # vmin, vmax = sg.velocity[vfrom], sg.velocity[vto]
-                # make sure we have all the freshest values
-                # row = signal.iloc[n]
+            # signal.loc[n, 'center'] = gus.center
+            # signal.loc[n, 'width'] = gus.width
+            # signal.loc[n, 'amplitude'] = gus.amplitude
+            # diff = gus.center - signal.loc[n, 'velocity']
+            # signal.loc[n, 'dcenter'] = diff
+            # discrepancy = abs(diff / gus.width)
+            # if discrepancy > sigmas:
+            # The difference between the peak follower and the gaussian
+            # fit was more than 1 value of the width.
+            # Let's print out a plot to show what's going on
+            # plt.clf()
+            # vmin, vmax = sg.velocity[vfrom], sg.velocity[vto]
+            # make sure we have all the freshest values
+            # row = signal.iloc[n]
 
-                # plt.plot([row['velocity'], ],
-                # [row['intensity'], ], 'k*')
-                # plt.plot([row['mean'] + n * row['sigma'] for n in (-1, 0, 1)],
-                # [row['intensity'] for x in (-1, 0, 1)],
-                # 'gs')
-                # plt.plot(speeds, powers, 'r.')
-                # vels = np.linspace(gus.center - 6 * gus.width,
-                # gus.center + 6 * gus.width, 100)
-                # plt.plot(vels, gus(vels), 'b-', alpha=0.5)
-                # tval = f"${pipe.spectrogram.time[t_index]*1e6:.2f}"
-                # plt.title(tval + "$~ µs")
-                # plt.xlabel("Velocity (m/s)")
-                # plt.ylabel(r"Intensity")
-                # plt.xlim(vmin, vmax)
-                # plt.savefig(os.path.join(pipe.output_dir, f'bad{t_index}.pdf'))
-                # plt.close()
-                # with open(os.path.join(pipe.output_dir, f'bad{t_index}.txt'), 'w') as f:
-                # f.write(pd.DataFrame(
-                # {'power': powers, }, index=speeds).to_csv())
+            # plt.plot([row['velocity'], ],
+            # [row['intensity'], ], 'k*')
+            # plt.plot([row['mean'] + n * row['sigma'] for n in (-1, 0, 1)],
+            # [row['intensity'] for x in (-1, 0, 1)],
+            # 'gs')
+            # plt.plot(speeds, powers, 'r.')
+            # vels = np.linspace(gus.center - 6 * gus.width,
+            # gus.center + 6 * gus.width, 100)
+            # plt.plot(vels, gus(vels), 'b-', alpha=0.5)
+            # tval = f"${pipe.spectrogram.time[t_index]*1e6:.2f}"
+            # plt.title(tval + "$~ µs")
+            # plt.xlabel("Velocity (m/s)")
+            # plt.ylabel(r"Intensity")
+            # plt.xlim(vmin, vmax)
+            # plt.savefig(os.path.join(pipe.output_dir, f'bad{t_index}.pdf'))
+            # plt.close()
+            # with open(os.path.join(pipe.output_dir, f'bad{t_index}.txt'), 'w') as f:
+            # f.write(pd.DataFrame(
+            # {'power': powers, }, index=speeds).to_csv())
 
     # for signal in pipe.signals:
         # pipe.log(signal.to_string(
@@ -841,8 +699,8 @@ def show_discrepancies(pipe: PNSPipe, **kwargs):
         # middle.plot(signal.time * 1e6, signal.velocity)
         # middle.set_ylabel(r'$v~(\mathrm{m/s})$')
         # bottom.errorbar(signal['time'] * 1e6,
-                # signal.dcenter, yerr=signal.width, fmt='b.',
-                # markersize=1.0, lw=0.5)
+            # signal.dcenter, yerr=signal.width, fmt='b.',
+            # markersize=1.0, lw=0.5)
         # bottom.set_xlabel(r'$t~(\mu \mathrm{s})$')
         # bottom.set_ylabel(r'$\delta v~(\mathrm{m/s})$')
         # plt.savefig(os.path.join(pipe.output_dir, 'gauss.pdf'))
@@ -863,9 +721,29 @@ def decode_arg(x):
 
 
 def process_command_file(x):
-    ""
+    """
+    Read a text file of commands that has the form
+    command1 keyword1=arg1 keyword2=arg2
+    command2 keyword3=arg3
+    ...
+
+    Returns:
+
+        A list of 2-tuples in which the first is the function
+        (not the function name) to call and the second
+        is a dictionary of keyword arguments.
+    """
+    from Pipeline import _pipe_functions
     order_text = open(x, 'r').readlines()
-    orders = []
+    orders = {x: [] for x in _pipe_functions.keys()}
+
+    def find_function(s):
+        for k, v in _pipe_functions.items():
+            hit = [x for x in v if x.__name__ == s]
+            if hit:
+                return (k, hit[0])
+        return (None, None)
+
     for line in order_text:
         # first remove any white space around equal signs
         line = re.sub(r' *= *', "=", line)
@@ -874,159 +752,253 @@ def process_command_file(x):
             continue
         routine = fields.pop(0).strip(',')
         if routine:
-            func = globals()[routine]
+            # func = globals()[routine]
+            category, func = find_function(routine)
             kwargs = {}
             for x in fields:
                 k, v = x.split('=')
                 kwargs[k] = decode_arg(v)
-            orders.append((func, kwargs))
+            orders[category].append((func, kwargs))
     return orders
 
 
-if __name__ == '__main__':
-    # sys.path.insert(0, '../')
-    t0 = time()
-    import argparse
-    import re
-    import shutil
+# Register all pipe functions in the present file
 
-    curdir = os.getcwd()
-    epi = "Available operations:\n\n" + describe_pipe_functions()
-    epi += "\n\nAvailable post-processing operations:\n\n" + \
-        describe_post_functions()
+class PNSPipeline:
+    """
+    This class runs a pipeline process, calling PNSPipe on each
+    of the requested source .dig files/segments.
+    """
 
-    parser = argparse.ArgumentParser(
-        description='Run a pipe to process .dig files',
-        prog="pipe",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog=epi
-    )
+    def __init__(self, *args):
 
-    parser.add_argument('-q', '--quiet', help="Don't report progress")
-    parser.add_argument('-s', '--segments', action='store_false',
-                        help="Only process segments")
-    parser.add_argument('-r', '--regex', default=r'.*',
-                        help="Regular expression to select files; defaults to '.*'")
-    parser.add_argument('-e', '--exclude', default=None,
-                        help="Regular expression for files to exclude")
-    parser.add_argument('-i', '--input', default=None,
-                        help="Input file of commands; defaults to script.txt")
-    parser.add_argument('-o', '--output', default=os.getcwd(),
-                        help="top directory for results")
-    parser.add_argument('-d', '--delete', action='store_true',
-                        help="Delete existing files before the run")
-    parser.add_argument('--dry', action='store_true',
-                        help='List the files that would be handled and where the output would be written')
-    parser.add_argument('-p', '--post', default='postscript.txt',
-                        help="File with post processing scripts")
-    parser.add_argument('-t', '--threads', default=1,
-                        help='Run this many threads in parallel')
+        from re import compile
+        self.start_time = time()
+        self.start_dir = os.getcwd()
+        self.results = dict()
+        self.finished_segments = dict()
 
-    args = parser.parse_args()
+        parser = self.make_parser()
+        self.args = parser.parse_args(*args)
 
-    # First look for a valid path expressed in the input argument
-    infile = ""
-    if args.input:
-        if os.path.isfile(args.input):
-            infile = os.path.abspath(args.input)
-    else:
-        infile = 'script.txt'
+        self.find_files()
+        if self.args.delete:
+            self.delete_files()  # remove any results from a previous run
+        self.include = compile(self.args.regex)
+        self.exclude = compile(
+            self.args.exclude) if self.args.exclude else None
 
-    if args.output:
-        os.chdir(args.output)
+        if self.args.dry:
+            print(f"Dry run, storing output in base directory {os.getcwd()}")
+        self.threads = self.args.threads
 
-    # Look for marching orders in an file called script.txt
-    assert os.path.isfile(infile), f"You must supply file script.txt in the output directory"
-    order_text = open(infile, 'r').readlines()
-    orders = []
-    for line in order_text:
-        # first remove any white space around equal signs
-        line = re.sub(r' *= *', "=", line)
-        fields = line.strip().split()
-        routine = fields.pop(0).strip(',')
-        if routine:
-            func = globals()[routine]
-            kwargs = {}
-            for x in fields:
-                k, v = x.split('=')
-                kwargs[k] = decode_arg(v)
-            orders.append((func, kwargs))
+    def make_parser(self):
+        from Pipeline import describe_pipe_functions
+        import argparse
 
-    if args.delete:
-        # remove all contents of subdirectories first
+        epilog = "Available operations:\n\n" + describe_pipe_functions("")
+        parser = argparse.ArgumentParser(
+            description='Run a pipeline to process .dig files',
+            prog="pipe",
+            formatter_class=argparse.RawDescriptionHelpFormatter,
+            epilog=epilog
+        )
+        parser.add_argument('-q', '--quiet', help="Don't report progress")
+        parser.add_argument('-s', '--segments', action='store_false',
+                            help="Only process segments")
+        parser.add_argument('-r', '--regex', default=r'.*',
+                            help="Regular expression to select files; defaults to '.*'")
+        parser.add_argument('-e', '--exclude', default=None,
+                            help="Regular expression for files to exclude")
+        parser.add_argument('-i', '--input', default=None,
+                            help="Input file of commands; defaults to script.txt")
+        parser.add_argument('-o', '--output', default=os.getcwd(),
+                            help="top directory for results")
+        parser.add_argument('-d', '--delete', action='store_true',
+                            help="Delete existing files before the run")
+        parser.add_argument('--dry', action='store_true',
+                            help='List the files that would be handled and where the output would be written')
+        parser.add_argument('-p', '--post', default='postscript.txt',
+                            help="File with post processing scripts")
+        parser.add_argument('-t', '--threads', default=1,
+                            help='Run this many threads in parallel')
+        return parser
+
+    def find_files(self):
+        """
+        Look for the input script file
+        """
+        infile = ""
+        args = self.args
+        if args.input:
+            if os.path.isfile(args.input):
+                infile = os.path.abspath(args.input)
+        else:
+            infile = 'script.txt'
+
+        if args.output:
+            os.chdir(args.output)
+
+        # Look for marching orders in a file called script.txt
+        assert os.path.isfile(infile), f"You must supply file script.txt in the output directory"
+        self.orders = process_command_file(infile)
+
+    def delete_files(self):
+        # remove all contents of subdirectories of the output directory first
         for candidate in os.listdir('.'):
             if os.path.isdir(candidate):
                 shutil.rmtree(candidate, ignore_errors=True)
 
-    include = re.compile(args.regex)
-    exclude = re.compile(args.exclude) if args.exclude else None
+    def preprocess(self):
+        for func, kwargs in self.orders['preprocess']:
+            func(self.include, self.exclude, **kwargs)
 
-    if args.dry:
-        print(f"Dry run, storing output in base directory {os.getcwd()}")
+    def postsegment(self, source: str):
+        """
+        All segments associated with the source file have been
+        processed. Run all postsegment routines on this file.
+        The source is the rel_dir of the source file.
+        """
+        # Fetch the results for all the segments of this source
+        # and run any postsegment routines on the list
+        # The source string is the rel_dir of the parent
+        _, src = os.path.split(source)[1]
+        # We now want to extract all results corresponding to this file
+        pat = re.compile(src + r'/seg(\d\d)')
+        segs = sorted([x for x in self.results.keys() if pat.search(x)])
+        the_segments = [self.results[x] for x in segs]
+        for routine, kwargs in self.orders['postsegment']:
+            routine(source, the_segments, **kwargs)
 
-    results = dict()
-    threads = int(args.threads)
-    paths = []
-    for file in DigFile.all_dig_files():
-        if not include.search(file):
-            continue
+    def add_segment_result(self, pipe):
+        df = pipe.df
+        title = df.title
 
-        if exclude and exclude.search(file):
-            continue
+        self.results[title] = pipe.results
+        # Now see if all segments have completed and we can run the
+        # postsegment routines
+        if df.is_segment:
+            src = df.source
+            self.num_segments[src] -= 1
+            if self.num_segments[src] == 0:
+                self.postsegment(df.rel_dir)
 
-        path = os.path.join(DigFile.dig_dir(), file)
-        if args.segments:
-            df = DigFile(path)
-            if not df.is_segment:
+    def segments(self):
+        paths = []
+        segs = {}
+        dd = DigFile.dig_dir()
+        for file in DigFile.all_dig_files():
+            if not self.include.search(file):
                 continue
+            if self.exclude and self.exclude.search(file):
+                continue
+            path = os.path.join(dd, file)
+            df = DigFile(path)
+            if self.args.segments:
+                if not df.is_segment:
+                    continue
+            paths.append(path)
+            src = df.source
+            if src not in segs:
+                segs[src] = 1
+            else:
+                segs[src] += 1
 
-        paths.append(path)
+        self.paths = paths
+        self.num_segments = segs
 
-    if not paths:
-        print("No files selected")
-    else:
-        if threads > 1:
+        if not paths:
+            print("No files were selected")
+            return
+
+        if self.threads > 1:
+            print("""
+            ***** WARNING *****
+            Matplotlib is not thread-safe. If your onsegment routines
+            include calls to matplotlib, Python will crash. So be
+            forewarned!
+            ***** ACHTUNG *****
+            """)
+
             def run_pipe(path, dry, orders):
                 if dry:
                     df = DigFile(path)
                     return df.title
-                return PNSPipe(path, orders)
+                return PNSPipe(path, orders['onsegment'])
 
             with concurrent.futures.ProcessPoolExecutor(max_workers=threads) as executor:
-                future_runs = {executor.submit(run_pipe, path, args.dry, orders): path for
-                               path in paths}
+                future_runs = {executor.submit(
+                    run_pipe, path, self.args.dry, self.orders): path for
+                    path in paths}
 
                 for run in concurrent.futures.as_completed(future_runs):
                     path = future_runs[run]
                     try:
                         pipe = run.result()
-                        results[pipe.df.title] = pipe.results
+                        self.add_segment_result(run.result())
+
                     except Exception as eeps:
                         print('%r generated an exception: %s' % (path, eeps))
         else:
             for path in paths:
-                if args.dry:
+                if self.args.dry:
                     print(path)
                     df = DigFile(path)
-                    results[df.title] = "Sure!"
+                    self.results[df.title] = "Sure!"
                 else:
                     try:
-                        pipe = PNSPipe(path, orders)
-                        results[pipe.df.title] = pipe.results
+                        pipe = PNSPipe(path, self.orders['onsegment'])
+                        self.add_segment_result(pipe)
+
                     except Exception as eeps:
                         print(f"\n********************\n")
                         print(f"Encountered error {eeps}")
                         print(f"while processing  {path}")
                         print("\n**********************\n")
 
-    # Now we need to deliver the results dictionary to any and all
-    # post-processing routines
+    def postprocess(self):
+        """
+        Run any requested procedures on the entirety of the results
+        """
+        # First organize the results by base file
+        # The keys are the df.title fields, which may have one or more
+        # slashes. If we are doing segments, we want the penultimate 2.
+        # That's all we really should be doing, so let's go with that.
+        # Prepare the sources dictionary whose keys are the files
+        # and whose values are dictionaries with key
+        # sources = [file][segment][results]
 
-    post_process_file = args.post
-    if post_process_file:
-        post_pipe(results, args)
+        sources = dict()
+        for key in self.results.keys():
+            fields = key.split('/')
+            source, segment = fields[-2:]
+            if source not in sources:
+                sources[source] = dict()
+            sources[source][segment] = self.results[key]
 
-    # restore the working directory (is this necessary?)
-    os.chdir(curdir)
-    dt = time() - t0
-    print(f"Analysis took {dt:.1f} s")
+        # Now run the requested commands
+        orders = self.orders['postprocess']
+        if orders:
+            for fname, source in sources.items():
+                segments = sorted(list(source.keys()))
+                for order in orders:
+                    routine, kwargs = order
+                    routine(fname, source, segments, **kwargs)
+
+    def run(self):
+        self.preprocess()
+        self.segments()
+        self.postprocess()
+
+        # restore the working directory (is this necessary?)
+        os.chdir(self.start_dir)
+        dt = time() - self.start_time
+        print(f"Analysis took {dt:.1f} s")
+
+
+if __name__ == '__main__':
+
+    pipeline = PNSPipeline()
+    pipeline.run()
+
+
