@@ -1,11 +1,5 @@
 {
   "File Category": "CH_1_009",
-  "files": [
-    {
-      "file": "Molecule Man",
-      "start point": 29
-    }
-],
   "manual_starts": {
       "seg02.dig" : [8.74e-6,3000],
       "seg03.dig" : [7e-6, 2795],
