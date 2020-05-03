@@ -14,10 +14,6 @@ from spectrogram import Spectrogram
 import ImageProcessing.TemplateMatching.Templates.saveTemplateImages as templateHelper
 import os
 from ImageProcessing.TemplateMatching.Templates.templates import Templates
-<<<<<<< HEAD:ImageProcessing/TemplateMatching/template_matcher.py
-=======
-
->>>>>>> origin/peter:ImageProcessing/TemplateMatching/template_matcher.py
 import scipy
 if scipy.__version__ > "1.2.1":
     from imageio import imsave
