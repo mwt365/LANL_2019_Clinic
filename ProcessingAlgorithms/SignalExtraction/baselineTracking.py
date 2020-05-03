@@ -1,22 +1,14 @@
-<<<<<<< HEAD:baselineTracking.py
-=======
-
-import os
->>>>>>> origin/peter:ProcessingAlgorithms/SignalExtraction/baselineTracking.py
 import pandas as pd
 import numpy as np
 # For printing a timing information to see how far you have gotten.
 import tqdm
 import matplotlib.pyplot as plt
-<<<<<<< HEAD:baselineTracking.py
 import os
 import tqdm # For printing a timing information to see how far you have gotten.
 
 
 from spectrogram import Spectrogram
 
-=======
->>>>>>> origin/peter:ProcessingAlgorithms/SignalExtraction/baselineTracking.py
 
 from spectrogram import Spectrogram
 from ProcessingAlgorithms.SignalExtraction.baselines import baselines_by_squash
@@ -49,12 +41,7 @@ def saveBaselineIntensityImages(files, saveLoc: str = None, imageExt: str = "png
         plt.clf()
         del MySpect
 
-<<<<<<< HEAD:baselineTracking.py
 def baselineTracking(spectrogram:Spectrogram, baselineVel, changeThreshold, skipUntilTime:float=12e-6):
-=======
-
-def baselineTracking(spectrogram, baselineVel, changeThreshold, skipUntilTime: float = 12e-6):
->>>>>>> origin/peter:ProcessingAlgorithms/SignalExtraction/baselineTracking.py
     """
         Return the first time in microseconds that baseline's intensity value changes outside the changeThreshold.
         Use the average baseline value as the estimate
@@ -77,12 +64,8 @@ def baselineTracking(spectrogram, baselineVel, changeThreshold, skipUntilTime: f
     return spectrogram.time[ind] * 1e6
 
 
-<<<<<<< HEAD:baselineTracking.py
 def runExperiment(trainingFilePath, thresholds:list, skipUntilTimes:list = []):
     import baselines
-=======
-def runExperiment(trainingFilePath, thresholds: list, skipUntilTimes: list = []):
->>>>>>> origin/peter:ProcessingAlgorithms/SignalExtraction/baselineTracking.py
 
     data = pd.read_excel(trainingFilePath)
 
