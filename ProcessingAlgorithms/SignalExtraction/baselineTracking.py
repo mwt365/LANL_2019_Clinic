@@ -1,7 +1,5 @@
 import pandas as pd
 import numpy as np
-# For printing a timing information to see how far you have gotten.
-import tqdm
 import matplotlib.pyplot as plt
 import os
 import tqdm # For printing a timing information to see how far you have gotten.
