@@ -3,6 +3,7 @@
 */*.dig
 */*.png
 *.png
+*.csv
 __pycache__/
 .ipynb_checkpoints/
 *.csv
