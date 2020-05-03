@@ -16,6 +16,7 @@ from scipy.signal import find_peaks
 from ProcessingAlgorithms.preprocess.digfile import DigFile
 from UI_Elements.plotter import COLORMAPS, DEFMAP
 
+
 class Spectrogram:
     """
 
@@ -116,7 +117,6 @@ class Spectrogram:
 
         # deal with kwargs
 
-
         try:
             if False:
                 self._load()
@@ -151,12 +151,13 @@ class Spectrogram:
             modes = [modes]
                 
         self.availableData = modes
-        self.complex = []
-        self.phase = []
+        if "complex" in modes:
+            self.complex = []
+            self.phase = []
 
         for mode in modes:
             # ["complex", "magnitude", "angle", "phase", "psd"]
-            # The available modes for signal.spectrogram 
+            # The available modes for signal.spectrogram
             # Only need to compute complex, phase, and psd and then we can derive the rest.
 
             # You can probably compute the psd from the complex spectrum
@@ -176,8 +177,12 @@ class Spectrogram:
             )
             setattr(self, mode, spec)
 
-
         times += self.t_start
+        if hasattr(self, "complex"):
+            self.magnitude = np.abs(self.complex)
+            self.angle = np.angle(self.complex)
+            self.real = np.real(self.complex)
+            self.imaginary = np.imag(self.complex)
 
         if kwargs.get("mode", "none") in ["all", 'complex']:
             self.real = np.real(getattr(self, "complex"))
@@ -195,8 +200,8 @@ class Spectrogram:
             self.availableData.remove("psd")
             self.intensity = self.transform(getattr(self, "psd"))
 
-        # Convert to a logarithmic representation and use floor to attempt
-        # to suppress some noise.
+            # Convert to a logarithmic representation and use floor to attempt
+            # to suppress some noise.
         self.histogram_levels = self.histo_levels(self.intensity)
 
         # the first index is frequency, the second time
@@ -219,7 +224,8 @@ class Spectrogram:
         """
         epsilon = 1e-10
         if self.form == 'db':
-            return 10 * np.log10(vals + epsilon) # Since you are already starting with power.
+            # Since you are already starting with power.
+            return 10 * np.log10(vals + epsilon)
         if self.form == 'log':
             return np.log10(vals + epsilon)
         return vals
@@ -284,7 +290,7 @@ class Spectrogram:
             return 0
         return min(p, -1 + len(self.velocity))
 
-    def slice(self, time_range, velocity_range, complexData:bool = False, phaseData:bool = False):
+    def slice(self, time_range, velocity_range, complexData: bool = False, phaseData: bool = False):
         """
         Input:
             time_range: Array/Tuple/List of times (t0, t1)
@@ -321,14 +327,14 @@ class Spectrogram:
         ivals = self.intensity[vel0:vel1 + 1, time0:time1 + 1]
 
         if complexData and phaseData:
-            return tvals, vvals, ivals, self.complex[vel0:vel1+1, time0:time1+1], self.phase[vel0:vel1+1, time0:time1+1]
+            return tvals, vvals, ivals, self.complex[vel0:vel1 + 1, time0:time1 + 1], self.phase[vel0:vel1 + 1, time0:time1 + 1]
         elif complexData:
-            return tvals, vvals, ivals, self.complex[vel0:vel1+1, time0:time1+1]
+            return tvals, vvals, ivals, self.complex[vel0:vel1 + 1, time0:time1 + 1]
         elif phaseData:
-            return tvals, vvals, ivals, self.phase[vel0:vel1+1, time0:time1+1]
+            return tvals, vvals, ivals, self.phase[vel0:vel1 + 1, time0:time1 + 1]
 
         return tvals, vvals, ivals
-        
+
     def analyze_noise(self, **kwargs):
         """
         Analyze the noise by performing a double-exponential fit.
@@ -345,8 +351,8 @@ class Spectrogram:
             fields beta, lam1, lam2, amp, mean, stdev, chisq, and
             prob_greater
         """
-        from fit import DoubleExponential, Exponential
-        from baselines import baselines_by_squash
+        from ProcessingAlgorithms.Fitting.fit import DoubleExponential, Exponential
+        from ProcessingAlgorithms.SignalExtraction.baselines import baselines_by_squash
 
         v_min = kwargs.get('v_min')
         if not v_min:
@@ -379,11 +385,16 @@ class Spectrogram:
         dub.n_bins = n_bins
         return dub
 
-    def noise_level(self, percentile=0.75):
+    def noise_level(self, percentile: float = 90.0):
         """
         Estimate the noise level by sorting all intensities and
         returning the level of the point at the given percentile.
         """
+        if percentile <= 90.0:
+            return self.histogram_levels['tens'][int(percentile / 10)]
+        if percentile <= 99.0:
+            return self.histogram_levels['ones'][int((percentile - 90) * 10)]
+        return self.histogram_levels['tenths'][int((percentile - 99) * 100)]
         all_intensity = np.sort(self.intensity.flatten())
         index = int(percentile * len(all_intensity))
         return all_intensity[index]
@@ -545,40 +556,43 @@ class Spectrogram:
         inds2 = np.where(maxArray == a)
         self.probe_destruction_index_max = inds2[0][0]
         if False:
-            print("The value of PD index using the max estimate is", self.probe_destruction_index_max, "it has type", type(self.probe_destruction_index_max))
+            print("The value of PD index using the max estimate is",
+                  self.probe_destruction_index_max, "it has type", type(self.probe_destruction_index_max))
             print("The time array has shape", self.time.shape)
 
         self.probe_destruction_time_max = self.time[self.probe_destruction_index_max]
 
     def estimateStartTime(self):
         """
-        Compute an approximate value for the jump off time based upon the change in 
+        Compute an approximate value for the jump off time based upon the change in
         the baseline intensity.
         """
-        from baselineTracking import baselineTracking
-        import baselines
-        peaks, _, _ = baselines.baselines_by_squash(self)
-        self.estimatedStartTime_ = baselineTracking(self, peaks[0], 0.024761904761904763)
+        from ProcessingAlgorithms.SignalExtraction.baselines import baselines_by_squash
+        from ProcessingAlgorithms.SignalExtraction.baselineTracking import baselineTracking
+        peaks, _, _ = baselines_by_squash(self)
+        self.estimatedStartTime_ = baselineTracking(
+            self, peaks[0], 0.024761904761904763)
 
-    def plotHist(self, fig = None, minFrac=0.0, maxFrac = 1.0, numBins = 1001, **kwargs):
+    def plotHist(self, fig=None, minFrac=0.0, maxFrac=1.0, numBins=1001, **kwargs):
         if fig == None:
             fig = plt.figure()
         bins = np.linspace(self.min, self.max, numBins)
 
-        threshold = bins[int(numBins*minFrac):int(numBins*maxFrac)]
+        threshold = bins[int(numBins * minFrac):int(numBins * maxFrac)]
 
         plt.hist(self.intensity.flatten(), threshold, **kwargs)
         axes = plt.gca()
-        axes.set_ylabel('Counts', fontsize = 18)
-        axes.set_xlabel('Intensity', fontsize = 18)
+        axes.set_ylabel('Counts', fontsize=18)
+        axes.set_xlabel('Intensity', fontsize=18)
         axes.xaxis.set_tick_params(labelsize=14)
-        axes.yaxis.set_tick_params(labelsize=14)        
+        axes.yaxis.set_tick_params(labelsize=14)
         title = self.data.filename.split('/')[-1]
-        axes.set_title(title.replace("_", "-")+" Intensity Histogram", fontsize = 24)
-        
+        axes.set_title(title.replace("_", "-") +
+                       " Intensity Histogram", fontsize=24)
+
         return fig
 
-    def plot(self, transformData = False, **kwargs):
+    def plot(self, transformData=False, **kwargs):
         # max_vel=6000, vmin=-200, vmax=100):
         pcms = {}
         if "psd" in self.availableData:
@@ -589,10 +603,9 @@ class Spectrogram:
             self.availableData.append("imaginary")
             self.availableData.remove("complex")
 
-
-        # endTime = self._time_to_index((self.probe_destruction_time + self.probe_destruction_time_max)/2)
-        endTime = self._time_to_index(50e-6)
-        # Our prediction for the probe destruction time. Just to make it easier to plot. 
+        endTime = self._time_to_index(
+            (self.probe_destruction_time + self.probe_destruction_time_max) / 2)
+        # Our prediction for the probe destruction time. Just to make it easier to plot.
 
         cmapUsed = COLORMAPS[DEFMAP]
         if 'cmap' in kwargs:
@@ -621,29 +634,30 @@ class Spectrogram:
         if right != None:
             del kwargs["max_time"]
 
-
-
         for data in self.availableData:
-            zData = getattr(self, data, "intensity") # getattr(object, itemname, default)
-            
+            # getattr(object, itemname, default)
+            zData = getattr(self, data, "intensity")
+
             key = f"{data}" + (f" transformed to {self.form}" if transformData else " raw")
             fig = plt.figure(num=key)
             fig.set_size_inches(10, 5)
             axes = plt.gca()
 
-            pcm = None # To define the scope.
+            pcm = None  # To define the scope.
             if 'cmap' not in kwargs:
                 pcm = axes.pcolormesh(
                     self.time[:endTime] * 1e6,
                     self.velocity,
-                    self.transform(zData[:,:endTime]) if (data != "intensity" and transformData) else zData[:,:endTime],
-                    cmap = cmapUsed,
+                    self.transform(zData[:, :endTime]) if (
+                        data != "intensity" and transformData) else zData[:, :endTime],
+                    cmap=cmapUsed,
                     **kwargs)
             else:
                 pcm = axes.pcolormesh(
                     self.time[:endTime] * 1e6,
                     self.velocity,
-                    self.transform(zData[:,:endTime]) if (data != "intensity" and transformData) else zData[:,:endTime],
+                    self.transform(zData[:, :endTime]) if (
+                        data != "intensity" and transformData) else zData[:, :endTime],
                     **kwargs)
 
             dataToLookAt = self.transform(zData[:,:endTime]) if (data != "intensity" and transformData) else zData[:,:endTime]
@@ -655,20 +669,19 @@ class Spectrogram:
             
             print(f"The current maximum of the colorbar is {np.max(zData[:,:endTime])} for the dataset {data}")
             plt.gcf().colorbar(pcm, ax=axes)
-            axes.set_ylabel('Velocity (m/s)', fontsize = 14)
-            axes.set_xlabel('Time ($\mu$s)', fontsize = 14)
+            axes.set_ylabel('Velocity (m/s)', fontsize=14)
+            axes.set_xlabel('Time ($\mu$s)', fontsize=14)
             axes.xaxis.set_tick_params(labelsize=12)
-            axes.yaxis.set_tick_params(labelsize=12)        
+            axes.yaxis.set_tick_params(labelsize=12)
             title = self.data.filename.split('/')[-1]
             axes.set_title(title.replace("_", "-") + f" {data} spectrogram", fontsize = 18)
 
             axes.set_xlim(left, right)
-            axes.set_ylim(bot, top) # The None value is the default value and does not update the axes limits.            
+            # The None value is the default value and does not update the axes limits.
+            axes.set_ylim(bot, top)
 
             pcms[key] = pcm
 
-
-        
         return pcms, axes
 
 

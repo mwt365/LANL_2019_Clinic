@@ -14,7 +14,7 @@ from scipy.optimize import curve_fit
 from scipy.interpolate import InterpolatedUnivariateSpline as ius
 
 
-def smooth(xvals, n=10, forward=True):
+def smooth(xvals: np.ndarray, n: int = 10, forward=True):
     """Provide an exponential smoothing of the values in xvals,
     yielding a single value representing the final smoothed value
     in the array. If forward is False, proceed in reverse order."""
@@ -30,7 +30,12 @@ def smooth(xvals, n=10, forward=True):
     return s
 
 
-def extrapolate(xvals, yvals, x, grouping=5, order=3):
+def extrapolate(
+        xvals: np.ndarray,
+        yvals: np.ndarray,
+        x: float,
+        grouping: int = 5,
+        order: int = 3):
     """Given equal-length arrays xvals and yvals, with the
     xvals in ascending order, produce an interpolated or extrapolated
     estimate for y at corresponding x. If there are enough points to
@@ -137,7 +142,7 @@ class Follower:
         self.t_index = spectrogram._time_to_index(self.t_start)
         self.span = span
 
-    def add_point(self, t_index, v, span=None):
+    def add_point(self, t_index: int, v: float, span=None):
         """Add this point to the results, making sure to keep the results
         array sorted by time.
         """
@@ -323,8 +328,6 @@ class Follower:
 
     @property
     def pandas_format(self):
-        def d1(x): return f"{x:.1f}"
-
         def d2(x): return f"{x:.2f}"
 
         formats = {x: d2 for x in
@@ -461,7 +464,7 @@ class FollowHood(object):
         """
         """
         # from gaussian import Gaussian
-        from fit import Gaussian
+        from ProcessingAlgorithms.Fitting.fit import Gaussian
         from ProcessingAlgorithms.Fitting.moments import moment
 
         res = follower.results

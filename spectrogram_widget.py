@@ -10,18 +10,18 @@
 """
 
 import os
-import cv2
+# import cv2
 import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib.colors
-import matplotlib.gridspec as gridspec
+# import matplotlib.colors
 import ipywidgets as widgets
 
 from matplotlib import widgets as mwidgets
 from IPython.display import display
+from plotter import COLORMAPS
+from spectrogram import Spectrogram
 
 from ProcessingAlgorithms.preprocess.digfile import DigFile
-from spectrogram import Spectrogram
 from ProcessingAlgorithms.spectrum import Spectrum
 
 from ProcessingAlgorithms.Fitting.gaussian import Gaussian
@@ -34,7 +34,8 @@ import time as Time
 
 from UI_Elements.plotter import COLORMAPS, DEFMAP
 from UI_Elements.value_sliders import ValueSlider
-from UI_Elements.percent_slider import PercentSlider # Note that this class is not actually used yet. 02/07/20
+# Note that this class is not actually used yet. 02/07/20
+# from UI_Elements.percent_slider import PercentSlider
 
 class SpectrogramWidget:
     """
@@ -136,7 +137,7 @@ class SpectrogramWidget:
                 self.digfile, None, None, **kwargs)
             self.spectrogram_fresh = True  # flag for the first pass
 
-            self.spectrogram.overlap = .125
+            self.spectrogram.overlap = 0.875
 
         self.fig, axes = plt.subplots(
             nrows=1, ncols=2, sharey=True,
@@ -329,7 +330,8 @@ class SpectrogramWidget:
         # Click selector  ###########################################
         # What to do when registering a click in the spectrogram
         cd['clicker'] = widgets.Select(
-            options=("Spectrum (dB)", "Spectrum", "Peak", "Gauss", "Template_Matching"),
+            options=("Spectrum (dB)", "Spectrum", "Peak",
+                     "Gauss", "Template_Matching"),
             value='Spectrum (dB)',
             description="Click:",
             disabled=False
@@ -569,7 +571,7 @@ class SpectrogramWidget:
                 vi = self.spectrogram._velocity_to_index(v)
                 self.match_templates(ti, vi)
             else:
-                print("I am handling a click that should be a peak follower")
+                # print("I am handling a click that should be a peak follower")
                 self.follow(t, v, action)
 
         except Exception as eeps:
@@ -578,7 +580,7 @@ class SpectrogramWidget:
     def handle_key(self, event):
         try:
             # convert time to seconds
-            t, v = event.xdata * 1e-6, event.ydata
+            _, v = event.xdata * 1e-6, event.ydata
         except:
             pass
         char = event.key
@@ -713,7 +715,9 @@ class SpectrogramWidget:
         res = pf.results
         points = len(res['t_index'])
 
-        def bound(x): return x % points
+        def bound(x):
+            return x % points
+
         follower_pt = bound(follower_pt)
 
         # We'd like to show data for this index, the previous one,
@@ -744,7 +748,6 @@ class SpectrogramWidget:
             bg = hood.moment['background']
             ax.plot([hood.velocity[0], hood.velocity[-1]], [bg, bg], 'r-')
             # show the center and widths from the moment calculation
-            pk = hood.peak_int
             tallest = np.max(hood.intensity)
             max_peak = max(tallest, max_peak)
             ax.plot([hood.moment['center'] + x * hood.moment['std_err'] for x in
@@ -837,7 +840,7 @@ class SpectrogramWidget:
         """
         Handle the baselines popup menu
         """
-        from baselines import baselines_by_squash
+        from ProcessingAlgorithms.SignalExtraction.baselines import baselines_by_squash
         blines = []
         self.baselines = []  # remove any existing baselines
         if method == "Squash":
@@ -977,7 +980,6 @@ class SpectrogramWidget:
             line = self.axSpectrogram.lines[0]
 
             line.set(xdata=[tval, tval], ydata=[0, self.spectrogram.v_max])
-
 
     def match_templates(self, time, velocity):
 

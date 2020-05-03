@@ -7,7 +7,6 @@
   Created: 9/18/19
 """
 import os
-import sys
 import re
 import numpy as np
 import pandas as pd
@@ -62,7 +61,8 @@ class DigFile:
         if self.ext == 'dig':
             self.load_dig_file()
         else:
-            raise ValueError(f"I don't understand files with extension {ext}")
+            raise ValueError(
+                f"I don't understand files with extension {ext}")
 
     @property
     def t_final(self):
@@ -106,6 +106,14 @@ class DigFile:
     def basename(self):
         "Return the name of this file, without extension"
         return os.path.splitext(os.path.split(self.path)[1])[0]
+
+    @property
+    def source(self):
+        "If this file is a segment, return the name of the source file"
+        if not self.is_segment:
+            return ""
+        parent = os.path.split(os.path.split(self.path)[0])[1]
+        return parent
 
     @property
     def title(self):
@@ -274,7 +282,8 @@ class DigFile:
             headerinfo.extend(self.header_args)
         datainfo = [
             self.filename,
-            f"{self.bits} bits" + f" {self.notes['byte_order']} first" if 'byte_order' in self.notes else "",
+            f"{self.bits} bits" +
+            f" {self.notes['byte_order']} first" if 'byte_order' in self.notes else "",
             f"{self.t0*1e6} µs to {(self.t0 + self.dt*self.num_samples)*1e6} µs in steps of {self.dt*1e12} ps",
             f"{self.num_samples:,} points",
         ]
@@ -440,7 +449,8 @@ class DigFile:
                 date=df.date,
                 bits=df.bits,
                 dt=df.dt * 1e12,
-                duration=df.dt * df.num_samples * 1e6
+                duration=df.dt * df.num_samples * 1e6,
+                segments=df.has_segments
             ))
             
         os.chdir(curdir) # Reset the current directory.
@@ -449,6 +459,18 @@ class DigFile:
     @property
     def is_segment(self):
         return self.header_text.startswith('Segment')
+
+    @property
+    def has_segments(self):
+        if self.is_segment:
+            return 0
+        # Segments are stored in a folder with the same base
+        # name as our name
+        folder = os.path.splitext(self.path)[0]
+        if not os.path.exists(folder):
+            return 0
+        segs = [x for x in os.listdir(folder) if x.endswith('.dig')]
+        return len(segs)
 
 
 if __name__ == '__main__':
@@ -466,18 +488,3 @@ if __name__ == '__main__':
     plt.show()
     raise Exception("Done")
 
-    for file in os.listdir('../dig/'):
-        filename = os.path.splitext(file)[0]
-        if filename != 'GEN3_CHANNEL1KEY001':
-            continue
-        df = DigFile(f'../dig/{filename}.dig')
-        print(df)
-        thumb = df.thumbnail(0, 1e-3, stdev=True)
-        xvals = thumb['times']
-        yvals = thumb['stdevs']  # thumb['peak_to_peak']
-        plt.plot(xvals * 1e6, yvals)
-        plt.xlabel('$t (\\mu \\mathrm{s})$')
-        plt.ylabel('amplitude')
-        plt.title(filename.replace("_", ""))
-        plt.savefig(f'../figs/thumbnails/{filename}.png')
-        plt.show()
