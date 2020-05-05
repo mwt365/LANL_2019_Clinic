@@ -7,19 +7,20 @@
   Purpose: Experiment to determine which Templates work best.
   Created: 04/10/20
 """
-
+import os
+currDir = os.getcwd()
+os.chdir(os.path.split(os.path.split(__file__)[0])[0]) # Since this file is in one level up from the root and we want act as if we are working from there.
 
 from spectrogram import Spectrogram
-from ImageProcessing.Templates.templates import Templates
-from template_matcher import TemplateMatcher
+from ImageProcessing.TemplateMatching.template_matcher import TemplateMatcher
+from ImageProcessing.TemplateMatching.Templates.templates import Templates
 
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import os
 import tqdm # For printing a timing information to see how far you have gotten.
 
-experimentDataFileName = r"..\NickEstimateOfJumpOffPosition.xlsx"
+experimentDataFileName = r"..\Labels\JustGen3DataJumpOffTrain.xlsx"
 
 data = pd.read_excel(experimentDataFileName)
 
@@ -29,8 +30,8 @@ data = data.dropna()
 data.reset_index()
 
 files = data["Filename"].to_list()
-bestGuessTimes = (data["starting time (bottom signal if frequency multiplexed)"]*1e6).to_list()
-bestGuessVels = data["starting velocity (bottom signal if frequency multiplexed)"].to_list()
+bestGuessTimes = (data[columns[1]]*1e6).to_list()
+bestGuessVels = data[columns[2]].to_list()
 
 baseFolder = r"..\dig"
 
@@ -113,3 +114,5 @@ for i in tqdm.trange(len(files)):
     d.to_csv(os.path.join(saveFolder, files[i].replace(".dig", "") + "_templateMatching.csv"))
 
 print("Experiment completed.")
+
+os.chdir(currDir)

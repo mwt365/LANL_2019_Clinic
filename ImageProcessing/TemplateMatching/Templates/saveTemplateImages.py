@@ -12,13 +12,18 @@ else:
 
 
 def saveAllTemplateImages():
+    currDir = os.getcwd()
+    imageSaveDir = getImageDirectory()
+    os.chdir(imageSaveDir)
 
     for ind, x in tqdm.tqdm(enumerate(Templates)):
         if not os.path.exists(f"./im_template_{x}.png"):
             imsave(f"./im_template_{x}.png", x.value[0])
 
     # Template images saved to the template directory.
-    print("All the template images have been saved.")
+
+    os.chdir(currDir)
+    return imageSaveDir
 
 
 def getImageDirectory():
@@ -27,8 +32,5 @@ def getImageDirectory():
 
 if __name__ == "__main__":
     # Save all the image files in the appropriate directory.
-    imageSaveDir = getImageDirectory()
-    currDir = os.getcwd()
-    os.chdir(imageSaveDir)
     saveAllTemplateImages()
-    os.chdir(currDir)
+

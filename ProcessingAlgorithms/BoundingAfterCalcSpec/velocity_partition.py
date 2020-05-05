@@ -10,11 +10,13 @@
 
 import matplotlib.pyplot as plt
 import numpy as np
-from spectrogram import Spectrogram
 import os
+currDir = os.getcwd()
+os.chdir(os.path.split(os.path.split(os.path.split((__file__))[0])[0])[0])
 
+from spectrogram import Spectrogram
 from ProcessingAlgorithms.SaveFiles.save_as_dig_file import save_as_dig
-
+os.chdir(currDir)
 
 def intensityOverTime(Intensity, time, title:str):
     """
@@ -126,7 +128,13 @@ def splitIntoDigFiles(SpectrogramObject:Spectrogram, fracOfMax = 0.1, timeBetwee
     return f"{len(timeForSplits)} files written in {folder}"
 
 if __name__ == "__main__":
+    currDir = os.getcwd()
+    os.chdir(os.path.split(os.path.split((__file__))[0])[0])
+    
     from ProcessingAlgorithms.preprocess.digfile import DigFile
+
+    os.chdir(currDir)
+    
 
     digFolder = DigFile.dig_dir()
     allDigs = DigFile.inventory()["file"] # Just the files that are not segments.

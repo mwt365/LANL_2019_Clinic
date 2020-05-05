@@ -23,21 +23,19 @@ from spectrogram import Spectrogram
 
 from ProcessingAlgorithms.preprocess.digfile import DigFile
 from ProcessingAlgorithms.spectrum import Spectrum
+
 from ProcessingAlgorithms.Fitting.gaussian import Gaussian
 from ProcessingAlgorithms.SignalExtraction.gaussian_follow import GaussianFitter
-from ProcessingAlgorithms.SignalExtraction.peak_follower import PeakFollower
+from peak_follower import PeakFollower
 from ImageProcessing.TemplateMatching.template_matcher import TemplateMatcher
-from ImageProcessing.TemplateMatching.Templates.templates import *
+from ImageProcessing.TemplateMatching.Templates.templates import Templates
 from matplotlib.patches import Rectangle
 import time as Time
 
-
+from UI_Elements.plotter import COLORMAPS, DEFMAP
 from UI_Elements.value_sliders import ValueSlider
 # Note that this class is not actually used yet. 02/07/20
 # from UI_Elements.percent_slider import PercentSlider
-
-DEFMAP = '3w_gby'  # should really be in an .ini file
-
 
 class SpectrogramWidget:
     """
@@ -575,7 +573,9 @@ class SpectrogramWidget:
             if 'Spectrum' in action:
                 self.spectrum(t, action)
             elif 'Template_Matching' in action:
-                self.match_templates(t, v)
+                ti = self.spectrogram._time_to_index(t)
+                vi = self.spectrogram._velocity_to_index(v)
+                self.match_templates(ti, vi)
             else:
                 # print("I am handling a click that should be a peak follower")
                 self.follow(t, v, action)
@@ -988,82 +988,22 @@ class SpectrogramWidget:
             line.set(xdata=[tval, tval], ydata=[0, self.spectrogram.v_max])
 
     def match_templates(self, time, velocity):
-        template = Templates.opencv_long_start_pattern4
 
-        span = 210
-        vscale = 9
+        methodsToUse = ['cv2.TM_CCORR_NORMED', 'cv2.TM_SQDIFF', 'cv2.TM_SQDIFF_NORMED']
 
-        dv = self.spectrogram.velocity[vscale * span]
-        dt = self.spectrogram.time[span] * 1e6
+        matcher = TemplateMatcher(self.spectrogram, template=Templates.opencv_long_start_pattern5.value, span=200, k=20, methods=methodsToUse)
+        
+        times, velos, scores, methodsUsed = matcher.match()
 
-        # print(self.spectrogram.intensity.shape)
+        time_offset = 2.0 + (2 * abs(matcher.spectrogram.time[matcher.template_time_offset_index] * 1e6))
+        times = np.array(times) + time_offset
 
-        new_click = (0, 0)
-
-        matcher = TemplateMatcher(
-            self.spectrogram, new_click, template, span=span, velo_scale=vscale)
-
-        times, velos, scores = matcher.match()
-
-        # print(times, velos, scores)
-
-        patch = Rectangle(new_click, dt, dv, fill=False,
-                          color='b', alpha=0.15)
-        self.axSpectrogram.add_patch(patch)
-
-        colors = ['ro', 'bo', 'go', 'mo', 'ko', 'co']
-        color_names = ['red', 'blue', 'green', 'magenta', 'black', 'cyan']
-        # methods = ['cv2.TM_CCOEFF', 'cv2.TM_CCOEFF_NORMED', 'cv2.TM_CCORR',
-        #     'cv2.TM_CCORR_NORMED', 'cv2.TM_SQDIFF', 'cv2.TM_SQDIFF_NORMED']
-
-        methods = ['cv2.TM_SQDIFF_NORMED', 'cv2.TM_CCOEFF_NORMED',
-                   'cv2.TM_SQDIFF']  # the 'best' method for matching
-
-        for i in range(len(times)):
-            print("method: ", methods[i])
-            print("color: ", color_names[i])
-            print("time: ", times[i])
-            print("velocity: ", velos[i], '\n')
-            # print("score: ", scores[i])
-            self.axSpectrogram.plot(
-                times[i], velos[i], colors[i], markersize=3, alpha=0.7)
-
-        # self.axSpectrogram.plot( times, velos, 'ro', markersize=2.5, alpha=0.9)
-
-        max_follower = 0
-        max_index = 0
-        max_tsecs = 0
-        max_v = 0
-
-        for i in range(len(times)):
-
-            t = times[i] * 1e-6
-            v = velos[i]
-
-            follower = PeakFollower(self.spectrogram, (t, v))
-
-            self.peak_followers.append(follower)
-            follow_sum = follower.run()
-
-            tsec, v = follower.v_of_t
-
-            if follow_sum > max_follower:
-                max_follower = follow_sum
-                max_index = i
-                max_tsecs = tsec
-                max_v = v
-
-        follower.line = self.axSpectrogram.plot(
-            max_tsecs * 1e6, max_v, 'r-', alpha=0.5)[0]
-
-        most_likely_time = times[max_index]
-        most_likely_velo = velos[max_index]
-
-        print("(most confident) time: ", most_likely_time)
-        print("             velocity: ", most_likely_velo, "\n")
-
-        self.axSpectrogram.plot(
-            most_likely_time, most_likely_velo, 'ko', markersize=2, alpha=1)
+        matcher.add_to_plot(self.axSpectrogram, times, velos, scores, methodsUsed, 
+                                show_points=True, 
+                                show_medoids=True,
+                                verbose=False,
+                                visualize_opacity=False, 
+                                show_bounds=True)
 
 
 

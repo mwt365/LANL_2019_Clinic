@@ -14,13 +14,13 @@
 Templates are tuples of (an intensity matrix, the time offset, the velocity offset)
 
 Where:
-intensity matrix -- is the array used to perform the template matching. 
+intensity matrix -- is the array used to perform the template matching.
 time and velocity offsets -- are where the signal actually would start.
 
 Template matching returns the top left index on the original image
-where the template matched the best. If you have a large template, 
-the actual starting point is somewhere inside the template, and must be 
-accounted for. Therefore, we use the index offset at which the signal in the 
+where the template matched the best. If you have a large template,
+the actual starting point is somewhere inside the template, and must be
+accounted for. Therefore, we use the index offset at which the signal in the
 template would start.
 
 To get these values, use: <template_name>[index_of_item]
@@ -65,7 +65,7 @@ class Templates(Enum):
         [-2, -2, -2, 6, 6, 6],
         [-1, -1, -1, -1, -1, -1],
         [-1, -1, -1, -1, -1, -1]
-        
+
     ], 4, 4)
 
     bigger_start_pattern2 = ([
@@ -76,7 +76,7 @@ class Templates(Enum):
         [-2, -1, -1, 2, 2, 2],
         [-2, -1, -1, -1, -1, -1],
         [-2, -1, -1, -1, -1, -1]
-        
+
     ], 4, 4)
 
     bigger_start_pattern3 = ([
@@ -87,7 +87,7 @@ class Templates(Enum):
         [-2, -1, -1, 1, 1, 2],
         [-2, -1, -1, 1, 1, 2],
         [-2, -1, -1, 1, 1, 2]
-        
+
     ], 4, 3)
 
 
@@ -100,29 +100,29 @@ class Templates(Enum):
         [6, 6, 6, -6, -6, -6],
         [2, 2, 1, -1, -2, -2],
         [2, 1, 1, -1, -1, -2]
-        
+
     ], 2, 4)
 
     bigger_end_pattern2 = ([
 
-        [3, 3, 2, -1, -1, -2], 
-        [3, 3, 2, -1, -1, -2], 
-        [2, 2, 2, -1, -1, -2], 
-        [2, 2, 2, -1, -1, -2], 
-        [-1, -1, -1, -1, -1, -1], 
+        [3, 3, 2, -1, -1, -2],
+        [3, 3, 2, -1, -1, -2],
+        [2, 2, 2, -1, -1, -2],
+        [2, 2, 2, -1, -1, -2],
+        [-1, -1, -1, -1, -1, -1],
         [-1, -1, -1, -1, -1, -1]
 
     ], 2, 4)
 
     bigger_end_pattern3 = ([
 
-        [2, -1, -1, -1, -1, -2], 
-        [2, 2, -1, -1, -1, -1], 
-        [2, 2, 2, 1, -1, -2], 
-        [2, 2, 2, 1, -1, -2], 
-        [2, 2, -1, -1, -1, -1], 
-        [2, -1, -1, -1, -1, -2] 
-        
+        [2, -1, -1, -1, -1, -2],
+        [2, 2, -1, -1, -1, -1],
+        [2, 2, 2, 1, -1, -2],
+        [2, 2, 2, 1, -1, -2],
+        [2, 2, -1, -1, -1, -1],
+        [2, -1, -1, -1, -1, -2]
+
     ], 2, 4)
 
 
@@ -352,7 +352,7 @@ class Templates(Enum):
         [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 0, -1, 0, -1, 0, -1, 0, -1, 0, -1, 0, -1, 0, -1, 0, -1, 0, -1, 0, -1, 0]
 
 
-    ], 72, 16)
+    ], 70, 16)
 
 
     opencv_long_start_pattern6 = ([
@@ -493,5 +493,5 @@ class Templates(Enum):
     #     [-2, -1, -1, 1, 1, 2],
     #     [-2, -1, -1, 1, 1, 2],
     #     [-2, -1, -1, 1, 1, 2]
-        
+
     # ]

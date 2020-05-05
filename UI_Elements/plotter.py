@@ -1,6 +1,5 @@
 #! /usr/bin/env python3
 
-
 # Due to the updated folder structure.
 import UI_Elements.xml_cm_files.cm_xml_to_matplotlib as cm
 import os
@@ -22,3 +21,9 @@ try:
                     print(f"No luck with {path}")
 except FileNotFoundError:
     print("No folder named 'xml color map files' in the source directory.")
+
+DEFMAP = '3w_gby'
+if '3w_gby' not in COLORMAPS:
+    # Just give me the first colormap in these colormaps.
+    DEFMAP = list(COLORMAPS.keys())[0]
+

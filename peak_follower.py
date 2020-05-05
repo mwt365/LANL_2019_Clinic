@@ -2,7 +2,6 @@
 # coding:utf-8
 """
 ::
-
   Author:  LANL Clinic 2019 --<lanl19@cs.hmc.edu>
   Purpose: Attempt to follow a peak.
   Created: 10/18/19
@@ -18,9 +17,7 @@ class PeakFollower(Follower):
     """
     A naive follower implementation that uses a local-region
     smoothing and then follows the local maximum.
-
     **Inputs to the constructor**
-
     - spectrogram: an instance of Spectrogram
     - start_point: (t, v), the coordinates at which to begin the search
                 The time is in seconds. The velocity is in m/s.
@@ -31,8 +28,6 @@ class PeakFollower(Follower):
       spectrum prior to searching for a peak.
     - max_hop: (50) the largest change in v from the previous time step to consider
       as a continuation.
-
-
     """
 
     def __init__(self, spectrogram, start_point, span=80,
@@ -85,7 +80,6 @@ class PeakFollower(Follower):
             return False
 
         if maxIter > 0:
-            print("Max iter is breaking it.")
             if len(self.results['time_index']) >= maxIter:
                 return False # We have done the maximum number of iterations.
 
@@ -94,7 +88,7 @@ class PeakFollower(Follower):
 
         # generate an index array to sort the intensities (low to high)
         low_to_high = np.argsort(intensities)
-        print("Check the new intensities")
+
         # remove any peaks that are too close to the baseline
         n = -1
         while True:
@@ -132,5 +126,3 @@ class PeakFollower(Follower):
         except Exception as eeps:
             print(eeps)
             return False
-
-
