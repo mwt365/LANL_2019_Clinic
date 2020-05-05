@@ -4,6 +4,7 @@
 import numpy as np
 from datetime import datetime
 
+
 def save_as_dig(filename, vvals, datatype, dt=20e-12, initialTime=0,
                 voltageMultiplier=6.103516e-5, voltageOffset=0,
                 top_header="", **kwargs):
@@ -76,7 +77,7 @@ def save_as_dig(filename, vvals, datatype, dt=20e-12, initialTime=0,
         f.write(top_header)  # write 512 bytes of spaces
         stuff = "\r\n".join([
             # todays date Day Mon NumDay HH:MM:SS: YEAR
-            # This is achieved using ctime() in the datetime library. 
+            # This is achieved using ctime() in the datetime library.
             # Reference https://docs.python.org/3/library/datetime.html
             date,
             # the number of samples used.

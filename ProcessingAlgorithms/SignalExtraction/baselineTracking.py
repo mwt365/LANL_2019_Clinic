@@ -9,21 +9,24 @@ from spectrogram import Spectrogram
 from UI_Elements.plotter import COLORMAPS, DEFMAP
 
 
+from spectrogram import Spectrogram
+from ProcessingAlgorithms.SignalExtraction.baselines import baselines_by_squash
 
 
-def saveBaselineIntensityImages(files, saveLoc:str = None, imageExt:str = "png"):
+def saveBaselineIntensityImages(files, saveLoc: str = None, imageExt: str = "png"):
     """
     Save a image file of the baseline as a function of time to the folder specified by saveLoc.
     """
     if saveLoc == None:
         saveLoc = r"../baselineIntensityMaps"
-    
+
     for i in tqdm.trange(len(files)):
         filename = f"../dig/{files[i]}"
         MySpect = Spectrogram(filename)
-        peaks, _, heights = baselines.baselines_by_squash(MySpect)
+        peaks, _, heights = baselines_by_squash(MySpect)
 
-        plt.plot(np.array(MySpect.time)*1e6, MySpect.intensity[MySpect._velocity_to_index(peaks[0])])
+        plt.plot(np.array(MySpect.time) * 1e6,
+                 MySpect.intensity[MySpect._velocity_to_index(peaks[0])])
         plt.xlabel("Time ($\mu$s)")
         plt.ylabel("Intensity (db)")
         plt.title(f"{MySpect.data.filename}")
@@ -44,16 +47,20 @@ def baselineTracking(spectrogram:Spectrogram, baselineVel, changeThreshold, skip
     """
 
     baselineInd = spectrogram._velocity_to_index(baselineVel)
-    runningAverage = spectrogram.intensity[baselineInd][spectrogram._time_to_index(spectrogram.t_start + skipUntilTime)]
-    
-    startInd = spectrogram._time_to_index(spectrogram.t_start + skipUntilTime)
+    runningAverage = spectrogram.intensity[baselineInd][spectrogram._time_to_index(
+        spectrogram.t_start + skipUntilTime)]
+
+    startInd = spectrogram._time_to_index(
+        spectrogram.t_start + skipUntilTime)
     for ind in range(startInd, spectrogram.intensity.shape[-1]):
         currentIntensity = spectrogram.intensity[baselineInd][ind]
-        if (np.abs(currentIntensity) >= np.abs((1+changeThreshold) * runningAverage)) or (np.abs(currentIntensity) <= np.abs((1-changeThreshold) * runningAverage)):
-            return spectrogram.time[ind]*1e6
-        runningAverage += 1/(ind+1-startInd) * (currentIntensity - runningAverage)
-    
-    return spectrogram.time[ind]*1e6
+        if (np.abs(currentIntensity) >= np.abs((1 + changeThreshold) * runningAverage)) or (np.abs(currentIntensity) <= np.abs((1 - changeThreshold) * runningAverage)):
+            # print(f"{changeThreshold}: {spectrogram.time[ind]*1e6}")
+            return spectrogram.time[ind] * 1e6
+        runningAverage += 1 / (ind + 1 - startInd) * \
+            (currentIntensity - runningAverage)
+
+    return spectrogram.time[ind] * 1e6
 
 
 def baselineExperiment(baselineIntensity:np.array, thresholds:np.array, skipFirstXIndices:int = 0):
@@ -86,13 +93,14 @@ def runExperiment(trainingFilePath, thresholds:list, skipUntilTimes:list = []):
 
     data = pd.read_excel(trainingFilePath)
 
-    data = data.dropna() # Ignore the samples that we do not have the full data for.
-    data.reset_index() # Reset so that it can be easily indexed.
+    # Ignore the samples that we do not have the full data for.
+    data = data.dropna()
+    data.reset_index()  # Reset so that it can be easily indexed.
 
     files = data["Filename"].to_list()
-    bestGuessTimes = (data[data.columns[1]]*1e6).to_list()
-    bestGuessVels = data[data.columns[-1]].to_list() # This will be the same times for the probe destruction dataset. It is generally ignored currently.
-
+    bestGuessTimes = (data[data.columns[1]] * 1e6).to_list()
+    # This will be the same times for the probe destruction dataset. It is generally ignored currently.
+    bestGuessVels = data[data.columns[-1]].to_list()
 
     d = {"Filename": files}
 
@@ -143,8 +151,6 @@ def runExperiment(trainingFilePath, thresholds:list, skipUntilTimes:list = []):
             summaryStatistics[i][j][3] = np.max(q)
             summaryStatistics[i][j][4] = np.min(q)
 
-
-
     for i in tqdm.trange(len(stats)):
         fig = plt.figure()
         ax = plt.gca()
@@ -154,13 +160,12 @@ def runExperiment(trainingFilePath, thresholds:list, skipUntilTimes:list = []):
         plt.ylabel("Thresholds")
         plt.xlabel("Time that you skip at the beginning")
         plt.gcf().colorbar(pcm, ax=ax)
-    
-        plt.show() # Need this for Macs.
-        
+
+        plt.show()  # Need this for Macs.
+
     summaryFolder = r"../ProbeDestructionEstimates"
     if not os.path.exists(summaryFolder):
         os.makedirs(summaryFolder)
-
 
     for i in range(len(thresholds)):
         q = pd.DataFrame(summaryStatistics[i])
@@ -168,8 +173,8 @@ def runExperiment(trainingFilePath, thresholds:list, skipUntilTimes:list = []):
         saveSummaryFilename = f"summaryThresh{internal_a}.csv"
         q.to_csv(os.path.join(summaryFolder, saveSummaryFilename))
 
-
     return summaryStatistics, d
+
 
 if __name__ == "__main__":
 

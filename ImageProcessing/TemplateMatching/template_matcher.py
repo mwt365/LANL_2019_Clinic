@@ -7,9 +7,9 @@
   Purpose: Attempt to match templates in a user specified area.
   Created: 2/16/20
 """
-import cv2 # The general computer vision library for python.
+import cv2  # The general computer vision library for python.
 import numpy as np
-from baselines import baselines_by_squash
+from ProcessingAlgorithms.SignalExtraction.baselines import baselines_by_squash
 from spectrogram import Spectrogram
 import ImageProcessing.TemplateMatching.Templates.saveTemplateImages as templateHelper
 import os
@@ -19,9 +19,11 @@ if scipy.__version__ > "1.2.1":
     from imageio import imsave
 else:
     from scipy.misc import imsave
+
 from matplotlib import pyplot as plt
 from matplotlib.patches import Rectangle
 from sklearn_extra.cluster import KMedoids
+
 
 class TemplateMatcher():
     """
@@ -32,7 +34,7 @@ class TemplateMatcher():
 
     - spectrogram: an instance of Spectrogram
     - start_point: (t, v), the coordinates at which to begin the search
-    - template: a two-dimensional array that is read into to OpenCV as 
+    - template: a two-dimensional array that is read into to OpenCV as
         a template image for matching.
     - span: (80) a 'radius' of pixels surrounding the starting point to 
         increase the searching space for the starting point.
@@ -77,22 +79,20 @@ class TemplateMatcher():
         self.zero_time_index = spectrogram._time_to_index(0)
         self.zero_velo_index = spectrogram._velocity_to_index(0)
 
-        if start_point is None: 
+        if start_point is None:
             self.click = (self.zero_time_index, self.zero_velo_index)
         else:
             assert isinstance(start_point, tuple)
             self.click = start_point
-        
+
         self.matching_methods = methods
         self.num_methods = len(methods)
-        
+
         self.setup()
-
-
 
     def setup(self):
 
-        velo_scale = self.velo_scale 
+        velo_scale = self.velo_scale
         time_index, velocity_index = self.click
 
         if time_index < 0:
@@ -119,10 +119,9 @@ class TemplateMatcher():
         max_velo = self.spectrogram.velocity[max_velo_index]
         max_time = self.spectrogram.time[max_time_index]
 
-        self.time_bounds = (time_index, ending_time_index) #indices, not actual time/velo values
+        # indices, not actual time/velo values
+        self.time_bounds = (time_index, ending_time_index)
         self.velo_bounds = (velocity_index, ending_velo_index)
-
-
 
     def crop_intensities(self, matrix):
 
@@ -134,10 +133,10 @@ class TemplateMatcher():
         assert (velo_bounds[0] != velo_bounds[1])
         assert (time_bounds[0] != time_bounds[1])
 
-        if velo_bounds[0] == 0: 
-            flipped_velo_bounds = (-1*velo_bounds[1], -1)
+        if velo_bounds[0] == 0:
+            flipped_velo_bounds = (-1 * velo_bounds[1], -1)
         else:
-            flipped_velo_bounds = (-1*velo_bounds[1], -1*velo_bounds[0])
+            flipped_velo_bounds = (-1 * velo_bounds[1], -1 * velo_bounds[0])
 
         self.flipped_velo_bounds = flipped_velo_bounds
 
@@ -149,19 +148,15 @@ class TemplateMatcher():
         sorted_matrix = sorted(cleaned_matrix.flatten(), reverse=True)
         threshold_percentile = np.percentile(sorted_matrix, percentile_value)
 
-        cleaned_matrix = np.where(cleaned_matrix > threshold_percentile, cleaned_matrix+threshold_percentile, threshold_percentile)
+        cleaned_matrix = np.where(cleaned_matrix > threshold_percentile,
+                                  cleaned_matrix + threshold_percentile, threshold_percentile)
 
         # imsave("./flipped_original.png", cleaned_matrix[:])
 
-        
-
-
-        spec = cleaned_matrix[ flipped_velo_bounds[0]:flipped_velo_bounds[1], time_bounds[0]:time_bounds[1]]
+        spec = cleaned_matrix[flipped_velo_bounds[0]:flipped_velo_bounds[1], time_bounds[0]:time_bounds[1]]
         # imsave("./debug.png", spec[:])
 
         return spec
-
-
 
     def match(self):
 
@@ -200,8 +195,8 @@ class TemplateMatcher():
             res = cv2.matchTemplate(img, template, method)
             min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(res)
 
-            #get all the matches:
-            result2 = np.reshape(res, res.shape[0]*res.shape[1])
+            # get all the matches:
+            result2 = np.reshape(res, res.shape[0] * res.shape[1])
             sort = np.argsort(result2)
 
             best_k = []
@@ -228,13 +223,15 @@ class TemplateMatcher():
                 velo_offset_index = self.template_velo_offset_index
                 time_offset_index = self.template_time_offset_index
 
-                real_velo_index = abs(self.flipped_velo_bounds[0] + bottom_right[1]) + velo_offset_index
+                real_velo_index = abs(
+                    self.flipped_velo_bounds[0] + bottom_right[1]) + velo_offset_index
 
                 # there might be a bug here. Causing issues with jupyter notebook timing index offsets.
                 time_match = self.spectrogram.time[top_left[0]] * 1e6
                 template_offset_time = self.spectrogram.time[time_offset_index] * 1e6
                 start_time = self.spectrogram.time[self.zero_time_index] * 1e6 * -1
-                time_offset = abs(self.spectrogram.time[self.time_bounds[0]] * 1e6)
+                time_offset = abs(
+                    self.spectrogram.time[self.time_bounds[0]] * 1e6)
 
                 time_total = time_match + template_offset_time + start_time + time_offset
 
@@ -245,8 +242,7 @@ class TemplateMatcher():
 
         return xcoords, ycoords, scores, methodUsed
 
-
-    def matchMultipleTemplates(self, methods = ['cv2.TM_CCOEFF', 'cv2.TM_CCOEFF_NORMED', 'cv2.TM_CCORR', 'cv2.TM_CCORR_NORMED', 'cv2.TM_SQDIFF', 'cv2.TM_SQDIFF_NORMED'], templatesList: list = None):
+    def matchMultipleTemplates(self, methods=['cv2.TM_CCOEFF', 'cv2.TM_CCOEFF_NORMED', 'cv2.TM_CCORR', 'cv2.TM_CCORR_NORMED', 'cv2.TM_SQDIFF', 'cv2.TM_SQDIFF_NORMED'], templatesList: list = None):
         """
             Enable the use of multiple templates in testing.
         """
@@ -275,8 +271,8 @@ class TemplateMatcher():
             for tempInd, temp in enumerate(templatesList):
                 template = cv2.imread(os.path.join(imageSaveDir, f"im_template_{temp}.png"), 0)
 
-                self.template_time_offset_index, self.template_velo_offset_index = temp.value[1:]
-
+                self.template_time_offset_index, self.template_velo_offset_index = temp.value[
+                    1:]
 
                 w, h = template.shape[::-1]
 
@@ -293,14 +289,15 @@ class TemplateMatcher():
                     res = cv2.matchTemplate(img, template, method)
                     min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(res)
 
-                    #get all the matches:
-                    result2 = np.reshape(res, res.shape[0]*res.shape[1])
+                    # get all the matches:
+                    result2 = np.reshape(res, res.shape[0] * res.shape[1])
                     sort = np.argsort(result2)
 
                     best_k = []
 
                     for i in range(self.k):
-                        best_k.append(np.unravel_index(sort[i], res.shape)[::-1])
+                        best_k.append(np.unravel_index(
+                            sort[i], res.shape)[::-1])
 
                     for point in best_k:
 
@@ -319,12 +316,14 @@ class TemplateMatcher():
                         velo_offset_index = self.template_velo_offset_index
                         time_offset_index = self.template_time_offset_index
 
-                        real_velo_index = abs(self.flipped_velo_bounds[0] + bottom_right[1]) + velo_offset_index
+                        real_velo_index = abs(
+                            self.flipped_velo_bounds[0] + bottom_right[1]) + velo_offset_index
 
                         time_match = self.spectrogram.time[top_left[0]] * 1e6
                         template_offset_time = self.spectrogram.time[time_offset_index] * 1e6
                         start_time = self.spectrogram.time[self.zero_time_index] * 1e6 * -1
-                        time_offset = abs(self.spectrogram.time[self.time_bounds[0]] * 1e6)
+                        time_offset = abs(
+                            self.spectrogram.time[self.time_bounds[0]] * 1e6)
 
                         time_total = time_match + template_offset_time + start_time + time_offset
 
@@ -333,11 +332,10 @@ class TemplateMatcher():
                         xcoords.append(time_total)
                         ycoords.append(true_velo)
 
-                outputValues[tempInd] = tuple([xcoords, ycoords, scores, methodUsed])
-        
+                outputValues[tempInd] = tuple(
+                    [xcoords, ycoords, scores, methodUsed])
+
         return outputValues
-
-
 
     def find_kmedoids(self, xcoords, ycoords, clusters=5, random_state=None):
         assert(len(xcoords) == len(ycoords))
@@ -345,8 +343,6 @@ class TemplateMatcher():
 
         kmedoids = KMedoids(n_clusters=clusters, random_state=random_state).fit(X)
         return kmedoids.cluster_centers_ # return a np array of shape (clusters, 2). The columns are xcoords and ycoords.
-
-
 
     def mask_baselines(self):
         peaks, _, _ = baselines_by_squash(self.spectrogram)
@@ -356,8 +352,6 @@ class TemplateMatcher():
             velo_index = velo_index - 20
             for i in range(velo_index, velo_index + 40, 1):
                 self.matrixToMatch[i][:] = minimum
-
-
 
     def add_to_plot(self, axes, times, velos, scores, methodsUsed,
                     show_points=True,
@@ -376,9 +370,9 @@ class TemplateMatcher():
         method_color_dict['cv2.TM_CCOEFF'] = ('ro', 'red')
         method_color_dict['cv2.TM_CCOEFF_NORMED'] = ('bo', 'blue')
         method_color_dict['cv2.TM_CCORR'] = ('go', 'green')
-        method_color_dict['cv2.TM_CCORR_NORMED'] = ('mo','magenta')
-        method_color_dict['cv2.TM_SQDIFF'] = ('ko','black')
-        method_color_dict['cv2.TM_SQDIFF_NORMED'] = ('co','cyan')
+        method_color_dict['cv2.TM_CCORR_NORMED'] = ('mo', 'magenta')
+        method_color_dict['cv2.TM_SQDIFF'] = ('ko', 'black')
+        method_color_dict['cv2.TM_SQDIFF_NORMED'] = ('co', 'cyan')
 
         handles = []
         seen_handles = []
@@ -390,7 +384,7 @@ class TemplateMatcher():
                 print("velocity: ", velos[i])
                 print("score: ", scores[i])
                 print("color: ", method_color_dict[methodsUsed[i]][1])
-                print("method: ", methodsUsed[i],'\n')
+                print("method: ", methodsUsed[i], '\n')
 
             if visualize_opacity and show_points: #not quite working
                 # plot the points in descending order, decreasing their opacity so the 'best' points 
@@ -399,20 +393,22 @@ class TemplateMatcher():
                 maxscore = np.max(scores)
                 opacity = (1 / (maxscore / scores[i]))
                 point_method = methodsUsed[i]
-                point, = axes.plot(times[i], velos[i], method_color_dict[methodsUsed[i]][0], markersize=2.5, alpha=opacity)
+                point, = axes.plot(
+                    times[i], velos[i], method_color_dict[methodsUsed[i]][0], markersize=2.5, alpha=opacity)
             else:
                 if show_points:
                     point_method = methodsUsed[i]
                     # plot the point found from template matching in order from 'best' to 'worst' match
-                    point, = axes.plot(times[i], velos[i], method_color_dict[methodsUsed[i]][0], markersize=2.5, alpha=.80)
-        
+                    point, = axes.plot(
+                        times[i], velos[i], method_color_dict[methodsUsed[i]][0], markersize=2.5, alpha=.80)
+
             # add each method to the plot legend handle
             if show_points:
                 if point_method not in seen_handles:
                     seen_handles.append(point_method)
                     point.set_label(point_method)
                     handles.append(point)
-    
+
         # cluster coordinates received from template matching, find cluster centers and plot them
         if show_medoids:
             centers = self.find_kmedoids(times, velos, clusters = self.num_methods)
@@ -420,7 +416,6 @@ class TemplateMatcher():
                 center, = axes.plot(t, v, 'ro', markersize=4, alpha=.9)
             center.set_label("cluster center")
             handles.append(center)
-
 
         # #update the legend with the current plotting handles
         axes.legend(handles=handles, loc='upper right')
@@ -431,18 +426,16 @@ class TemplateMatcher():
         plt.show()
 
 
-
-
 if __name__ == "__main__":
     """
     example files 
 
-    WHITE_CH1_SHOT/seg00.dig -- opencv_long_start_pattern4 span=200 
-    WHITE_CH2_SHOT/seg00.dig -- opencv_long_start_pattern4 span=200 
-    WHITE_CH3_SHOT/seg00.dig -- opencv_long_start_pattern4 span=200 
-    WHITE_CH4_SHOT/seg00.dig -- ??? opencv_long_start_pattern4 span=200 
+    WHITE_CH1_SHOT/seg00.dig -- opencv_long_start_pattern4 span=200
+    WHITE_CH2_SHOT/seg00.dig -- opencv_long_start_pattern4 span=200
+    WHITE_CH3_SHOT/seg00.dig -- opencv_long_start_pattern4 span=200
+    WHITE_CH4_SHOT/seg00.dig -- ??? opencv_long_start_pattern4 span=200
 
-    BLUE_CH1_SHOT/seg00.dig -- opencv_long_start_pattern4 span=150 
+    BLUE_CH1_SHOT/seg00.dig -- opencv_long_start_pattern4 span=150
     BLUE_CH2_SHOT/seg00.dig -- ??? opencv_long_start_pattern3 span=200
     BLUE_CH3_SHOT/seg00.dig -- opencv_long_start_pattern4 span=200
 
