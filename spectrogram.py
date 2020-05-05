@@ -14,7 +14,7 @@ from scipy import signal
 from scipy.signal import find_peaks
 
 from ProcessingAlgorithms.preprocess.digfile import DigFile
-from plotter import COLORMAPS
+from UI_Elements.plotter import COLORMAPS
 
 DEFMAP = '3w_gby'
 
@@ -376,6 +376,7 @@ class Spectrogram:
         dub.t_min = t_min
         dub.t_max = t_max
         dub.n_bins = n_bins
+        self.noise = dub.mean
         return dub
 
     def noise_level(self, percentile: float = 90.0):
@@ -630,7 +631,8 @@ class Spectrogram:
             # getattr(object, itemname, default)
             zData = getattr(self, data, "intensity")
 
-            key = f"{data}" + (f" transformed to {self.form}" if transformData else " raw")
+            key = f"{data}" + \
+                (f" transformed to {self.form}" if transformData else " raw")
             fig = plt.figure(num=key)
             axes = plt.gca()
 
@@ -654,21 +656,24 @@ class Spectrogram:
             dataToLookAt = self.transform(zData[:, :endTime]) if (
                 data != "intensity" and transformData) else zData[:, :endTime]
 
-            print(f"The current maximum of the colorbar is {np.max(dataToLookAt) } for the dataset {data}")
+            print(
+                f"The current maximum of the colorbar is {np.max(dataToLookAt) } for the dataset {data}")
 
             # Plot the start time estimate.
             axes.plot([self.estimatedStartTime_] * len(self.velocity),
                       self.velocity, "k-", label="Estimated Start Time", alpha=0.75)
             # plt.legend()
 
-            print(f"The current maximum of the colorbar is {np.max(zData[:,:endTime])} for the dataset {data}")
+            print(
+                f"The current maximum of the colorbar is {np.max(zData[:,:endTime])} for the dataset {data}")
             plt.gcf().colorbar(pcm, ax=axes)
             axes.set_ylabel('Velocity (m/s)', fontsize=14)
             axes.set_xlabel('Time ($\mu$s)', fontsize=14)
             axes.xaxis.set_tick_params(labelsize=12)
             axes.yaxis.set_tick_params(labelsize=12)
             title = self.data.filename.split('/')[-1]
-            axes.set_title(title.replace("_", "-") + f" {data} spectrogram", fontsize=24)
+            axes.set_title(title.replace("_", "-") +
+                           f" {data} spectrogram", fontsize=24)
 
             axes.set_xlim(left, right)
             # The None value is the default value and does not update the axes limits.
@@ -693,7 +698,7 @@ class Spectrogram:
             - color_range
             - cmap
         """
-        from plotter import COLORMAPS
+        from UI_Elements.plotter import COLORMAPS
 
         if 'folder' in kwargs:
             folder = kwargs.pop('folder')

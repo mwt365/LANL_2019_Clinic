@@ -53,6 +53,8 @@ class PeakFollower(Follower):
         # Let's take only the peaks greater than 10% of the strongest peak
         self.baselines = peaks[heights > 0.1]
         self.noise_level = spectrogram.noise_level() * 3
+        self.noise = None if not hasattr(
+            spectrogram, 'noise') else spectrogram.noise
 
     def reverse(self):
         """Switch directions"""
@@ -141,7 +143,8 @@ class PeakFollower(Follower):
             try:
                 hop = abs(v_high - self.last_peak)
                 if hop > self.max_hop:
-                    print(f"hop at [{self.t_index}] of {hop} from {self.last_peak:0f} to {self.v_high:0f}")
+                    print(
+                        f"hop at [{self.t_index}] of {hop} from {self.last_peak:0f} to {self.v_high:0f}")
 
             except:
                 pass

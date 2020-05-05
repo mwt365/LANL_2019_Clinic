@@ -20,7 +20,7 @@ class Fit:
     """
     Object to perform a fit and compute residuals and chisq.
 
-    If the fit is successful, the field Gaussian.valid is
+    If the fit is successful, the field Fit.valid is
     set to True.
     """
 
@@ -213,10 +213,12 @@ class Fit:
             if TABLE:
                 lines.append(r"\end{tabular}")
             if has_unc:
-                lines.append(r"$N_{\rm dof} = " + self.texval(f"{self.dof}") + ", ")
+                lines.append(r"$N_{\rm dof} = " +
+                             self.texval(f"{self.dof}") + ", ")
                 lines[-1] += r"\chi^2 = " + self.texval(f"{self.chisq:.3g}")
                 lines[-1] += r"\; " + f" ({self.reduced_chisq:.3g})$"
-                lines.append(r"$P_> = " + f"{100*self.prob_greater:.1f}" + "\%$")
+                lines.append(
+                    r"$P_> = " + f"{100*self.prob_greater:.1f}" + "\%$")
         else:
             lines.append(self.error)
         return "\n".join(lines)
@@ -232,6 +234,15 @@ class Fit:
     @property
     def valid(self):
         return self.error is None
+
+    @property
+    def error_scale(self):
+        """
+        By what factor errors need to grow to yield chisq/DoF = 1
+        """
+        if not self.valid or not isinstance(self.errors, np.ndarray):
+            return None
+        return np.sqrt(self.chisq / self.dof)
 
     def plot(self, **kwargs):
         """
@@ -675,8 +686,10 @@ if __name__ == '__main__':
     print(gus)
     print('\nActual parameters:')
     print(f'amplitude = {amp:.3g}')
-    print(f'center = {center:.3g}  ({abs((center-gus.params[1])/gus.errors[1]):.1f} σ)')
-    print(f'width = {width:.3g}  ({abs((width-abs(gus.params[2]))/gus.errors[2]):.1f} σ)')
+    print(
+        f'center = {center:.3g}  ({abs((center-gus.params[1])/gus.errors[1]):.1f} σ)')
+    print(
+        f'width = {width:.3g}  ({abs((width-abs(gus.params[2]))/gus.errors[2]):.1f} σ)')
     print(f'background = {background:.3g}')
     gus.plot(legend=(1, 1))
     plt.show()

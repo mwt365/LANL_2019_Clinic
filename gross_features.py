@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 from ProcessingAlgorithms.preprocess.digfile import DigFile
 from spectrogram import Spectrogram
 from ProcessingAlgorithms.spectrum import Spectrum
-from plotter import COLORMAPS
+from UI_Elements.plotter import COLORMAPS
 from scipy.cluster.vq import kmeans, kmeans2, whiten
 
 

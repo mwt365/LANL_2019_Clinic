@@ -15,7 +15,7 @@ from pnspipe import PNSPipe
 import matplotlib.pyplot as plt
 
 from ProcessingAlgorithms.Fitting.fit import Exponential, DoubleExponential
-from plotter import COLORMAPS
+from UI_Elements.plotter import COLORMAPS
 DEFMAP = '3w_gby'
 
 
@@ -24,11 +24,14 @@ def make_spectrogram(pipe: PNSPipe, **kwargs):
     Compute a spectrogram using the passed kwargs or
     built-in defaults and set the pipe.spectrogram field.
     Default values are:
-      wavelength = 1.55e-6
-      points_per_spectrum = 4096
-      overlap = 7/8
-      window_function = None
-      form = 'power'
+        wavelength = 1.55e-6
+        points_per_spectrum = 4096
+        overlap = 7/8
+        window_function = None
+        form = 'power'
+
+    Results:
+        adds spectrogram to pipe
     """
     from spectrogram import Spectrogram
 
@@ -53,6 +56,9 @@ def find_destruction(pipe: PNSPipe, **kwargs):
     """
     Look for a signature of probe destruction using the
     vertical squash method.
+
+    Results:
+        adds probe_destruction (s) to pipe
     """
     sg = pipe.spectrogram
     t_blast = sg.vertical_spike()
@@ -68,8 +74,16 @@ def find_baselines(pipe: PNSPipe, **kwargs):
     passed as a keyword argument, only keep baseline values
     that are larger than this value (which should be between
     0 and 1).
+
+    Possible kwargs:
+        baseline_limit: defaults to 0.01
+
+    Results:
+        adds baselines to pipe in the form of a np.ndarray
+        of velocities
     """
-    from ProcessingAlgorithms.SignalExtraction.baselines import baselines_by_squash as bline
+    from ProcessingAlgorithms.SignalExtraction.baselines \
+        import baselines_by_squash as bline
     peaks, widths, heights = bline(pipe.spectrogram)
     baseline_limit = kwargs.get('baseline_limit', 0.01)
     pipe.baselines = peaks[heights > baseline_limit]
@@ -79,7 +93,11 @@ def find_baselines(pipe: PNSPipe, **kwargs):
 
 def find_signal(pipe: PNSPipe, **kwargs):
     """
-    Start at t_start and look for a peak above the baseline
+    Analyze the spectrum at t_start (seconds), looking for a peak above the
+    lowest baseline.
+
+    Results:
+        adds signal_guess = (t_start, v_guess) to pipe
     """
     from ProcessingAlgorithms.SignalExtraction.peak_follower import signal_finder
 
@@ -93,7 +111,10 @@ def find_signal(pipe: PNSPipe, **kwargs):
 
 def analyze_noise(pipe: PNSPipe, **kwargs):
     """
-    Attempt to analyze the noise statistics in the spectrogram.
+    Attempt to analyze the noise statistics in the spectrogram by
+    preparing a histogram of a rectangle of intensity data
+    (t_min, t_max) and (v_min, v_max) and fitting a double
+    exponential.
 
     Possible kwargs:
         v_min:    defaults to bottom baseline
@@ -101,14 +122,37 @@ def analyze_noise(pipe: PNSPipe, **kwargs):
         t_min:    defaults to t_start
         t_max:    defaults to probe destruction
         n_bins:   defaults to 100
+        ext:      defaults to .pdf
+
+    Results:
+        - sets noise field of spectrogram to mean noise
+        - saves a figure: f'Noise_{segment_name}.{ext}'
+        - adds a 'noise' dictionary to pipe.results with fields
+            figname: the name described above
+            amp:     amplitude of the fitted exponential(s)
+            mean:    mean noise
+            stdev:   standard deviation of the noise
+            chisq:   chi-squared for the fit
+            prob:    the probability that χ2 would be larger
+            if the fit is to a single exponential, the dictionary
+            also has fields; this happens if the double-exponential
+            fit fails
+            lamb:    the exponential decay parameter
+            otherwise, it has
+            beta:    fit parameter that adjusts the fraction \
+                     of each exponential
+            lam1:    exponential decay parameter
+            lam2:    ditto
     """
 
     f = pipe.spectrogram.analyze_noise(**kwargs)
+    pipe.spectrogram.noise = f.mean
 
-    pipe.log(f" + v_max = {f.v_max} = {100*f.v_max/pipe.spectrogram.v_max:.1f}%")
+    pipe.log(
+        f" + v_max = {f.v_max} = {100*f.v_max/pipe.spectrogram.v_max:.1f}%")
     pipe.log(f" + t_range = {f.t_min*1e6:0.1f} - {f.t_max*1e6:0.1f} µs")
     pipe.log(f" + n_bins = {f.n_bins}")
-    pipe.log(f"mean = {f.mean:0.3f}, sigma = {f.stdev:0.3f}", True)
+    pipe.log(f"mean = {f.mean:0.3g}, sigma = {f.stdev:0.3g}", True)
     try:
         f.plot(
             logy=True,
@@ -118,7 +162,8 @@ def analyze_noise(pipe: PNSPipe, **kwargs):
             ylabel="Counts",
             title=pipe.segment_name
         )
-        figname = os.path.join(pipe.segment_parent, f'Noise_{pipe.segment_name}.pdf')
+        figname = os.path.join(pipe.segment_parent,
+                               f'Noise_{pipe.segment_name}.pdf')
         f.fig.savefig(figname)
         plt.close(f.fig)
         del f.fig
@@ -152,10 +197,16 @@ def follow_signal(pipe: PNSPipe, **kwargs):
     """
     Using the peak_follower, look first look left, then right.
     Optional kwargs:
-      plot = extension of the plot file type to save, or None;
+        plot = extension of the plot file type to save, or None;
              default is 'pdf'
-      image = (boolean) produce a spectrogram image with superimposed follower
-      gaussian = 'start:stop:step' in microseconds to plot gaussian fits
+        image = (boolean) produce a spectrogram image with superimposed follower
+        gaussian = 'start:stop:step' in microseconds to plot gaussian fits
+
+    Results:
+        adds a follower.full_frame to pipe.signals
+        if plot is not None, save a plot named fol-{segment_name}.{plot}
+        if image evaluates true, save spectrogram sg-{segment_name}.jpg
+        if gaussian specifies a list of times, save fits gauss-{ns}.pdf
     """
     from ProcessingAlgorithms.SignalExtraction.peak_follower import PeakFollower
     if not pipe.signal_guess:
@@ -216,7 +267,8 @@ def follow_signal(pipe: PNSPipe, **kwargs):
         maxy = np.ceil(np.log10(np.max(signal['peak_int'])))
         intensity.set_ylim(10**miny, 10**maxy)
         intensity.set_title(pipe.df.title, usetex=False)
-        fig.savefig(os.path.join(pipe.segment_parent, f'fol-{pipe.segment_name}.{plot}'))
+        fig.savefig(os.path.join(pipe.segment_parent,
+                                 f'fol-{pipe.segment_name}.{plot}'))
         plt.close(fig)
 
     if image:
@@ -259,7 +311,8 @@ def follow_signal(pipe: PNSPipe, **kwargs):
         plt.xlabel(r'$t$ ($\mu$s)')
         plt.ylabel('$v$ (m/s)')
         plt.title(pipe.df.title, usetex=False)
-        fig.savefig(os.path.join(pipe.segment_parent, f"sg-{pipe.segment_name}.jpg"))
+        fig.savefig(os.path.join(pipe.segment_parent,
+                                 f"sg-{pipe.segment_name}.jpg"))
         plt.close(fig)
 
     if gaussian:
@@ -271,7 +324,8 @@ def follow_signal(pipe: PNSPipe, **kwargs):
                 "$N=%d$" % (sg.points_per_spectrum),
             ]
             if sg.nfft:
-                pretitle.append(f"padding = {int(sg.nfft/sg.points_per_spectrum)}")
+                pretitle.append(
+                    f"padding = {int(sg.nfft/sg.points_per_spectrum)}")
             try:
                 hood = follower.hood(t=t, expand=(2, 1))
                 ut = 1e6 * hood.time
@@ -284,7 +338,7 @@ def follow_signal(pipe: PNSPipe, **kwargs):
                 )
                 fig = plt.gcf()
                 fig.set_size_inches(6, 4.5)
-                fname = f"gauss_{int(ut*1000)}.pdf"
+                fname = f"gauss-{int(ut*1000)}.pdf"
                 fig.savefig(os.path.join(pipe.output_dir, fname))
                 plt.close(fig)
             except Exception as eeps:
@@ -351,9 +405,8 @@ def show_discrepancies(pipe: PNSPipe, **kwargs):
                 hood = hoods[suspect]
                 fig, ax = plt.subplots(1, 1)
                 hood.plot_all(ax[0], xlabel=True, ylabel=True)
-                fig.savefig(os.path.join(pipe.output_dir, f'bad{suspect}.png'))
+                fig.savefig(os.path.join(
+                    pipe.output_dir, f'bad{suspect}.png'))
                 fig.close()
 
 
-# for name, obj in inspect.getmembers(sys.modules[__name__]):
-#    register_pipe_function(obj)

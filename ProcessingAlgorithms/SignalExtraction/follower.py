@@ -14,6 +14,9 @@ from spectrogram import Spectrogram
 from scipy.optimize import curve_fit
 from scipy.interpolate import InterpolatedUnivariateSpline as ius
 
+from ProcessingAlgorithms.Fitting.fit import Gaussian
+from ProcessingAlgorithms.Fitting.moments import moment
+
 
 def smooth(xvals: np.ndarray, n: int = 10, forward=True):
     """Provide an exponential smoothing of the values in xvals,
@@ -324,6 +327,7 @@ class Follower:
         df['g_int'] = [h.gaussian.amplitude for h in hoods]
         df['g_chisq'] = [h.gaussian.chisq for h in hoods]
         df['g_prob'] = [h.gaussian.prob_greater for h in hoods]
+        df['g_scale'] = [h.gaussian.error_scale for h in hoods]
         # return the frame with the index set to time in microseconds
         df.index = df['time'] * 1e6
         # Now we need to set the formatting with
@@ -470,8 +474,6 @@ class FollowHood(object):
 
         """
         # from gaussian import Gaussian
-        from ProcessingAlgorithms.Fitting.fit import Gaussian
-        from ProcessingAlgorithms.Fitting.moments import moment
 
         res = follower.results
         assert pt >= 0 and pt < len(res['time'])
@@ -485,12 +487,12 @@ class FollowHood(object):
 
         if isinstance(expand, (int, float)):
             f, t = res['vi_span'][pt]
-            di = round(0.5 * (t - f) * (expand - 1))
+            di = int(round(0.5 * (t - f) * (expand - 1)))
             self.vi_span = (f - di, t + di)
         elif isinstance(expand, (list, tuple)) and len(expand) == 2:
             # two stretch amounts, one below, one above
             f, t = res['vi_span'][pt]
-            dl, dh = [round(0.5 * (t - f) * (x - 1)) for x in expand]
+            dl, dh = [int(round(0.5 * (t - f) * (x - 1))) for x in expand]
             self.vi_span = (f - dl, t + dh)
 
         # Now fetch the raw points from the spectrogram
@@ -543,7 +545,28 @@ class FollowHood(object):
             right = np.arange(g.center + 3 * sig, g.center + 10 * sig, sig)
             v = np.concatenate((left, middle, right))
             i = g(v)
-            ax.plot(v, i, 'b-', alpha=0.5, label='gaussian')
+            if ax:
+                ax.plot(v, i, 'b-', alpha=0.5, label='gaussian')
+            else:
+                return (v, i)
+        else:
+            return ([], [])
+
+    def animate_all(self):
+        """
+        Compute points for all the series in the plot, so
+        it can be used in an animation.
+        """
+        tallest = np.max(self.intensity)
+        series = [
+            (self.velocity, self.intensity),
+            ([self.velocity[0], self.velocity[-1]],
+             [self.moment['background'] for n in range(2)]),
+            ([self.moment['center'] + x * self.moment['std_err'] for x in
+              (-1, 0, 1)], 0.5 * tallest * np.ones(3)),
+            self.plot_gaussian(None)
+        ]
+        return series
 
     def plot_all(self, ax, **kwargs):
         """
@@ -564,7 +587,12 @@ class FollowHood(object):
         # show the gaussian
         self.plot_gaussian(ax)
         vcenter, width = self.peak_v, self.moment['std_err']
-        ax.set_xlim(vcenter - 12 * width, vcenter + 12 * width)
+        if 'widths' in kwargs:
+            w = kwargs['widths']
+            ax.set_xlim(vcenter - w * width, vcenter + w * width)
+        elif 'points' in kwargs:
+            dv = kwargs['points'] * (self.velocity[1] - self.velocity[0])
+            ax.set_xlim(vcenter - dv, vcenter + dv)
 
         xlabel = kwargs.get('xlabel')
         ylabel = kwargs.get('ylabel')
@@ -579,4 +607,30 @@ class FollowHood(object):
             ax.set_title(title)
         if legend:
             ax.legend()
+        ax.text(
+            np.dot(np.array([0.9, 0.1]), ax.get_xlim()),
+            np.dot(np.array([0.1, 0.9]), ax.get_ylim()),
+            f"ES = {self.gaussian.error_scale:.1f}",
+            horizontalalignment='left',
+            verticalalignment='top')
         return tallest
+
+    def moment_analysis(self, axes=None, **kwargs):
+        """
+        Plot the inferred width from moment analysis with a range
+        of different noise levels. If axes is None, or if
+        it does not contain a pair of axes objects, a new figure
+        with two subplots is created.
+        """
+        intense = sorted(self.intensity)
+        step = intense[0]
+        stop = intense[len(intense) // 2]
+        noise_levels = np.arange(0, stop, step)
+        adevs, sdevs = [], []
+        for noise in noise_levels:
+            moms = moment(self.velocity, self.intensity, noise)
+            adevs.append(moms['avg_dev'])
+            sdevs.append(moms['std_dev'])
+
+        return (noise_levels, adevs, sdevs)
+

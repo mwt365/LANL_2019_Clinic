@@ -336,7 +336,7 @@ class Fiducials:
         if not basename:
             basename = "seg"
         # Make the directory
-        home, filename = os.path.split(self.digfile.path)
+        _, filename = os.path.split(self.digfile.path)
         folder = os.path.join(parent, folder)
         if not os.path.exists(folder):
             os.makedirs(folder)

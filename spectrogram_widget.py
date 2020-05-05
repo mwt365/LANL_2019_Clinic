@@ -18,7 +18,7 @@ import ipywidgets as widgets
 
 from matplotlib import widgets as mwidgets
 from IPython.display import display
-from plotter import COLORMAPS
+from UI_Elements.plotter import COLORMAPS
 from spectrogram import Spectrogram
 
 from ProcessingAlgorithms.preprocess.digfile import DigFile
@@ -202,6 +202,12 @@ class SpectrogramWidget:
         """
         cd = self.controls  # the dictionary of controls
         t_range = kwargs.get('t_range', (0, 100))
+        if 'v_range' in kwargs:
+            v_range = kwargs['v_range']
+            # we need to convert to fraction of whole
+            v_range = [1e5 * x / self.spectrogram.v_max for x in v_range]
+        else:
+            v_range = (0, 50)
 
         # If we are associated with a dig file, include controls that
         # allow recomputation of the spectrogram
@@ -254,7 +260,7 @@ class SpectrogramWidget:
             # Velocity range ###########################################
             cd['velocity_range'] = slide = ValueSlider(
                 "Velocity (km/s)",
-                (0, 50),
+                v_range,
                 (0.0, self.spectrogram.v_max), 1e-3,
                 readout_format=".1f",
                 continuous_update=False
@@ -628,7 +634,7 @@ class SpectrogramWidget:
     def follow(self, t, v, action):
         """Attempt to follow the path starting with the clicked
         point."""
-        print(f"Let's follow something starting at {t, v} using action {action}.")
+
         if action == "Gauss":
             fitter = GaussianFitter(self.spectrogram, (t, v))
             self.gauss = fitter

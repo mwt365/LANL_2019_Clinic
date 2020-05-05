@@ -41,12 +41,14 @@ def moment(x, y, noise_level=None):
     x_center = np.dot(x, prob)
     delta_x = x - x_center
     variance = np.dot(delta_x * delta_x, prob)
-    std_dev = np.sqrt(variance)
+    std_dev = np.nan if variance < 0.0 else np.sqrt(variance)
+    avg_dev = np.dot(np.abs(delta_x), prob)
     npnts = 8 * std_dev / dx
     return dict(
         center=x_center,
         variance=variance,
         std_dev=std_dev,
+        avg_dev=avg_dev,
         std_err=std_dev / np.sqrt(npnts),
         background=noise_level
     )

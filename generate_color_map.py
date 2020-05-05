@@ -10,7 +10,7 @@
 import numpy as np
 from scipy.cluster.vq import kmeans, kmeans2
 from spectrogram import Spectrogram
-from plotter import COLORMAPS
+from UI_Elements.plotter import COLORMAPS
 
 
 def make_spectrogram_color_map(spectrogram, number_of_bands, name):
@@ -95,7 +95,7 @@ if __name__ == '__main__':
     sg = Spectrogram('../dig/CH_4_009.dig')
     roids = make_spectrogram_color_map(sg, 4, "Kitty")
 
-    sg.plot(cmap = roids["cmap"])
+    sg.plot(cmap=roids["cmap"])
     import matplotlib.pyplot as plt
     plt.xlim((0, 50))
     plt.ylim((1500, 5000))
