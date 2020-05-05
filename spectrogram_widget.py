@@ -18,7 +18,6 @@ import ipywidgets as widgets
 
 from matplotlib import widgets as mwidgets
 from IPython.display import display
-from plotter import COLORMAPS
 from spectrogram import Spectrogram
 
 from ProcessingAlgorithms.preprocess.digfile import DigFile
@@ -528,7 +527,7 @@ class SpectrogramWidget:
         """
         mapname = self.controls['color_map'].value
         if mapname == 'Computed':
-            from generate_color_map import make_spectrogram_color_map
+            from UI_Elements.generate_color_map import make_spectrogram_color_map
             mapinfo = make_spectrogram_color_map(
                 self.spectrogram, 4, mapname)
             maprange = (mapinfo['centroids'][1], mapinfo['centroids'][-2])
