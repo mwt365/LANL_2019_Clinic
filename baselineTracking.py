@@ -6,6 +6,7 @@ import tqdm # For printing a timing information to see how far you have gotten.
 
 
 from spectrogram import Spectrogram
+from UI_Elements.plotter import COLORMAPS, DEFMAP
 
 
 
@@ -49,12 +50,36 @@ def baselineTracking(spectrogram:Spectrogram, baselineVel, changeThreshold, skip
     for ind in range(startInd, spectrogram.intensity.shape[-1]):
         currentIntensity = spectrogram.intensity[baselineInd][ind]
         if (np.abs(currentIntensity) >= np.abs((1+changeThreshold) * runningAverage)) or (np.abs(currentIntensity) <= np.abs((1-changeThreshold) * runningAverage)):
-            # print(f"{changeThreshold}: {spectrogram.time[ind]*1e6}")
             return spectrogram.time[ind]*1e6
         runningAverage += 1/(ind+1-startInd) * (currentIntensity - runningAverage)
     
     return spectrogram.time[ind]*1e6
 
+
+def baselineExperiment(baselineIntensity:np.array, thresholds:np.array, skipFirstXIndices:int = 0):
+
+    numPassedThres = 0
+    currTimeInd = 0
+    outputTimeInds = np.zeros(len(thresholds), dtype = int)
+
+    time_len = len(baselineIntensity)
+    runningAverage = baselineIntensity[skipFirstXIndices]
+
+    while currTimeInd + skipFirstXIndices < time_len:
+        currentIntensity = baselineIntensity[currTimeInd+skipFirstXIndices]
+        while (np.abs(currentIntensity) >= np.abs((1+thresholds[numPassedThres]) * runningAverage)) \
+            or (np.abs(currentIntensity) <= np.abs((1-thresholds[numPassedThres]) * runningAverage)):
+            
+            outputTimeInds[numPassedThres] = int(currTimeInd + skipFirstXIndices)
+            numPassedThres += 1
+            if numPassedThres >= len(thresholds):
+                return outputTimeInds # nothing left to check.
+        currTimeInd += 1
+
+    for k in range(numPassedThres, len(thresholds)):
+        outputTimeInds[k] = time_len - 1
+
+    return outputTimeInds
 
 def runExperiment(trainingFilePath, thresholds:list, skipUntilTimes:list = []):
     import baselines
@@ -82,18 +107,26 @@ def runExperiment(trainingFilePath, thresholds:list, skipUntilTimes:list = []):
 
     for i in tqdm.trange(len(files)):
         filename = os.path.join(os.path.join("..", "dig") , f"{files[i]}")
-        MySpect = Spectrogram(filename)
-        peaks, _, heights = baselines.baselines_by_squash(MySpect)
+        MySpect = Spectrogram(filename,  overlap = 0)
+        peaks, _, heights = baselines.baselines_by_squash(MySpect, min_percent = 0.75)
+        baselineInd = MySpect._velocity_to_index(peaks[0])
+        intensity = MySpect.intensity[baselineInd]
+
+        for skipTimeInd in range(len(skipUntilTimes)):
+            skipXInds = MySpect._time_to_index(skipUntilTimes[skipTimeInd])
 
 
-        for thres in thresholds:
-            
-            for skipTimeInd in range(len(skipUntilTimes)):
-                skipTime = skipUntilTimes[skipTimeInd]
-                timeEstimate = baselineTracking(MySpect, peaks[0], thres, skipTime)
+            outputTimeInds = np.array(baselineExperiment(intensity, thresholds, skipXInds), dtype = int)
+
+            for thresInd, thres in enumerate(thresholds):
+                timeEstimate = MySpect.time[outputTimeInds[thresInd]]*1e6
 
                 d[f"threshold {thres}"][skipTimeInd][i] = timeEstimate
                 d[f"threshold {thres} error"][skipTimeInd][i] = bestGuessTimes[i] - timeEstimate
+
+
+        del MySpect
+
 
     # Compute summary statistics
     summaryStatistics = np.zeros((len(thresholds), len(skipUntilTimes), 5))
@@ -103,7 +136,7 @@ def runExperiment(trainingFilePath, thresholds:list, skipUntilTimes:list = []):
 
     for i in tqdm.trange(len(thresholds)):
         for j in range(len(skipUntilTimes)):
-            q = np.power(d[f"threshold {thresholds[i]} error"][j],2)
+            q = d[f"threshold {thresholds[i]} error"][j]
             summaryStatistics[i][j][0] = np.mean(q)
             summaryStatistics[i][j][1] = np.std(q)
             summaryStatistics[i][j][2] = np.median(q)
@@ -116,7 +149,7 @@ def runExperiment(trainingFilePath, thresholds:list, skipUntilTimes:list = []):
         fig = plt.figure()
         ax = plt.gca()
 
-        pcm = ax.pcolormesh(np.array(skipUntilTimes)*1e6, thresholds, summaryStatistics[:,:,i])
+        pcm = ax.pcolormesh(np.array(skipUntilTimes)*1e6, thresholds, summaryStatistics[:,:,i], cmap = COLORMAPS["blue-1"])
         plt.title(f"{stats[i]} L2 error over the files")
         plt.ylabel("Thresholds")
         plt.xlabel("Time that you skip at the beginning")
@@ -140,19 +173,20 @@ def runExperiment(trainingFilePath, thresholds:list, skipUntilTimes:list = []):
 
 if __name__ == "__main__":
 
-    thresholds = np.linspace(0.3, 1)
-    skipUntilTimes = [12e-6]
-    saveLoc = r"../baselineIntensityMaps"
-    experimentFileName = r"../Labels/EstimateOfJumpOffPositionTrain.xlsx"
+    # thresholds = np.linspace(0.3, 1)
+    # skipUntilTimes = [12e-6]
+    # saveLoc = r"../baselineIntensityMaps"
+    # experimentFileName = r"../Labels/JustGen3DataProbeDestructTrain.xlsx"
 
-    data = pd.read_excel(experimentFileName)
+    # data = pd.read_excel(experimentFileName)
 
-    data = data.dropna() # Ignore the samples that we do not have the full data for.
-    data.reset_index() # Reset so that it can be easily indexed.
+    # data = data.dropna() # Ignore the samples that we do not have the full data for.
+    # data.reset_index() # Reset so that it can be easily indexed.
 
-    files = data["Filename"].to_list()
+    # files = data["Filename"].to_list()
 
-    if False:
-        saveBaselineIntensityImages(files, imageExt = "jpeg")
+    # if False:
+    #     saveBaselineIntensityImages(files, imageExt = "jpeg")
 
-    runExperiment(experimentFileName, thresholds, skipUntilTimes)
+    # runExperiment(experimentFileName, thresholds, skipUntilTimes)
+    pass

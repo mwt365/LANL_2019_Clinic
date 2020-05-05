@@ -544,9 +544,6 @@ class Spectrogram:
         maxArray = np.max(self.intensity, axis=0)
         inds2 = np.where(maxArray == a)
         self.probe_destruction_index_max = inds2[0][0]
-        if False:
-            print("The value of PD index using the max estimate is", self.probe_destruction_index_max, "it has type", type(self.probe_destruction_index_max))
-            print("The time array has shape", self.time.shape)
 
         self.probe_destruction_time_max = self.time[self.probe_destruction_index_max]
 
@@ -578,7 +575,7 @@ class Spectrogram:
         
         return fig
 
-    def plot(self, transformData = False, **kwargs):
+    def plot(self, transformData = False, includeAllTime = False, **kwargs):
         # max_vel=6000, vmin=-200, vmax=100):
         pcms = {}
         if "psd" in self.availableData:
@@ -606,8 +603,6 @@ class Spectrogram:
         right = kwargs.get("max_time", None)
         left = kwargs.get("min_time", None)
 
-        print("The axes settings should be t,b,r,L", top, bot, right, left)
-
         if top != None:
             del kwargs['max_vel']
         if bot != None:
@@ -633,27 +628,39 @@ class Spectrogram:
 
             pcm = None # To define the scope.
             if 'cmap' not in kwargs:
-                pcm = axes.pcolormesh(
-                    self.time[:endTime] * 1e6,
-                    self.velocity,
-                    self.transform(zData[:,:endTime]) if (data != "intensity" and transformData) else zData[:,:endTime],
-                    cmap = cmapUsed,
-                    **kwargs)
+                if not includeAllTime:
+                    pcm = axes.pcolormesh(
+                        self.time[:endTime] * 1e6,
+                        self.velocity,
+                        self.transform(zData[:,:endTime]) if (data != "intensity" and transformData) else zData[:,:endTime],
+                        cmap = cmapUsed,
+                        **kwargs)
+                else:
+                    pcm = axes.pcolormesh(
+                        self.time * 1e6,
+                        self.velocity,
+                        self.transform(zData) if (data != "intensity" and transformData) else zData,
+                        cmap = cmapUsed,
+                        **kwargs)
             else:
-                pcm = axes.pcolormesh(
-                    self.time[:endTime] * 1e6,
-                    self.velocity,
-                    self.transform(zData[:,:endTime]) if (data != "intensity" and transformData) else zData[:,:endTime],
-                    **kwargs)
-
-            dataToLookAt = self.transform(zData[:,:endTime]) if (data != "intensity" and transformData) else zData[:,:endTime]
+                if not includeAllTime:
+                    pcm = axes.pcolormesh(
+                        self.time[:endTime] * 1e6,
+                        self.velocity,
+                        self.transform(zData[:,:endTime]) if (data != "intensity" and transformData) else zData[:,:endTime],
+                        **kwargs)
+                else:
+                    pcm = axes.pcolormesh(
+                        self.time * 1e6,
+                        self.velocity,
+                        self.transform(zData) if (data != "intensity" and transformData) else zData,
+                        **kwargs)
             
             if self.estimatedStartTime_ != None:
                 # Plot the start time estimate.
                 axes.plot([self.estimatedStartTime_]*len(self.velocity), self.velocity, "k-", label = "Estimated Start Time", alpha = 0.75)
                 # plt.legend()
             
-            print(f"The current maximum of the colorbar is {np.max(zData[:,:endTime])} for the dataset {data}")
             plt.gcf().colorbar(pcm, ax=axes)
             axes.set_ylabel('Velocity (m/s)', fontsize = 14)
             axes.set_xlabel('Time ($\mu$s)', fontsize = 14)
