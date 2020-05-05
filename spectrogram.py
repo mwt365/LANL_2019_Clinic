@@ -534,9 +534,6 @@ class Spectrogram:
         maxArray = np.max(self.intensity, axis=0)
         inds2 = np.where(maxArray == a)
         self.probe_destruction_index_max = inds2[0][0]
-        if False:
-            print("The value of PD index using the max estimate is", self.probe_destruction_index_max, "it has type", type(self.probe_destruction_index_max))
-            print("The time array has shape", self.time.shape)
 
         self.probe_destruction_time_max = self.time[self.probe_destruction_index_max]
 
@@ -592,8 +589,6 @@ class Spectrogram:
         bot = kwargs.get("min_vel", None)
         right = kwargs.get("max_time", None)
         left = kwargs.get("min_time", None)
-
-        print("The axes settings should be t,b,r,L", top, bot, right, left)
 
         if top != None:
             del kwargs['max_vel']
@@ -653,7 +648,6 @@ class Spectrogram:
                 axes.plot([self.estimatedStartTime_]*len(self.velocity), self.velocity, "k-", label = "Estimated Start Time", alpha = 0.75)
                 # plt.legend()
             
-            print(f"The current maximum of the colorbar is {np.max(zData[:,:endTime])} for the dataset {data}")
             plt.gcf().colorbar(pcm, ax=axes)
             axes.set_ylabel('Velocity (m/s)', fontsize = 14)
             axes.set_xlabel('Time ($\mu$s)', fontsize = 14)
@@ -672,22 +666,4 @@ class Spectrogram:
         return pcms, axes
 
 
-if __name__ == '__main__':
-    currDir = os.getcwd()
-    sp = Spectrogram(
-        '../dig/CH_4_009/seg10',
-        None,
-        None,
-        mode=('psd', 'phase', 'angle'))
-    print(sp)
-    fig, ax = plt.subplots()
-    pcm = ax.pcolormesh(
-        sp.time * 1e6,
-        sp.velocity,
-        sp.angle
-    )
-    fig.colorbar(pcm, ax=ax)
-    ax.set_ylabel('Velocity (m/s)')
-    ax.set_xlabel('Time ($\mu$s)')
-    plt.show()
-    os.chdir(currDir)
+
