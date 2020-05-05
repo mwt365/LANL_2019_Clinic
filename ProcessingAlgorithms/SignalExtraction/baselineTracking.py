@@ -88,8 +88,7 @@ def baselineExperiment(baselineIntensity:np.array, thresholds:np.array, skipFirs
 
     return outputTimeInds
 
-def runExperiment(trainingFilePath, thresholds:list, skipUntilTimes:list = []):
-    import baselines
+def runExperiment(trainingFilePath, thresholds:list, skipUntilTimes:list = [], cmap:str = DEFMAP):
 
     data = pd.read_excel(trainingFilePath)
 
@@ -107,6 +106,10 @@ def runExperiment(trainingFilePath, thresholds:list, skipUntilTimes:list = []):
     if skipUntilTimes == []:
         skipUntilTimes = [12e-6]
 
+    cmapAttempt = cmap
+    if cmapAttempt in COLORMAPS.keys():
+        cmapAttempt = COLORMAPS[cmapAttempt]
+
     for i in range(len(thresholds)):
         d[f"threshold {thresholds[i]}"] = np.zeros((len(skipUntilTimes), len(files)))
         d[f"threshold {thresholds[i]} error"] = np.zeros((len(skipUntilTimes), len(files)))
@@ -116,7 +119,7 @@ def runExperiment(trainingFilePath, thresholds:list, skipUntilTimes:list = []):
     for i in tqdm.trange(len(files)):
         filename = os.path.join(os.path.join("..", "dig") , f"{files[i]}")
         MySpect = Spectrogram(filename,  overlap = 0)
-        peaks, _, heights = baselines.baselines_by_squash(MySpect, min_percent = 0.75)
+        peaks, _, heights = baselines_by_squash(MySpect, min_percent = 0.75)
         baselineInd = MySpect._velocity_to_index(peaks[0])
         intensity = MySpect.intensity[baselineInd]
 
@@ -154,11 +157,11 @@ def runExperiment(trainingFilePath, thresholds:list, skipUntilTimes:list = []):
     for i in tqdm.trange(len(stats)):
         fig = plt.figure()
         ax = plt.gca()
-
-        pcm = ax.pcolormesh(np.array(skipUntilTimes)*1e6, thresholds, summaryStatistics[:,:,i], cmap = COLORMAPS["blue-1"])
-        plt.title(f"{stats[i]} L2 error over the files")
+        
+        pcm = ax.pcolormesh(np.array(skipUntilTimes)*1e6, thresholds, summaryStatistics[:,:,i], cmap = cmapAttempt)
+        plt.title(f"{stats[i]} Error over the Files Tested")
         plt.ylabel("Thresholds")
-        plt.xlabel("Time that you skip at the beginning")
+        plt.xlabel("Time that you skip at the beginning ($\mu$s)")
         plt.gcf().colorbar(pcm, ax=ax)
 
         plt.show()  # Need this for Macs.
