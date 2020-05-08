@@ -82,13 +82,14 @@ def baselineExperiment(baselineIntensity:np.array, thresholds:np.array, skipFirs
             if numPassedThres >= len(thresholds):
                 return outputTimeInds # nothing left to check.
         currTimeInd += 1
+        runningAverage += 1 / (currTimeInd + 1) * (currentIntensity - runningAverage)
 
     for k in range(numPassedThres, len(thresholds)):
         outputTimeInds[k] = time_len - 1
 
     return outputTimeInds
 
-def runExperiment(trainingFilePath, thresholds:list, skipUntilTimes:list = [], cmap:str = DEFMAP):
+def runExperiment(trainingFilePath, thresholds:list, skipUntilTimes:list = [], cmap:str = DEFMAP, errorPower:int = 1):
 
     data = pd.read_excel(trainingFilePath)
 
@@ -147,7 +148,7 @@ def runExperiment(trainingFilePath, thresholds:list, skipUntilTimes:list = [], c
 
     for i in tqdm.trange(len(thresholds)):
         for j in range(len(skipUntilTimes)):
-            q = d[f"threshold {thresholds[i]} error"][j]
+            q = np.power(d[f"threshold {thresholds[i]} error"][j], errorPower)
             summaryStatistics[i][j][0] = np.mean(q)
             summaryStatistics[i][j][1] = np.std(q)
             summaryStatistics[i][j][2] = np.median(q)
@@ -166,7 +167,7 @@ def runExperiment(trainingFilePath, thresholds:list, skipUntilTimes:list = [], c
 
         plt.show()  # Need this for Macs.
 
-    summaryFolder = r"../ProbeDestructionEstimates"
+    summaryFolder = r"../JumpOffTimeEstimates"
     if not os.path.exists(summaryFolder):
         os.makedirs(summaryFolder)
 
@@ -177,6 +178,42 @@ def runExperiment(trainingFilePath, thresholds:list, skipUntilTimes:list = [], c
         q.to_csv(os.path.join(summaryFolder, saveSummaryFilename))
 
     return summaryStatistics, d
+
+
+def runAgainstTestSet(testSetFilename, guessAtOptimalThres, guessAtOptimalSkipUntil, errorPower:int = 1):
+
+    data = pd.read_excel(testSetFilename)
+    
+    # Ignore the samples that we do not have the full data for.
+    data = data.dropna()
+    data.reset_index()  # Reset so that it can be easily indexed.
+
+    files = data["Filename"].to_list()
+    
+    bestGuessTimes = (data[data.columns[1]] * 1e6).to_list()
+    # This will be the same times for the probe destruction dataset. It is generally ignored currently.
+    bestGuessVels = data[data.columns[-1]].to_list()
+
+    d = {"Filename": files}
+
+
+    d["ProbeDestructionEstimateTime"] = np.zeros(len(files))
+    d["Error Versus Label"] = np.zeros(len(files))
+
+    for i in tqdm.trange(len(files)):
+        filename = os.path.join(os.path.join("..", "dig") , f"{files[i]}")
+        MySpect = Spectrogram(filename,  overlap = 0)
+        peaks, _, heights = baselines_by_squash(MySpect, min_percent = 0.75)
+        timeEstimate = baselineTracking(MySpect, peaks[0], guessAtOptimalThres, guessAtOptimalSkipUntil)
+        d["ProbeDestructionEstimateTime"][i] = timeEstimate
+        d["Error Versus Label"][i] = np.power(bestGuessTimes[i] - timeEstimate, errorPower)
+
+    errors = d["Error Versus Label"]
+
+    print(f"The statistics for the test set specified by {testSetFilename}\n")
+    print(f"Avg: {np.mean(errors)} Std: {np.std(errors)} Median: {np.median(errors)} Max: {np.max(errors)} Min: {np.min(errors)}")
+
+    return d
 
 
 if __name__ == "__main__":
