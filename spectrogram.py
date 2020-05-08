@@ -546,17 +546,16 @@ class Spectrogram:
         totalInten = np.sum(self.intensity, axis=0)
         maxInten = np.max(totalInten)
         inds = np.where(totalInten == maxInten)
-        self.probe_destruction_time = self.time[inds][0]
-        self.probe_destruction_index = inds[0][0]
+        self.probe_destruction_time_total = self.time[inds][0]
+        
 
-        # Compute the maximum single intensity value and use that as another
-        # estimate of probe destruction. Choose the smaller of the two options.
-        a = self.max
-        maxArray = np.max(self.intensity, axis=0)
-        inds2 = np.where(maxArray == a)
-        self.probe_destruction_index_max = inds2[0][0]
+        from ProcessingAlgorithms.SignalExtraction.baselines import baselines_by_squash
+        from ProcessingAlgorithms.SignalExtraction.baselineTracking import baselineTracking
 
-        self.probe_destruction_time_max = self.time[self.probe_destruction_index_max]
+        peaks, _, _ = baselines_by_squash(self, min_percent = 0.75)
+        self.probe_destruction_BT_estimate = baselineTracking(
+            self, peaks[0], changeThreshold=0.9, skipUntilTime = 21e-6) 
+            # Optimal value based upon training with ..\Labels\JustGen3DataProbeDestructTrain.xslx
 
     def estimateStartTime(self):
         """
@@ -599,8 +598,7 @@ class Spectrogram:
             self.availableData.append("imaginary")
             self.availableData.remove("complex")
 
-        endTime = self._time_to_index(
-            (self.probe_destruction_time + self.probe_destruction_time_max) / 2)
+        endTime = self._time_to_index(self.probe_destruction_BT_estimate*1e-6)
         # Our prediction for the probe destruction time. Just to make it easier to plot.
 
         cmapUsed = COLORMAPS[DEFMAP]
